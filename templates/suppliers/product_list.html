@@ -1,0 +1,105 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% load qty_tags humanize %}
+{% block title %}My Products{% endblock %}
+{% block page_title %}My Products{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='product_list' %}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <span class="text-muted small">{{ products|length }} product{{ products|length|pluralize }}</span>
+  <div class="d-flex gap-2">
+    {% include 'partials/column_toggle.html' with table_id="supProductTable" count=products|length %}
+    <a href="{% url 'suppliers:bulk_image_upload' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-upload me-1"></i>Bulk Upload</a>
+    <a href="{% url 'suppliers:product_add' %}" class="btn btn-success btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Product</a>
+  </div>
+</div>
+
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm p-3 mb-3">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+    <select name="category" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
+      <option value="">All Categories</option>
+      {% for c in categories %}
+        <option value="{{ c.pk }}" {% if category_filter == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="status" class="form-select form-select-sm" style="max-width:150px" onchange="this.form.submit()">
+      <option value="">All Statuses</option>
+      {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% if category_filter or status_filter %}
+      <a href="{% url 'suppliers:product_list' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+{% include 'partials/product_stock_table.html' with products=products table_id="supProductTable" show_actions=True show_supplier=False show_downstream=True %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Total Stock "details" toggle — expands a FULL-WIDTH sub-row below the product
+// row (an inline accordion) showing each variant and its packs. No navigation,
+// no scroll jump. Delegated so it keeps working after sort / filter re-renders.
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('.stock-row-toggle');
+  if (!btn) return;
+  const row = document.getElementById(btn.dataset.target);
+  if (!row) return;
+  const opening = row.classList.contains('d-none');
+  row.classList.toggle('d-none', !opening);
+  btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  const chevron = btn.querySelector('.toggle-chevron');
+  if (chevron) {
+    chevron.classList.toggle('bi-chevron-down', !opening);
+    chevron.classList.toggle('bi-chevron-up', opening);
+  }
+  // Update the trailing label text (keeps the chevron icon intact).
+  btn.lastChild && (btn.lastChild.textContent = opening ? 'hide' : 'details');
+});
+
+document.querySelectorAll('.pricing-badge').forEach(badge => {
+  badge.addEventListener('click', function() {
+    const pk      = this.dataset.pk;
+    const current = this.dataset.mode;
+    const next    = current === 'auto' ? 'Manual' : 'Auto';
+    const msg     = current === 'auto'
+      ? `Switch to Manual price?\n\nYou will need to set prices individually for each pack size.`
+      : `Switch to Auto price?\n\nPrices will be recalculated from your master price per kg/litre. Any manual prices will be overwritten.`;
+
+    if (!confirm(msg)) return;
+
+    const csrf = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+    const el   = this;
+    el.style.opacity = '0.5';
+    el.style.pointerEvents = 'none';
+
+    fetch(`/supplier/products/${pk}/toggle-pricing/`, {
+      method: 'POST',
+      headers: {'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest'}
+    })
+    .then(r => r.json())
+    .then(data => {
+      el.style.opacity = '1';
+      el.style.pointerEvents = '';
+      if (data.mode === 'auto') {
+        el.className = 'badge bg-success pricing-badge';
+        el.dataset.mode = 'auto';
+        el.title = 'Auto price. Click to switch to Manual price';
+        el.textContent = '⚡ Auto';
+      } else {
+        el.className = 'badge bg-warning text-dark pricing-badge';
+        el.dataset.mode = 'manual';
+        el.title = 'Manual price. Click to switch to Auto price';
+        el.textContent = '✏️ Manual';
+      }
+    })
+    .catch(() => {
+      el.style.opacity = '1';
+      el.style.pointerEvents = '';
+    });
+  });
+});
+</script>
+{% endblock %}

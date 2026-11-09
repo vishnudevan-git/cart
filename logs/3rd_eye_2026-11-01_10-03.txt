@@ -1,0 +1,47 @@
+3RD-EYE REPORT
+Passed:39 Warnings:2 Errors:0 Fixes:0
+
+WARNINGS:
+  [product#2] Not found in DB — may have been hard-deleted
+  [order#27] Order total is Rs.0 — likely a test/bad order
+
+PASSED:
+  [activity_log] 13 events recorded
+  [order#45] was deleted (test cleanup) — expected
+  [product:no_sticker_bolt] Not in DB (was cleaned up or never saved)
+  [order#18] delivered | Rs.1192.00 | pay=paid
+  [order#19] confirmed | Rs.1121.00 | pay=pending
+  [order#20] pending | Rs.442.00 | pay=pending
+  [order#21] delivered | Rs.1038.00 | pay=paid
+  [order#22] out_for_delivery | Rs.925.00 | pay=pending
+  [order#23] pending | Rs.412.00 | pay=pending
+  [order#24] pending | Rs.1810.00 | pay=pending
+  [order#25] pending | Rs.201.00 | pay=pending
+  [order#28] pending | Rs.32387.00 | pay=pending
+  [order#29] delivered | Rs.231.00 | pay=paid
+  [order#30] stockist_picked | Rs.672.00 | pay=pending
+  [order#32] delivered | Rs.425.00 | pay=paid
+  [order#33] confirmed | Rs.115.00 | pay=pending
+  [order#35] delivered | Rs.330.00 | pay=paid
+  [order#36] pending | Rs.330.00 | pay=pending
+  [order#37] delivered | Rs.330.00 | pay=paid
+  [order#38] confirmed | Rs.1195.00 | pay=pending
+  [payments] No delivered orders with pending payment ✓
+  [price:Anna Nagar Organics] All checked prices ≥ floor ✓
+  [price:Velachery Fresh Store] All checked prices ≥ floor ✓
+  [price:E2E Fresh Store] All checked prices ≥ floor ✓
+  [price:North Chennai Daily Needs] All checked prices ≥ floor ✓
+  [page:admin:dashboard] HTTP 200 ✓
+  [page:admin:orders] HTTP 200 ✓
+  [page:admin:price-trace] HTTP 200 ✓
+  [page:shop:dashboard] HTTP 200 ✓
+  [page:shop:orders] HTTP 200 ✓
+  [page:supplier:dashboard] HTTP 200 ✓
+  [coverage:orders.views] activity_logger wired ✓
+  [coverage:delivery.views] activity_logger wired ✓
+  [coverage:accounts.views] activity_logger wired ✓
+  [coverage:cart.views] activity_logger wired ✓
+  [coverage:distributors.views] activity_logger wired ✓
+  [coverage:stockist.views] activity_logger wired ✓
+  [coverage:suppliers.views] activity_logger wired ✓
+  [coverage:admin_panel.views] activity_logger wired ✓

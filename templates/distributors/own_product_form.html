@@ -1,0 +1,237 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}{% if product %}Edit{% else %}Add{% endif %} my product{% endblock %}
+{% block page_title %}{% if product %}Edit my product{% else %}Add my product{% endif %}{% endblock %}
+{% block active_nav %}own_products{% endblock %}
+{% block content %}
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="{% url 'distributors:own_product_list' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to my products
+  </a>
+  <a href="{% url 'distributors:template_library' %}" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-collection me-1"></i>Browse product library / bulk import
+  </a>
+</div>
+{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>{% endfor %}
+
+{% if not product %}
+<!-- Template picker: reuse a product that already exists in the library -->
+<div class="card border-0 shadow-sm mb-3 border-start border-primary border-3">
+  <div class="card-body py-3">
+    <label class="form-label small fw-semibold mb-1">
+      <i class="bi bi-search me-1 text-primary"></i>Reuse an existing product
+    </label>
+    <div class="position-relative">
+      <input type="text" id="tmplSearch" class="form-control" autocomplete="off"
+             placeholder="Type a product name — e.g. soap, rice, dal, eggs, water…">
+      <div id="tmplResults" class="list-group position-absolute w-100 shadow"
+           style="z-index:1050; max-height:320px; overflow:auto; display:none;"></div>
+    </div>
+    <div class="form-text">Pick one to pre-fill the form below, then set your own price &amp; stock.</div>
+  </div>
+</div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data">
+  {% csrf_token %}
+  <div class="row g-3">
+    <div class="col-12 col-lg-5">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body">
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Product name <span class="text-danger">*</span></label>
+            <input type="text" name="name" class="form-control" required value="{{ product.name|default:'' }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Category</label>
+            <select name="category" class="form-select">
+              <option value="">— None —</option>
+              {% for c in categories %}
+              <option value="{{ c.pk }}" {% if product and product.category_id == c.pk %}selected{% endif %}>{{ c.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="mb-3">
+            <label class="form-label small fw-semibold">Description</label>
+            <textarea name="description" rows="3" class="form-control">{{ product.description|default:'' }}</textarea>
+          </div>
+          <div class="mb-1">
+            <label class="form-label small fw-semibold">Photo</label>
+            <input type="file" name="image" accept="image/*" class="form-control">
+            {% if product.image %}<div class="mt-2"><img src="{{ product.image.url }}" alt="" style="height:70px;border-radius:8px;"></div>{% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 col-lg-7">
+      <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center">
+          <span>Packs &amp; prices</span>
+          <button type="button" class="btn btn-sm btn-outline-success" onclick="addPackRow()">
+            <i class="bi bi-plus-lg"></i> Add pack
+          </button>
+        </div>
+        <div class="card-body">
+          <p class="text-muted small">
+            The price you enter is what your customer pays — there is no supplier or stockist cost behind your own products.
+          </p>
+          <div id="packRows" class="vstack gap-3">
+            {% for v in variants %}
+            <div class="border rounded p-2 pack-row">
+              <input type="hidden" name="variant_id" value="{{ v.pk }}">
+              <div class="row g-2">
+                <div class="col-6 col-md-3">
+                  <label class="form-label small mb-1">Pack</label>
+                  <input type="text" name="variant_label" class="form-control form-control-sm" value="{{ v.label }}" placeholder="500 g">
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label small mb-1">Price ₹</label>
+                  <input type="number" step="0.01" min="0" name="variant_price" class="form-control form-control-sm" value="{{ v.selling_price }}">
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label small mb-1">MRP ₹</label>
+                  <input type="number" step="0.01" min="0" name="variant_mrp" class="form-control form-control-sm" value="{{ v.mrp|default_if_none:'' }}">
+                </div>
+                <div class="col-6 col-md-2">
+                  <label class="form-label small mb-1">Stock</label>
+                  <input type="number" min="0" name="variant_stock" class="form-control form-control-sm" value="{{ v.stock }}">
+                </div>
+                <div class="col-6 col-md-3">
+                  <label class="form-label small mb-1">Size (g/ml)</label>
+                  <input type="number" min="0" name="variant_grams" class="form-control form-control-sm" value="{{ v.unit_grams }}">
+                </div>
+              </div>
+              <div class="text-end mt-1">
+                <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="this.closest('.pack-row').remove()">Remove pack</button>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="form-text mt-2">Removing a pack hides it from your store; nothing is permanently deleted.</div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2 mt-3">
+        <button class="btn btn-success px-4">Save &amp; publish to my store</button>
+        <a href="{% url 'distributors:own_product_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<template id="packTemplate">
+  <div class="border rounded p-2 pack-row">
+    <input type="hidden" name="variant_id" value="">
+    <div class="row g-2">
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Pack</label>
+        <input type="text" name="variant_label" class="form-control form-control-sm" placeholder="500 g">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Price ₹</label>
+        <input type="number" step="0.01" min="0" name="variant_price" class="form-control form-control-sm">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">MRP ₹</label>
+        <input type="number" step="0.01" min="0" name="variant_mrp" class="form-control form-control-sm">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">Stock</label>
+        <input type="number" min="0" name="variant_stock" class="form-control form-control-sm" value="0">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Size (g/ml)</label>
+        <input type="number" min="0" name="variant_grams" class="form-control form-control-sm" value="0">
+      </div>
+    </div>
+    <div class="text-end mt-1">
+      <button type="button" class="btn btn-sm btn-link text-danger p-0" onclick="this.closest('.pack-row').remove()">Remove pack</button>
+    </div>
+  </div>
+</template>
+
+<script>
+  function addPackRow() {
+    const tpl = document.getElementById('packTemplate');
+    document.getElementById('packRows').appendChild(tpl.content.cloneNode(true));
+    return document.querySelector('#packRows .pack-row:last-child');
+  }
+  // A new product always starts with one empty pack row.
+  if (!document.querySelector('#packRows .pack-row')) addPackRow();
+
+  // ── Template picker: type-to-search the shared product library ──
+  (function () {
+    const input = document.getElementById('tmplSearch');
+    const box = document.getElementById('tmplResults');
+    if (!input || !box) return;
+
+    let timer = null;
+    input.addEventListener('input', function () {
+      const q = this.value.trim();
+      clearTimeout(timer);
+      if (q.length < 2) { box.style.display = 'none'; box.innerHTML = ''; return; }
+      timer = setTimeout(function () {
+        fetch('{% url "distributors:template_search" %}?q=' + encodeURIComponent(q))
+          .then(r => r.json())
+          .then(data => {
+            box.innerHTML = '';
+            if (!data.results.length) {
+              box.innerHTML = '<div class="list-group-item text-muted small">No matching products — just fill the form to create a new one.</div>';
+              box.style.display = 'block';
+              return;
+            }
+            data.results.forEach(function (t) {
+              const item = document.createElement('button');
+              item.type = 'button';
+              item.className = 'list-group-item list-group-item-action d-flex align-items-center gap-2';
+              const img = t.image
+                ? '<img src="' + t.image + '" style="width:40px;height:40px;object-fit:cover;border-radius:6px">'
+                : '<div style="width:40px;height:40px;background:#eef;border-radius:6px;display:flex;align-items:center;justify-content:center"><i class="bi bi-box-seam text-primary"></i></div>';
+              const packs = t.packs.length ? (t.packs.length + ' pack(s)') : 'no packs';
+              item.innerHTML = img +
+                '<div class="flex-fill text-start"><div class="fw-semibold small">' + t.display +
+                '</div><div class="text-muted" style="font-size:.72rem">' +
+                (t.category_name || 'Uncategorised') + ' · ' + packs +
+                (t.use_count ? ' · used ' + t.use_count + '×' : '') + '</div></div>' +
+                '<span class="badge bg-primary-subtle text-primary">Use</span>';
+              item.addEventListener('click', function () { applyTemplate(t); });
+              box.appendChild(item);
+            });
+            box.style.display = 'block';
+          })
+          .catch(() => { box.style.display = 'none'; });
+      }, 250);
+    });
+
+    document.addEventListener('click', function (e) {
+      if (!input.contains(e.target) && !box.contains(e.target)) box.style.display = 'none';
+    });
+
+    function applyTemplate(t) {
+      box.style.display = 'none';
+      input.value = '';
+      // Fill the product fields.
+      document.querySelector('input[name="name"]').value = t.brand ? (t.brand + ' ' + t.name) : t.name;
+      const desc = document.querySelector('textarea[name="description"]');
+      if (desc && t.description) desc.value = t.description;
+      const catSel = document.querySelector('select[name="category"]');
+      if (catSel && t.category_id) catSel.value = String(t.category_id);
+      // Rebuild pack rows from the template's default packs.
+      const rows = document.getElementById('packRows');
+      rows.innerHTML = '';
+      if (!t.packs.length) { addPackRow(); }
+      t.packs.forEach(function (p) {
+        const row = addPackRow();
+        row.querySelector('input[name="variant_label"]').value = p.label || '';
+        if (p.suggested_price) row.querySelector('input[name="variant_price"]').value = p.suggested_price;
+        if (p.suggested_mrp) row.querySelector('input[name="variant_mrp"]').value = p.suggested_mrp;
+        if (p.unit_grams) row.querySelector('input[name="variant_grams"]').value = p.unit_grams;
+      });
+      // Nudge the shop to set its own price.
+      const firstPrice = document.querySelector('#packRows input[name="variant_price"]');
+      if (firstPrice) { firstPrice.focus(); firstPrice.select(); }
+    }
+  })();
+</script>
+{% endblock %}

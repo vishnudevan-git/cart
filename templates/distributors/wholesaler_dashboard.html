@@ -1,0 +1,66 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Distributor Dashboard{% endblock %}
+{% block page_title %}Distributor — {{ wholesaler.company_name }}{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm p-3">
+      <div class="text-muted small">Marketplaces</div>
+      <div class="fs-3 fw-bold">{{ enterprise_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm p-3">
+      <div class="text-muted small">Active</div>
+      <div class="fs-3 fw-bold text-success">{{ active_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm p-3">
+      <div class="text-muted small">Wholesale margin</div>
+      <div class="fs-3 fw-bold">{{ wholesaler.margin_display }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm p-3">
+      <div class="text-muted small">Territory</div>
+      <div class="fs-5 fw-bold">{{ wholesaler.area|default:"—" }}</div>
+    </div>
+  </div>
+</div>
+
+{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>{% endfor %}
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white d-flex justify-content-between align-items-center">
+    <span class="fw-semibold">Your Shops</span>
+    <span class="d-flex gap-2 flex-wrap">
+      <a href="{% url 'wholesaler:my_stock' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-boxes me-1"></i>My Stock</a>
+      {% if site_settings.rentals_enabled %}<a href="{% url 'rentals:dist_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-tools me-1"></i>Rentals</a>{% endif %}
+      <a href="{% url 'wholesaler:create_shop' %}" class="btn btn-success btn-sm"><i class="bi bi-plus-lg me-1"></i>Create Shop</a>
+    </span>
+  </div>
+  <div class="table-responsive">
+    <table class="table mb-0 align-middle">
+      <thead><tr><th>Shop</th><th>Area</th><th>Invite code</th><th>Status</th><th>Customers</th><th></th></tr></thead>
+      <tbody>
+        {% for e in enterprises %}
+        <tr>
+          <td class="fw-semibold">{{ e.company_name }}</td>
+          <td>{{ e.area|default:"—" }}</td>
+          <td><code>{{ e.invite_code }}</code></td>
+          <td>
+            {% if e.status == 'active' %}<span class="badge bg-success-subtle text-success">Active</span>
+            {% else %}<span class="badge bg-danger-subtle text-danger">Suspended</span>{% endif %}
+          </td>
+          <td>{{ e.customers.count }}</td>
+          <td class="text-end"><a href="{% url 'wholesaler:reset_shop_password' e.pk %}" class="btn btn-sm btn-outline-secondary">Reset password</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-muted text-center py-4">No shops yet. Click <strong>Create Shop</strong> to add your first one.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

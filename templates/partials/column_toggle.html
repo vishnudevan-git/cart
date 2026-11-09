@@ -1,0 +1,198 @@
+{% comment %}
+Column toggle + per-column search.
+Usage: {% include 'partials/column_toggle.html' with table_id="myTable" count=users|length count_label="users" %}
+Requires: <th data-col="colname"> and <td data-col="colname"> on each cell.
+{% endcomment %}
+
+<div class="d-flex align-items-center gap-2">
+  {% if count is not None %}
+  <span class="text-muted small">Total Records | <strong>{{ count }}</strong></span>
+  {% endif %}
+
+  <!-- Search icon -->
+  <button class="btn btn-sm btn-link text-muted p-1" id="searchToggle_{{ table_id }}" title="Search columns" type="button">
+    <i class="bi bi-search fs-6"></i>
+  </button>
+
+  <!-- Column chooser icon -->
+  <div class="dropdown">
+    <button class="btn btn-sm btn-link text-muted p-1 dropdown-toggle-no-caret"
+            type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside"
+            title="Column Chooser">
+      <i class="bi bi-layout-three-columns fs-6"></i>
+    </button>
+    <div class="dropdown-menu dropdown-menu-end shadow p-0" style="min-width:220px;max-height:400px;overflow-y:auto"
+         id="colChooser_{{ table_id }}">
+      <div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center bg-light">
+        <span class="fw-semibold small">Column Chooser</span>
+        <div class="d-flex gap-1">
+          <button class="btn btn-outline-success btn-sm py-0 px-2" id="showAll_{{ table_id }}" type="button">All</button>
+          <button class="btn btn-outline-secondary btn-sm py-0 px-2" id="hideAll_{{ table_id }}" type="button">None</button>
+        </div>
+      </div>
+      <div id="colList_{{ table_id }}" class="py-1 px-2">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const TID  = '{{ table_id }}';
+  const SKEY = 'col_prefs_' + TID;
+  let searchVisible = false;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById(TID);
+    if (!table) return;
+
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    const headerRow = thead.querySelector('tr');
+
+    // ── Collect columns ────────────────────────────────────────────────────
+    const cols = [];
+    headerRow.querySelectorAll('th[data-col]').forEach(th => {
+      const col   = th.dataset.col;
+      const label = th.innerText.replace(/[↑↓⇅▲▼]/g, '').trim() || col;
+      if (col && !cols.find(c => c.col === col)) cols.push({col, label, th});
+    });
+
+    // ── Load prefs ─────────────────────────────────────────────────────────
+    let prefs = {};
+    try { prefs = JSON.parse(localStorage.getItem(SKEY) || '{}'); } catch(e) {}
+
+    // Safety: if a saved preference ends up hiding EVERY data column (e.g. an
+    // accidental "None" click, or stale/corrupt prefs), the whole table looks
+    // empty. Never allow that — reset to all-visible so rows always show.
+    const anyVisible = cols.some(({col}) => prefs[col] !== false);
+    if (cols.length && !anyVisible) {
+      prefs = {};
+      try { localStorage.removeItem(SKEY); } catch(e) {}
+    }
+
+    function savePrefs() { localStorage.setItem(SKEY, JSON.stringify(prefs)); }
+
+    function applyVisibility() {
+      cols.forEach(({col}) => {
+        const hidden = prefs[col] === false;
+        table.querySelectorAll(`[data-col="${col}"]`).forEach(el => {
+          el.style.display = hidden ? 'none' : '';
+        });
+        // Also hide search input for hidden col
+        const si = document.getElementById('srch_' + TID + '_' + col);
+        if (si) si.closest('td') && (si.closest('td').style.display = hidden ? 'none' : '');
+      });
+    }
+
+    // ── Build column chooser ───────────────────────────────────────────────
+    const colList = document.getElementById('colList_' + TID);
+
+    function buildChooser() {
+      colList.innerHTML = '';
+      cols.forEach(({col, label}) => {
+        const visible = prefs[col] !== false;
+        const div = document.createElement('div');
+        div.className = 'form-check py-1 ps-4 pe-3';
+        div.innerHTML = `<input class="form-check-input" type="checkbox" id="cc_${TID}_${col}"
+                                ${visible ? 'checked' : ''} data-col="${col}">
+                         <label class="form-check-label small" for="cc_${TID}_${col}">${label}</label>`;
+        div.querySelector('input').addEventListener('change', function() {
+          prefs[this.dataset.col] = this.checked;
+          savePrefs(); applyVisibility();
+        });
+        colList.appendChild(div);
+      });
+    }
+
+    document.getElementById('showAll_' + TID).addEventListener('click', function(e) {
+      e.stopPropagation();
+      cols.forEach(({col}) => { prefs[col] = true; });
+      savePrefs(); buildChooser(); applyVisibility();
+    });
+    document.getElementById('hideAll_' + TID).addEventListener('click', function(e) {
+      e.stopPropagation();
+      // Keep the FIRST column visible so the table can never become fully blank.
+      const keep = (cols[0] || {}).col;
+      cols.forEach(({col}) => { if (col !== 'actions' && col !== keep) prefs[col] = false; });
+      savePrefs(); buildChooser(); applyVisibility();
+    });
+
+    buildChooser();
+    applyVisibility();
+
+    // ── Per-column search row ──────────────────────────────────────────────
+    const searchRow = document.createElement('tr');
+    searchRow.id = 'searchRow_' + TID;
+    searchRow.style.display = 'none';
+    searchRow.style.background = '#f8f9fa';
+
+    cols.forEach(({col, th}) => {
+      const td = document.createElement('td');
+      td.dataset.col = col;
+      td.style.padding = '4px 6px';
+      if (prefs[col] === false) td.style.display = 'none';
+      if (col === 'actions' || col === 'image') {
+        td.innerHTML = '';
+      } else {
+        td.innerHTML = `<input type="text" class="form-control form-control-sm col-search-input"
+                               data-col="${col}" id="srch_${TID}_${col}"
+                               placeholder="Search…" autocomplete="off"
+                               style="min-width:60px">`;
+      }
+      searchRow.appendChild(td);
+    });
+
+    // If header has more th than data-col th, add empty td for non-data-col columns
+    const totalTh = headerRow.querySelectorAll('th').length;
+    const dataTh  = cols.length;
+    for (let i = dataTh; i < totalTh; i++) {
+      const td = document.createElement('td');
+      td.style.padding = '4px';
+      searchRow.appendChild(td);
+    }
+
+    thead.appendChild(searchRow);
+
+    // Per-column filter logic
+    function applySearch() {
+      const filters = {};
+      searchRow.querySelectorAll('.col-search-input').forEach(inp => {
+        const v = inp.value.trim().toLowerCase();
+        if (v) filters[inp.dataset.col] = v;
+      });
+
+      tbody.querySelectorAll('tr').forEach(row => {
+        if (!Object.keys(filters).length) { row.style.display = ''; return; }
+        let match = true;
+        for (const [col, q] of Object.entries(filters)) {
+          const cell = row.querySelector(`[data-col="${col}"]`);
+          if (cell && !cell.textContent.toLowerCase().includes(q)) {
+            match = false; break;
+          }
+        }
+        row.style.display = match ? '' : 'none';
+      });
+    }
+
+    searchRow.addEventListener('input', applySearch);
+
+    // Toggle search row
+    document.getElementById('searchToggle_' + TID).addEventListener('click', function() {
+      searchVisible = !searchVisible;
+      searchRow.style.display = searchVisible ? '' : 'none';
+      this.querySelector('i').className = searchVisible
+        ? 'bi bi-x-lg fs-6 text-danger'
+        : 'bi bi-search fs-6';
+      if (!searchVisible) {
+        searchRow.querySelectorAll('input').forEach(i => i.value = '');
+        applySearch();
+      } else {
+        const first = searchRow.querySelector('input');
+        if (first) first.focus();
+      }
+    });
+  });
+})();
+</script>

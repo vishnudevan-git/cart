@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}Sign in or create account{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <h4 class="text-center mb-4">🌿 Sign in or create account</h4>
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>
+          {% endfor %}
+          <form method="post">
+            {% csrf_token %}
+            <div class="mb-3">
+              <label class="form-label fw-bold">Enter mobile number or email</label>
+              <div class="d-flex border rounded overflow-hidden" style="border-color:#ced4da">
+                <select name="country_code" id="loginCountryCode"
+                        class="form-select border-0 rounded-0 bg-light fw-semibold"
+                        style="width:120px;flex-shrink:0;font-size:.9rem">
+                  <option value="+91">IN +91</option>
+                </select>
+                <input type="text" name="identifier" id="loginIdentifier"
+                       class="form-control border-0 rounded-0 px-3 py-2"
+                       placeholder="Mobile number or email" required autofocus enterkeyhint="next">
+              </div>
+            </div>
+            <button type="submit" class="btn btn-warning w-100 fw-semibold rounded-pill py-2 text-dark border-0">Continue</button>
+          </form>
+          <div class="mt-4 small text-muted">
+            By continuing, you agree to our <a href="{% url 'terms' %}" class="text-decoration-none">Conditions of Use</a> and <a href="{% url 'privacy' %}" class="text-decoration-none">Privacy Notice</a>.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+(function(){
+  const input = document.getElementById('loginIdentifier');
+  const ccSel = document.getElementById('loginCountryCode');
+  const phoneRe = /^[0-9]{10}$/;
+  const emailRe = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+
+  // Auto-detect country code
+  const ccMap = {
+    IN:'+91',SG:'+65',MV:'+960',LK:'+94',BT:'+975',NP:'+977'
+  };
+  fetch('https://ipapi.co/json/')
+    .then(r=>r.json())
+    .then(d=>{ if(ccMap[d.country_code]) ccSel.value=ccMap[d.country_code]; })
+    .catch(()=>{});
+
+  // Hide country code dropdown when user types an email
+  input.addEventListener('input', function(){
+    const v = this.value.trim();
+    if (v.includes('@')) {
+      ccSel.style.display = 'none';
+    } else {
+      ccSel.style.display = '';
+    }
+    clearErr(this);
+  });
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); this.closest('form').submit(); }
+  });
+
+  function showErr(el, msg) {
+    clearErr(el);
+    const wrapper = el.closest('.mb-3');
+    el.style.borderColor = '#dc3545';
+    const div = document.createElement('div');
+    div.className = 'text-danger small mt-1 login-err';
+    div.textContent = msg;
+    wrapper.appendChild(div);
+  }
+  function clearErr(el) {
+    el.style.borderColor = '';
+    const wrapper = el.closest('.mb-3');
+    const old = wrapper.querySelector('.login-err');
+    if (old) old.remove();
+  }
+
+  input.addEventListener('blur', function(){
+    const v = this.value.trim();
+    if (!v) { clearErr(this); return; }
+    if (v.toLowerCase() === 'admin') { clearErr(this); return; }
+    if (!phoneRe.test(v) && !emailRe.test(v)) {
+      showErr(this, 'Enter a valid 10-digit mobile number or email address.');
+    } else {
+      clearErr(this);
+    }
+  });
+})();
+{% if show_register_prompt %}
+// No account found — ask user if they want to register
+(function(){
+  const yes = confirm('No account found for "{{ prompt_identifier }}". Would you like to create a new account?');
+  if (yes) {
+    window.location.href = "{% url 'accounts:login' %}?action=register";
+  }
+})();
+{% endif %}
+</script>
+{% endblock %}

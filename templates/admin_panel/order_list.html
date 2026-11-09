@@ -1,0 +1,80 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Orders{% endblock %}
+{% block page_title %}All Orders{% endblock %}
+{% block active_nav %}order_list{% endblock %}
+{% block content %}
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm p-3 mb-3">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+    <select name="status" class="form-select form-select-sm" style="max-width:180px">
+      <option value="">All Statuses</option>
+      {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-success btn-sm">Filter</button>
+    <a href="{% url 'admin_panel:order_list' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    <a href="{% url 'admin_panel:export_orders' %}?fmt=xlsx" class="btn btn-outline-success btn-sm ms-auto"><i class="bi bi-file-earmark-excel me-1"></i>Export Excel</a>
+    <a href="{% url 'admin_panel:export_orders' %}?fmt=csv" class="btn btn-outline-secondary btn-sm"><i class="bi bi-filetype-csv me-1"></i>Export CSV</a>
+    {% include 'partials/column_toggle.html' with table_id="orderTable" count=orders|length %}
+  </form>
+</div>
+<!-- Desktop -->
+<div class="card border-0 shadow-sm d-none d-md-block">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0" id="orderTable">
+      <thead class="table-light"><tr>
+        <th data-col="id">{% include 'partials/sort_header.html' with field="id" label="Order #" current_sort=sort %}</th>
+        <th data-col="customer">{% include 'partials/sort_header.html' with field="customer" label="Customer" current_sort=sort %}</th>
+        <th data-col="items">Items</th>
+        <th data-col="total">{% include 'partials/sort_header.html' with field="total" label="Total" current_sort=sort %}</th>
+        <th data-col="status">{% include 'partials/sort_header.html' with field="status" label="Status" current_sort=sort %}</th>
+        <th data-col="date">{% include 'partials/sort_header.html' with field="date" label="Date" current_sort=sort %}</th>
+        <th data-col="actions"></th>
+      </tr></thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td data-col="id">#{{ order.id }}</td>
+          <td data-col="customer">{{ order.customer.username }}</td>
+          <td data-col="items">{{ order.items.count }}</td>
+          <td data-col="total">₹{{ order.total_amount }}</td>
+          <td data-col="status"><span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ order.get_status_display }}</span>
+            {% if order.fulfillment_source == 'distributor_stock' %}
+              <span class="badge bg-info text-dark ms-1"><i class="bi bi-boxes me-1"></i>Dist. Stock</span>
+            {% endif %}
+          </td>
+          <td data-col="date">{{ order.created_at|date:"d M Y" }}</td>
+          <td data-col="actions"><a href="{% url 'admin_panel:order_detail' order.pk %}" class="btn btn-sm btn-outline-success">Manage</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No orders yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Mobile cards -->
+<div class="d-md-none">
+  {% for order in orders %}
+  <div class="card border-0 shadow-sm mb-2">
+    <div class="card-body p-3">
+      <div class="d-flex justify-content-between align-items-start mb-1">
+        <div>
+          <div class="fw-semibold">#{{ order.id }} — {{ order.customer.username }}</div>
+          <div class="text-muted small">{{ order.created_at|date:"d M Y" }} · {{ order.items.count }} item{{ order.items.count|pluralize }}</div>
+        </div>
+        <span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ order.get_status_display }}</span>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <span class="fw-bold text-success">₹{{ order.total_amount }}</span>
+        <a href="{% url 'admin_panel:order_detail' order.pk %}" class="btn btn-sm btn-outline-success">Manage</a>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">No orders yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

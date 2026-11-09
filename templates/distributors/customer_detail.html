@@ -1,0 +1,46 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}{{ customer.get_full_name|default:customer.username }}{% endblock %}
+{% block page_title %}Customer: {{ customer.get_full_name|default:customer.username }}{% endblock %}
+{% block active_nav %}customers{% endblock %}
+{% block content %}
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm p-3">
+      <h6 class="fw-semibold mb-3">Profile</h6>
+      <div class="small">
+        <div class="mb-1"><span class="text-muted">Username:</span> {{ customer.username }}</div>
+        <div class="mb-1"><span class="text-muted">Name:</span> {{ customer.get_full_name|default:"—" }}</div>
+        <div class="mb-1"><span class="text-muted">Phone:</span> {{ customer.phone|default:"—" }}</div>
+        <div class="mb-1"><span class="text-muted">Email:</span> {{ customer.email|default:"—" }}</div>
+        <div class="mb-1"><span class="text-muted">Joined:</span> {{ customer.date_joined|date:"d M Y" }}</div>
+        <div class="mt-2 pt-2 border-top fw-semibold text-success">Total Spent: ₹{{ total_spent }}</div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header fw-semibold">Order History</div>
+      <div class="table-wrap">
+        <table class="table table-sm align-middle mb-0 small">
+          <thead class="table-light">
+            <tr><th>#</th><th>Date</th><th>Amount</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for o in orders %}
+            <tr>
+              <td><a href="{% url 'distributors:order_detail' o.pk %}">#{{ o.id }}</a></td>
+              <td>{{ o.created_at|date:"d M Y" }}</td>
+              <td>₹{{ o.total_amount }}</td>
+              <td><span class="badge {% if o.status == 'delivered' %}bg-success{% elif o.status == 'cancelled' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ o.get_status_display }}</span></td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center text-muted py-3">No orders yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<a href="{% url 'distributors:customer_list' %}" class="btn btn-outline-secondary btn-sm">← Back</a>
+{% endblock %}

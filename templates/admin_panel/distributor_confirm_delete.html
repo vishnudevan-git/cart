@@ -1,0 +1,28 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Archive Marketplace: {{ distributor.company_name }}{% endblock %}
+{% block page_title %}Archive Marketplace{% endblock %}
+{% block active_nav %}distributor_list{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm p-4" style="max-width:500px">
+  <div class="text-danger mb-3"><i class="bi bi-exclamation-triangle-fill fs-3"></i></div>
+  <h5 class="fw-bold mb-1">Archive "{{ distributor.company_name }}"?</h5>
+  <p class="text-muted mb-1">Status: <strong>{{ distributor.get_status_display }}</strong></p>
+  <div class="text-muted small mb-3 p-2 bg-light rounded">
+    <strong>This is reversible and preserves all data:</strong>
+    <ul class="mb-0 mt-2">
+      <li>Marketplace profile, settings, pricing, and inventory remain intact</li>
+      <li>{{ distributor.customers.count }} linked customer account(s) remain linked</li>
+      <li>{{ distributor.orders.count }} order record(s) remain intact</li>
+      <li>Customers cannot shop until an admin reactivates the Marketplace</li>
+    </ul>
+    <p class="mb-0 mt-2"><strong class="text-warning">The Marketplace will be suspended, not deleted.</strong></p>
+  </div>
+  <form method="post" class="d-flex gap-2">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-warning px-4">
+      <i class="bi bi-archive me-1"></i>Archive and Suspend
+    </button>
+    <a href="{% url 'admin_panel:distributor_list' %}" class="btn btn-outline-secondary">Cancel</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Rental item{% endblock %}
+{% block page_title %}{% if item %}Edit{% else %}Add{% endif %} rental item{% endblock %}
+{% block active_nav %}rentals{% endblock %}
+{% block content %}
+{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+<form method="post" enctype="multipart/form-data" class="card border-0 shadow-sm p-3" style="max-width:560px">
+  {% csrf_token %}
+  <label class="form-label small fw-semibold">Name *</label>
+  <input name="name" class="form-control mb-2" value="{{ item.name|default:'' }}" required>
+  <label class="form-label small fw-semibold">Category</label>
+  <select name="category" class="form-select mb-2">
+    {% for v,l in categories %}<option value="{{ v }}" {% if item.category == v %}selected{% endif %}>{{ l }}</option>{% endfor %}
+  </select>
+  <label class="form-label small fw-semibold">Description</label>
+  <textarea name="description" class="form-control mb-2" rows="2">{{ item.description|default:'' }}</textarea>
+  <div class="row g-2">
+    <div class="col-4"><label class="form-label small fw-semibold">Rent/day ₹ *</label><input name="rent_per_day" type="number" step="0.01" min="1" class="form-control" value="{{ item.rent_per_day|default:'' }}" required></div>
+    <div class="col-4"><label class="form-label small fw-semibold">Item cost ₹ *</label><input name="item_cost" type="number" step="0.01" min="1" class="form-control" value="{{ item.item_cost|default:'' }}" required></div>
+    <div class="col-4"><label class="form-label small fw-semibold">Units</label><input name="units" type="number" min="1" class="form-control" value="{{ item.units|default:'1' }}"></div>
+  </div>
+  <div class="form-text mb-2">Item cost is what the renter pays if it is damaged or lost.</div>
+  <label class="form-label small fw-semibold">Photo</label>
+  <input type="file" name="image" accept="image/*" class="form-control mb-3">
+  <div><button class="btn btn-success">Save (live for rent)</button>
+  <a href="{% url 'rentals:shop_items' %}" class="btn btn-outline-secondary">Cancel</a></div>
+</form>
+{% endblock %}

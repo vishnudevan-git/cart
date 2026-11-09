@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}List my item{% endblock %}
+{% block content %}
+<div class="container py-3" style="max-width:560px">
+  {% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+  <h4 class="fw-bold mb-1">List my item for rent</h4>
+  <p class="text-muted small">Goes to {{ dist.company_name }} for approval before it shows.</p>
+  <form method="post" enctype="multipart/form-data" class="card border-0 shadow-sm p-3">
+    {% csrf_token %}
+    <label class="form-label small fw-semibold">Name *</label>
+    <input name="name" class="form-control mb-2" required>
+    <label class="form-label small fw-semibold">Category</label>
+    <select name="category" class="form-select mb-2">{% for v,l in categories %}<option value="{{ v }}">{{ l }}</option>{% endfor %}</select>
+    <label class="form-label small fw-semibold">Description</label>
+    <textarea name="description" class="form-control mb-2" rows="2"></textarea>
+    <div class="row g-2">
+      <div class="col-4"><label class="form-label small fw-semibold">Rent/day ₹ *</label><input name="rent_per_day" type="number" step="0.01" min="1" class="form-control" required></div>
+      <div class="col-4"><label class="form-label small fw-semibold">Item cost ₹ *</label><input name="item_cost" type="number" step="0.01" min="1" class="form-control" required></div>
+      <div class="col-4"><label class="form-label small fw-semibold">Units</label><input name="units" type="number" min="1" value="1" class="form-control"></div>
+    </div>
+    <div class="form-text mb-2">Item cost = what a renter pays you if it is damaged or lost.</div>
+    <label class="form-label small fw-semibold">Photo</label>
+    <input type="file" name="image" accept="image/*" class="form-control mb-3">
+    <button class="btn btn-success">Send for approval</button>
+  </form>
+</div>
+{% endblock %}

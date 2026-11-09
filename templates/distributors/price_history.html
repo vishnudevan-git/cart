@@ -1,0 +1,7 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Price History{% endblock %}
+{% block page_title %}Supplier Price Trends{% endblock %}
+{% block active_nav %}price_history{% endblock %}
+{% block content %}
+{% include 'partials/price_history_content.html' with back_url='distributors:price_history' role='distributor' %}
+{% endblock %}

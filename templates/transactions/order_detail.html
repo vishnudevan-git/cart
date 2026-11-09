@@ -1,0 +1,263 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Order Details - #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="h2">Order #{{ order.id }}</h1>
+            <a href="{% url 'transactions:order_dashboard' %}" class="btn btn-secondary btn-sm">← Back to Orders</a>
+            <hr>
+        </div>
+    </div>
+
+    <!-- Order Info -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Order Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td><strong>Order ID:</strong></td>
+                            <td>#{{ order.id }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Customer:</strong></td>
+                            <td>{{ order.customer.get_full_name|default:order.customer.username }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Marketplace:</strong></td>
+                            <td>{{ order.distributor.company_name|default:"N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% if order.status == 'delivered' %}
+                                    <span class="badge bg-success">{{ order.get_status_display }}</span>
+                                {% elif order.status == 'cancelled' %}
+                                    <span class="badge bg-danger">{{ order.get_status_display }}</span>
+                                {% else %}
+                                    <span class="badge bg-warning">{{ order.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Subtotal:</strong></td>
+                            <td>₹{{ order.subtotal }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Delivery Charge:</strong></td>
+                            <td>₹{{ order.delivery_charge }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Total Amount:</strong></td>
+                            <td><strong>₹{{ order.total_amount }}</strong></td>
+                        </tr>
+                        <tr>
+                            <td><strong>Delivery Address:</strong></td>
+                            <td>{{ order.address }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Phone:</strong></td>
+                            <td>{{ order.phone }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Fulfillment Source:</strong></td>
+                            <td>{{ order.get_fulfillment_source_display }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Created:</strong></td>
+                            <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Updated:</strong></td>
+                            <td>{{ order.updated_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    {% if order.status == 'pending' %}
+                        <form method="POST" action="{% url 'transactions:confirm_order' order.id %}" class="mb-2">
+                            {% csrf_token %}
+                            <textarea name="reason" class="form-control form-control-sm mb-2" placeholder="Reason..." rows="2"></textarea>
+                            <button type="submit" class="btn btn-success w-100 mb-2" onclick="return confirm('Confirm this order?')">
+                                ✓ Confirm Order
+                            </button>
+                        </form>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Update Order Status:</label>
+                        <form method="POST" action="{% url 'transactions:update_order_status' order.id %}">
+                            {% csrf_token %}
+                            <select name="status" class="form-control form-control-sm mb-2" required>
+                                <option value="">-- Select New Status --</option>
+                                <option value="pending">Pending</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="stockist_picked">Stockist Picked</option>
+                                <option value="at_distributor">At Marketplace</option>
+                                <option value="out_for_delivery">Out for Delivery</option>
+                                <option value="delivered">Delivered</option>
+                            </select>
+                            <textarea name="reason" class="form-control form-control-sm mb-2" placeholder="Reason..." rows="2"></textarea>
+                            <button type="submit" class="btn btn-primary w-100 mb-2">Update Status</button>
+                        </form>
+                    </div>
+
+                    {% if order.status != 'delivered' and order.status != 'cancelled' %}
+                        <form method="POST" action="{% url 'transactions:cancel_order' order.id %}">
+                            {% csrf_token %}
+                            <textarea name="reason" class="form-control form-control-sm mb-2" placeholder="Reason..." rows="2"></textarea>
+                            <button type="submit" class="btn btn-danger w-100" onclick="return confirm('Cancel this order?')">
+                                ✕ Cancel Order
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Items -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Order Items ({{ items.count }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Variant</th>
+                                    <th>Qty</th>
+                                    <th>Price</th>
+                                    <th>Subtotal</th>
+                                    <th>Fulfillment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in items %}
+                                <tr>
+                                    <td><strong>{{ item.product.name }}</strong></td>
+                                    <td>{{ item.variant_label|default:'N/A' }}</td>
+                                    <td>{{ item.quantity }}</td>
+                                    <td>₹{{ item.price }}</td>
+                                    <td>₹{{ item.subtotal }}</td>
+                                    <td>
+                                        <span class="badge bg-secondary">{{ item.get_fulfillment_status_display }}</span>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-3">No items in order</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Transactions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Order Status Transactions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Old Status</th>
+                                    <th>New Status</th>
+                                    <th>Initiated By</th>
+                                    <th>Reason</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for txn in transactions %}
+                                <tr>
+                                    <td><span class="badge bg-secondary">{{ txn.get_event_display }}</span></td>
+                                    <td>{{ txn.old_status }}</td>
+                                    <td>{{ txn.new_status }}</td>
+                                    <td>{{ txn.initiated_by.username }}</td>
+                                    <td>{{ txn.reason|truncatewords:10 }}</td>
+                                    <td>{{ txn.created_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-3">No transactions yet</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Item Transactions -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Item-Level Transactions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Item</th>
+                                    <th>Event</th>
+                                    <th>Old Value</th>
+                                    <th>New Value</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for txn in item_transactions %}
+                                <tr>
+                                    <td><strong>{{ txn.item.variant.product.name }}</strong></td>
+                                    <td><span class="badge bg-info">{{ txn.get_event_display }}</span></td>
+                                    <td>{{ txn.old_value }}</td>
+                                    <td>{{ txn.new_value }}</td>
+                                    <td>{{ txn.created_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-3">No item transactions</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

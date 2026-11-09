@@ -1,0 +1,84 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}{{ supplier.company_name }} | Admin{% endblock %}
+{% block page_title %}{{ supplier.company_name }} Details{% endblock %}
+{% block active_nav %}supplier_list{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <a href="{% url 'admin_panel:supplier_list' %}" class="text-decoration-none text-muted mb-2 d-inline-block"><i class="bi bi-arrow-left"></i> Back to Suppliers</a>
+        <h2 class="h3 mb-0">{{ supplier.company_name }}</h2>
+        <span class="badge {% if supplier.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">{{ supplier.status|title }}</span>
+    </div>
+    <div>
+        <a href="{% url 'admin_panel:user_detail' supplier.user.pk %}" class="btn btn-outline-secondary">View Connected User Profile</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title fw-bold">Supplier Info</h5>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2"><strong>Category:</strong> {{ supplier.get_category_display }}</li>
+                    <li class="mb-2"><strong>Joined:</strong> {{ supplier.created_at|date:"M d, Y" }}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title fw-bold">Contact Info</h5>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2"><strong>Name:</strong> {{ supplier.user.get_full_name }}</li>
+                    <li class="mb-2"><strong>Mobile:</strong> <a href="tel:{{ supplier.user.username }}">{{ supplier.user.username }}</a></li>
+                    <li class="mb-2"><strong>Email:</strong> <a href="mailto:{{ supplier.user.email }}">{{ supplier.user.email|default:"N/A" }}</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-header  fw-bold">Products Provided ({{ products.count }})</div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>Product Name</th>
+                    <th>Status</th>
+                    <th>Variants</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for product in products %}
+                <tr>
+                    <td>
+                        <div class="fw-semibold">{{ product.name }}</div>
+                        <div class="small text-muted">{{ product.category.name }}</div>
+                    </td>
+                    <td>
+                        {% if product.status == 'approved' %}<span class="badge bg-success">Approved</span>
+                        {% elif product.status == 'pending' %}<span class="badge bg-warning">Pending</span>
+                        {% else %}<span class="badge bg-danger">Rejected</span>{% endif %}
+                    </td>
+                    <td>
+                        {% for v in product.variants.all %}
+                            <span class="badge bg-secondary">{{ v.label }} (₹{{ v.price }})</span>
+                        {% empty %}
+                            <span class="text-muted small">No variants</span>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="3" class="text-center text-muted py-4">This supplier has not added any products yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

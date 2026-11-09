@@ -1,0 +1,303 @@
+{% extends 'base.html' %}
+{% block title %}Quick Test Login — Development{% endblock %}
+{% block extra_css %}
+<style>
+  .distributor-chip, .user-chip {
+    display: inline-block;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    padding: 8px 14px;
+    margin: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .distributor-chip:hover, .user-chip:hover {
+    background: #e8e8e8;
+    border-color: #999;
+    transform: scale(1.05);
+  }
+  .distributor-chip.active, .user-chip.active {
+    background: #28a745;
+    color: white;
+    border-color: #28a745;
+  }
+  .role-badge {
+    display: inline-block;
+    padding: 6px 12px;
+    margin: 4px;
+    border-radius: 12px;
+    font-size: 13px;
+    cursor: pointer;
+    border: 2px solid #ddd;
+    background: white;
+    transition: all 0.2s;
+  }
+  .role-badge:hover {
+    border-color: #007bff;
+  }
+  .role-badge.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+    box-shadow: 0 0 10px rgba(0, 123, 255, 0.3);
+  }
+  .dev-banner {
+    background: linear-gradient(135deg, #ff9800, #f44336);
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 30px;
+  }
+  .step-label {
+    font-size: 14px;
+    font-weight: 600;
+    color: #333;
+  }
+  .user-card {
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 4px;
+    cursor: pointer;
+    display: inline-block;
+    transition: all 0.2s;
+    min-width: 180px;
+  }
+  .user-card:hover {
+    border-color: #007bff;
+    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.15);
+  }
+  .user-card.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+  }
+  .user-name {
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .user-username {
+    font-size: 12px;
+    opacity: 0.7;
+  }
+  .user-phone {
+    font-size: 11px;
+    opacity: 0.6;
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+  <div class="col-md-7">
+    <div class="dev-banner">
+      <i class="bi bi-exclamation-triangle me-2"></i>
+      <strong>Development Only</strong> — This feature is disabled in production
+    </div>
+
+    <div class="card shadow-sm">
+      <div class="card-header bg-primary text-white">
+        <h5 class="mb-0"><i class="bi bi-speedometer2 me-2"></i>Quick Test Login</h5>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          
+          <!-- Step 1: Role Selection -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold step-label mb-3">1️⃣ Select Role</label>
+            <div>
+              <span class="role-badge active" onclick="selectRole(this, 'customer')">👥 Customer</span>
+              <span class="role-badge" onclick="selectRole(this, 'supplier')">🏭 Supplier</span>
+              <span class="role-badge" onclick="selectRole(this, 'wholesaler')">🚚 Distributor</span>
+              <span class="role-badge" onclick="selectRole(this, 'distributor')">🏪 Marketplace (shop)</span>
+              <span class="role-badge" onclick="selectRole(this, 'stockist')">📦 Stockist</span>
+              <span class="role-badge" onclick="selectRole(this, 'admin')">⚙️ Admin</span>
+            </div>
+            <input type="hidden" id="roleInput" name="role" value="customer">
+          </div>
+
+          <!-- Step 2: Marketplace Selection (only for customers) -->
+          <div id="distributorStep" class="mb-4">
+            <label class="form-label fw-semibold step-label mb-3">2️⃣ Select Marketplace</label>
+            <div id="distributorChips" style="max-height: 150px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 12px;">
+              <!-- Marketplaces loaded dynamically -->
+            </div>
+            <input type="hidden" id="distributorInput" value="">
+          </div>
+
+          <!-- Step 3: User Selection -->
+          <div class="mb-4">
+            <label class="form-label fw-semibold step-label mb-3" id="userStepLabel">2️⃣ Select User</label>
+            <div class="input-group mb-2">
+              <input type="text" id="usernameInput" name="username" class="form-control" 
+                     placeholder="Click a user or type username…" autocomplete="off" required>
+            </div>
+            <div id="userChips" style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 12px;">
+              <!-- Users loaded dynamically based on role/distributor -->
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100 fw-semibold py-2">
+            <i class="bi bi-box-arrow-in-right me-2"></i>Quick Login
+          </button>
+        </form>
+
+        <hr class="my-4">
+        
+        <div class="alert alert-info small mb-0">
+          <strong>💡 How to use:</strong>
+          <ol class="mb-0 mt-2">
+            <li>Select a role badge</li>
+            <li>For customers: Select a marketplace, then select a customer</li>
+            <li>For other roles: Select a user directly</li>
+            <li>Click "Quick Login" to login instantly</li>
+          </ol>
+        </div>
+      </div>
+    </div>
+
+    <div class="text-center mt-4">
+      <a href="{% url 'accounts:login' %}" class="btn btn-outline-secondary">← Back to Regular Login</a>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Data passed from backend
+  const distributorsData = {{ distributors_data|safe }};
+  const usersByRole = {{ users_by_role|safe }};
+
+  function getDisplayName(user) {
+    const name = (user.first_name + ' ' + user.last_name).trim();
+    const phone = user.phone ? ` (${user.phone})` : '';
+    return name || user.username;
+  }
+
+  function getDisplayInfo(user) {
+    // For business roles (shop, supplier, stockist, distributor), show the
+    // company name as the primary label instead of the raw first/last name,
+    // which is often just a seeded short word like "Anna" or "North".
+    const companyName = user.company_name || '';
+    const personName  = (user.first_name + ' ' + user.last_name).trim();
+    const displayName = companyName || personName || user.username;
+    return {
+      name: displayName,
+      username: user.username,
+      phone: user.phone,
+    };
+  }
+
+  function selectRole(el, role) {
+    // Update active role badge
+    document.querySelectorAll('.role-badge').forEach(b => b.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('roleInput').value = role;
+    document.getElementById('usernameInput').value = '';
+
+    if (role === 'customer') {
+      // Show distributor step
+      document.getElementById('distributorStep').style.display = 'block';
+      document.getElementById('userStepLabel').textContent = '3️⃣ Select Customer';
+      loadMarketplaces();
+    } else {
+      // Hide distributor step, show users for this role
+      document.getElementById('distributorStep').style.display = 'none';
+      document.getElementById('userStepLabel').textContent = '2️⃣ Select User';
+      loadUsersForRole(role);
+    }
+  }
+
+  function loadMarketplaces() {
+    const container = document.getElementById('distributorChips');
+    container.innerHTML = '';
+    
+    if (distributorsData.length === 0) {
+      container.innerHTML = '<p class="text-muted mb-0 small">No marketplaces found</p>';
+      return;
+    }
+    
+    distributorsData.forEach(dist => {
+      const chip = document.createElement('span');
+      chip.className = 'distributor-chip';
+      chip.textContent = `${dist.distributor_name} (${dist.customers.length})`;
+      chip.onclick = () => selectMarketplace(dist);
+      container.appendChild(chip);
+    });
+  }
+
+  function selectMarketplace(dist) {
+    // Highlight selected distributor
+    document.querySelectorAll('.distributor-chip').forEach(el => el.classList.remove('active'));
+    event.target.classList.add('active');
+    document.getElementById('distributorInput').value = dist.distributor_id;
+    document.getElementById('usernameInput').value = '';
+    
+    // Load customers for this distributor
+    loadCustomersForMarketplace(dist);
+  }
+
+  function loadCustomersForMarketplace(dist) {
+    const container = document.getElementById('userChips');
+    container.innerHTML = '';
+    
+    if (dist.customers.length === 0) {
+      container.innerHTML = '<p class="text-muted mb-0 small">No customers found</p>';
+      return;
+    }
+    
+    dist.customers.forEach(user => {
+      const info = getDisplayInfo(user);
+      const card = document.createElement('div');
+      card.className = 'user-card';
+      card.innerHTML = `
+        <div class="user-name">${info.name}</div>
+        <div class="user-username">@${info.username}</div>
+        ${info.phone ? `<div class="user-phone">${info.phone}</div>` : ''}
+      `;
+      card.onclick = () => selectUser(user.username);
+      container.appendChild(card);
+    });
+  }
+
+  function loadUsersForRole(role) {
+    const container = document.getElementById('userChips');
+    container.innerHTML = '';
+    const users = usersByRole[role] || [];
+    
+    if (users.length === 0) {
+      container.innerHTML = '<p class="text-muted mb-0 small">No users found with this role</p>';
+      return;
+    }
+    
+    users.forEach(user => {
+      const info = getDisplayInfo(user);
+      const card = document.createElement('div');
+      card.className = 'user-card';
+      card.innerHTML = `
+        <div class="user-name">${info.name}</div>
+        <div class="user-username">@${info.username}</div>
+        ${info.phone ? `<div class="user-phone">${info.phone}</div>` : ''}
+      `;
+      card.onclick = () => selectUser(user.username);
+      container.appendChild(card);
+    });
+  }
+
+  function selectUser(username) {
+    document.getElementById('usernameInput').value = username;
+    // Highlight the selected card
+    document.querySelectorAll('.user-card').forEach(el => el.classList.remove('active'));
+    event.target.closest('.user-card').classList.add('active');
+  }
+
+  // Load initial state (customer role with distributors)
+  window.addEventListener('load', () => {
+    loadMarketplaces();
+  });
+</script>
+{% endblock %}

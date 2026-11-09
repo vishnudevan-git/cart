@@ -1,0 +1,65 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Rentals{% endblock %}
+{% block page_title %}🛠️ Rentals{% endblock %}
+{% block active_nav %}rentals{% endblock %}
+{% block content %}
+{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{% url 'rentals:shop_item_create' %}" class="btn btn-success btn-sm"><i class="bi bi-plus-lg me-1"></i>Add item</a>
+  <a href="{% url 'rentals:shop_bookings' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-calendar-check me-1"></i>Bookings</a>
+  <a href="{% url 'rentals:shop_wallets' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-wallet2 me-1"></i>Wallets (load cash)</a>
+</div>
+
+{% if pending %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold text-warning">Awaiting your approval ({{ pending|length }})</div>
+  <div class="table-wrap"><table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>Item</th><th>By</th><th>Rent/day</th><th>Cost</th><th></th></tr></thead>
+    <tbody>
+      {% for i in pending %}
+      <tr><td class="fw-semibold">{{ i.name }}</td><td><span class="badge bg-info text-dark">{{ i.get_owner_kind_display }}</span> {{ i.owner.username }}</td>
+      <td>₹{{ i.rent_per_day }}</td><td>₹{{ i.item_cost }}</td>
+      <td class="text-end">
+        <form method="post" action="{% url 'rentals:shop_item_moderate' i.pk %}" class="d-inline">{% csrf_token %}
+          <button name="action" value="approve" class="btn btn-sm btn-success">Approve</button>
+          <button name="action" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
+        </form>
+      </td></tr>
+      {% endfor %}
+    </tbody></table></div>
+</div>
+{% endif %}
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold">Live for rent ({{ live|length }})</div>
+  <div class="table-wrap"><table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>Item</th><th>Owner</th><th>Rent/day</th><th>Cost</th><th>Units</th><th></th></tr></thead>
+    <tbody>
+      {% for i in live %}
+      <tr><td class="fw-semibold">{{ i.name }}</td><td><span class="badge bg-secondary">{{ i.get_owner_kind_display }}</span></td>
+      <td>₹{{ i.rent_per_day }}</td><td>₹{{ i.item_cost }}</td><td>{{ i.units }}</td>
+      <td class="text-end">
+        {% if i.owner_kind == 'shop' %}<a href="{% url 'rentals:shop_item_edit' i.pk %}" class="btn btn-sm btn-outline-secondary">Edit</a><a href="{% url 'rentals:shop_blocks' i.pk %}" class="btn btn-sm btn-outline-secondary">Block days</a>{% endif %}
+        <form method="post" action="{% url 'rentals:shop_item_moderate' i.pk %}" class="d-inline">{% csrf_token %}
+          <button name="action" value="hide" class="btn btn-sm btn-outline-warning">Hide</button>
+        </form>
+      </td></tr>
+      {% empty %}<tr><td colspan="6" class="text-center text-muted py-4">Nothing live yet. Add an item or approve a submission.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+{% if hidden %}
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white fw-semibold text-muted">Hidden ({{ hidden|length }})</div>
+  <div class="table-wrap"><table class="table table-sm align-middle mb-0"><tbody>
+    {% for i in hidden %}
+    <tr><td class="fw-semibold">{{ i.name }}</td><td class="text-end">
+      <form method="post" action="{% url 'rentals:shop_item_moderate' i.pk %}" class="d-inline">{% csrf_token %}
+        <button name="action" value="show" class="btn btn-sm btn-outline-success">Show</button>
+        <button name="action" value="remove" class="btn btn-sm btn-outline-danger">Remove</button>
+      </form></td></tr>
+    {% endfor %}
+  </tbody></table></div>
+</div>
+{% endif %}
+{% endblock %}

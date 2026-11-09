@@ -1,0 +1,63 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Stock{% endblock %}
+{% block page_title %}Stock (view only){% endblock %}
+{% block active_nav %}stock{% endblock %}
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <span class="text-muted small"><i class="bi bi-info-circle me-1"></i>Read-only. Stock changes happen at each tier via restock deliveries.</span>
+  {% include 'partials/column_toggle.html' with table_id="adminStockTable" count=products|length %}
+</div>
+
+<!-- Filter bar -->
+<div class="card border-0 shadow-sm p-3 mb-3">
+  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
+    {% if show_suspended %}<input type="hidden" name="show_suspended" value="1">{% endif %}
+    <select name="supplier" class="form-select form-select-sm" style="max-width:220px" onchange="this.form.submit()">
+      <option value="">All Suppliers</option>
+      {% for s in suppliers %}
+        <option value="{{ s.pk }}" {% if selected_supplier == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.company_name }}</option>
+      {% endfor %}
+    </select>
+    <select name="category" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
+      <option value="">All Categories</option>
+      {% for c in categories %}
+        <option value="{{ c.pk }}" {% if selected_category == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    {% if show_suspended %}
+      <a href="{% url 'admin_panel:stock_adjust' %}{% if selected_supplier %}?supplier={{ selected_supplier }}{% endif %}" class="btn btn-sm btn-warning"><i class="bi bi-eye-slash me-1"></i>Active suppliers only</a>
+    {% else %}
+      <a href="{% url 'admin_panel:stock_adjust' %}?show_suspended=1{% if selected_supplier %}&supplier={{ selected_supplier }}{% endif %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-eye me-1"></i>Show suspended suppliers' products</a>
+    {% endif %}
+    {% if selected_supplier or selected_category %}
+      <a href="{% url 'admin_panel:stock_adjust' %}{% if show_suspended %}?show_suspended=1{% endif %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    {% endif %}
+    <span class="text-muted small ms-auto">{{ products|length }} product{{ products|length|pluralize }}</span>
+  </form>
+</div>
+
+{% include 'partials/product_stock_table.html' with products=products table_id="adminStockTable" show_actions=False show_supplier=True show_downstream=True %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// "details" sub-row toggle (same behaviour as the supplier products page).
+document.addEventListener('click', function (e) {
+  const btn = e.target.closest('.stock-row-toggle');
+  if (!btn) return;
+  const row = document.getElementById(btn.dataset.target);
+  if (!row) return;
+  const opening = row.classList.contains('d-none');
+  row.classList.toggle('d-none', !opening);
+  btn.setAttribute('aria-expanded', opening ? 'true' : 'false');
+  const chevron = btn.querySelector('.toggle-chevron');
+  if (chevron) {
+    chevron.classList.toggle('bi-chevron-down', !opening);
+    chevron.classList.toggle('bi-chevron-up', opening);
+  }
+  btn.lastChild && (btn.lastChild.textContent = opening ? 'hide' : 'details');
+});
+</script>
+{% endblock %}

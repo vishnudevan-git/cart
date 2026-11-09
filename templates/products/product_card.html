@@ -1,0 +1,124 @@
+{# Reusable product card — {% include 'products/product_card.html' with product=product %} #}
+{% with dv=product.enriched_default %}{% if dv %}
+<div class="card product-card h-100 border-0 shadow-sm" id="card-{{ product.pk }}">
+
+  {# Image #}
+  <div class="position-relative product-image-wrap">
+    {% if product.show_mrp and dv.display_discount %}
+      <span class="product-card-offer-badge">{{ dv.display_discount }}% OFF</span>
+    {% elif product.rating and product.rating >= 4.5 %}
+      <span class="product-card-offer-badge product-card-offer-badge-alt">Fast Selling</span>
+    {% endif %}
+    <a href="{% url 'products:product_detail' product.pk %}" class="text-decoration-none">
+      {% if product.image %}
+        <img src="{{ product.image.url }}" class="card-img-top product-card-image" alt="{{ product.name }}">
+      {% else %}
+        <div class="bg-light d-flex align-items-center justify-content-center product-card-image-placeholder"><i data-lucide="leaf" class="product-placeholder-icon"></i></div>
+      {% endif %}
+    </a>
+  </div>
+
+  <div class="card-body p-2 pb-1">
+    <div class="product-card-head">
+    <a href="{% url 'products:product_detail' product.pk %}" class="text-decoration-none product-title-link">
+      <div class="small fw-semibold lh-sm mb-1 product-title" style="min-height:2.4em">{{ product.name }}</div>
+    </a>
+    <div class="text-muted mb-1 product-brand" style="font-size:.68rem">by {{ product.supplier.company_name }}</div>
+    
+    {% if product.review_count > 0 %}
+    <div class="mb-1 d-flex align-items-center" style="font-size: .75rem; color: #ffab00;">
+      <i class="bi bi-star-fill me-1"></i>
+      <span class="fw-bold product-rating-value">{{ product.rating|floatformat:1 }}</span>
+      <span class="text-muted ms-1" style="font-size: .7rem">({{ product.review_count }})</span>
+    </div>
+    {% endif %}
+
+    {# Price — updates via JS on variant change #}
+    <div class="d-flex align-items-center gap-1 flex-wrap mb-1">
+      <span class="text-success fw-bold small product-price" id="sp-{{ product.pk }}">₹{{ dv.display_price|default:dv.selling_price|floatformat:0 }}</span>
+      {% if product.show_mrp and dv.display_discount %}
+        <span class="text-muted text-decoration-line-through product-mrp" style="font-size:.7rem" id="mrp-{{ product.pk }}">₹{{ dv.display_mrp|default:dv.mrp|floatformat:0 }}</span>
+      {% else %}
+        <span id="mrp-{{ product.pk }}" class="d-none"></span>
+      {% endif %}
+    </div>
+    </div>
+
+    {# Variant selector #}
+    <div class="product-card-controls mt-auto">
+    {% if product.has_named_variants %}
+    {# Multi-variant product — choose variant & size on the detail page. #}
+    <a href="{% url 'products:product_detail' product.pk %}"
+       class="btn btn-outline-success btn-sm w-100 mb-1 py-1" style="font-size:.78rem">
+      <i class="bi bi-diagram-3 me-1"></i>{{ product.variant_count }} variants — choose
+    </a>
+    <input type="hidden" id="vsel-{{ product.pk }}" value="{{ dv.pk }}" data-show-mrp="{{ product.show_mrp|yesno:'1,0' }}">
+    {% else %}
+    {% with variants=product.enriched_variants %}
+    {% if variants|length > 1 %}
+    <select class="form-select form-select-sm mb-1 variant-select"
+            data-product="{{ product.pk }}"
+            data-show-mrp="{{ product.show_mrp|yesno:'1,0' }}"
+            id="vsel-{{ product.pk }}"
+            style="font-size:.78rem">
+      {% for v in variants %}{% if v.is_active %}
+        <option value="{{ v.pk }}"
+                data-price="{{ v.display_price|default:v.selling_price }}"
+                data-mrp="{{ v.display_mrp|default:v.mrp }}"
+                data-discount="{{ v.display_discount|default:0 }}"
+                data-stock="{{ v.stock }}"
+                {% if v.pk == dv.pk %}selected{% endif %}>
+          {{ v.label }} — ₹{{ v.display_price|default:v.selling_price|floatformat:0 }}
+        </option>
+      {% endif %}{% endfor %}
+    </select>
+    {% else %}
+    <input type="hidden" id="vsel-{{ product.pk }}" value="{{ dv.pk }}" data-show-mrp="{{ product.show_mrp|yesno:'1,0' }}">
+    <div class="text-muted mb-1" style="font-size:.75rem">{{ dv.label }}</div>
+    {% endif %}
+    {% endwith %}
+    {% endif %}{# /has_named_variants #}
+
+    {# Stock #}
+    <div id="stock-{{ product.pk }}" class="product-stock" style="font-size:.72rem">
+      {% if dv.stock > 0 %}
+        <span class="text-success">● In Stock</span>
+      {% else %}
+        <span class="text-danger">● Out of Stock</span>
+      {% endif %}
+    </div>
+    </div>
+  </div>
+
+  {# Footer — Add to cart for everyone (guest or logged in) #}
+  <div class="card-footer border-0 p-2 pt-1">
+    {% if user.is_authenticated and active_role != 'customer' %}
+      {# Supplier / admin — just view link #}
+      <a href="{% url 'products:product_detail' product.pk %}" class="btn btn-outline-success btn-sm w-100 py-1">View</a>
+    {% else %}
+      {# Customer OR guest — Add to Cart + Buy Now #}
+      <div class="w-100">
+        <!-- Add to Cart / Stepper -->
+        <div class="d-flex align-items-center w-100 mb-1">
+           <button id="add-btn-{{ product.pk }}"
+             class="btn btn-success btn-sm w-100 py-1 fw-semibold btn-add-cart {% if not dv.is_in_stock %}disabled{% endif %}"
+             onclick="addFirstToCart(event, {{ product.pk }})">
+            Add to Cart
+          </button>
+          <div class="input-group input-group-sm w-100 d-none" id="qty-group-{{ product.pk }}">
+            <button class="btn btn-success px-2 text-white fw-bold" type="button" onclick="updateCartQty(event, {{ product.pk }}, -1)">−</button>
+            <input type="text" class="form-control text-center px-1 fw-bold text-dark border-success" id="qty-{{ product.pk }}" value="1" readonly style="font-size:.85rem; background-color:#fff;">
+            <button class="btn btn-success px-2 text-white fw-bold" type="button" onclick="updateCartQty(event, {{ product.pk }}, 1)">+</button>
+          </div>
+        </div>
+        <!-- Buy Now -->
+        <button class="btn btn-outline-success btn-sm w-100 py-1 fw-semibold btn-buy-now {% if not dv.is_in_stock %}disabled{% endif %}"
+                onclick="buyNowFromCard(event, {{ product.pk }})">
+          Buy Now
+        </button>
+      </div>
+    {% endif %}
+  </div>
+
+</div>
+{% endif %}{% endwith %}

@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block title %}Block days{% endblock %}
+{% block content %}
+<div class="container py-3" style="max-width:560px">
+  {% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+  <h4 class="fw-bold mb-1">{{ item.name }} — block days you’re away</h4>
+  <p class="text-muted small">Tap a day to block/unblock it. Blocked days can’t be booked by anyone.</p>
+  <div class="d-flex flex-wrap gap-2">
+    {% for d in grid %}
+    <form method="post">{% csrf_token %}
+      <input type="hidden" name="day" value="{{ d.day|date:'Y-m-d' }}">
+      <input type="hidden" name="action" value="{% if d.blocked %}unblock{% else %}block{% endif %}">
+      <button class="btn btn-sm {% if d.blocked %}btn-secondary{% elif d.free == 0 %}btn-outline-danger disabled{% else %}btn-outline-success{% endif %}" style="min-width:3rem">
+        {{ d.day|date:"d M" }}<br><span style="font-size:.7rem">{% if d.blocked %}away{% elif d.free == 0 %}booked{% else %}free{% endif %}</span>
+      </button>
+    </form>
+    {% endfor %}
+  </div>
+  <a href="{% if redirect_name == 'rentals:shop_blocks' %}{% url 'rentals:shop_items' %}{% else %}{% url 'rentals:customer_bookings' %}{% endif %}" class="btn btn-outline-secondary btn-sm mt-3">← Back</a>
+</div>
+{% endblock %}

@@ -1,0 +1,7 @@
+{% if brand_logo %}
+  <img src="{{ brand_logo.url }}"
+       style="height:{{ logo_height|default:'32px' }};width:auto;object-fit:contain{% if invert %};filter:brightness(0) invert(1){% endif %}"
+       alt="{{ brand_name }}">
+{% else %}
+  🌿 {{ brand_name }}
+{% endif %}

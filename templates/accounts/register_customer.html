@@ -1,0 +1,177 @@
+{% extends 'base.html' %}
+{% block title %}Create your account{% endblock %}
+{% block content %}
+<div class="container mt-5 mb-5">
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <h4 class="text-center mb-4">🌿 Create your account</h4>
+
+          {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>
+          {% endfor %}
+
+          <form method="post" id="regForm">
+            {% csrf_token %}
+
+            <!-- Mobile / Email (same style as login) -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">Mobile number or email</label>
+              <div class="d-flex border rounded overflow-hidden" style="border-color:#ced4da" id="usernameGroup">
+                {{ form.country_code }}
+                <input type="text" name="username" id="id_username"
+                       class="form-control border-0 rounded-0 px-3 py-2"
+                       placeholder="Mobile number or email" required autofocus
+                       value="{{ form.username.value|default:'' }}">
+              </div>
+              {% if form.username.errors %}<div class="text-danger small mt-1">{{ form.username.errors }}</div>{% endif %}
+              <div id="usernameErr" class="text-danger small mt-1 d-none"></div>
+            </div>
+
+            <!-- Name row -->
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label fw-bold">First name</label>
+                {{ form.first_name }}
+              </div>
+              <div class="col-6">
+                <label class="form-label fw-bold">Last name</label>
+                {{ form.last_name }}
+              </div>
+            </div>
+
+            <!-- Email (auto-filled if username is phone) -->
+            <div class="mb-3" id="emailGroup">
+              <label class="form-label fw-bold">Email</label>
+              {{ form.email }}
+              {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors }}</div>{% endif %}
+            </div>
+
+            <!-- Phone (auto-filled if username is email) -->
+            <div class="mb-3 d-none" id="phoneGroup">
+              <label class="form-label fw-bold">Phone</label>
+              {{ form.phone }}
+              {% if form.phone.errors %}<div class="text-danger small mt-1">{{ form.phone.errors }}</div>{% endif %}
+            </div>
+
+            <!-- Password -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">Password</label>
+              {{ form.password1 }}
+              {% if form.password1.errors %}<div class="text-danger small mt-1">{{ form.password1.errors }}</div>{% endif %}
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-bold">Confirm password</label>
+              {{ form.password2 }}
+              {% if form.password2.errors %}<div class="text-danger small mt-1">{{ form.password2.errors }}</div>{% endif %}
+              <div id="pwMatchErr" class="text-danger small mt-1 d-none"></div>
+            </div>
+
+            <!-- Marketplace code -->
+            <div class="mb-3">
+              <label class="form-label fw-bold">Marketplace code or mobile <span class="text-muted fw-normal small">(optional)</span></label>
+              {{ form.invite_code }}
+              {% if form.invite_code.errors %}<div class="text-danger small mt-1">{{ form.invite_code.errors }}</div>{% endif %}
+              <div class="form-text text-muted small">Enter the code or mobile number of your marketplace.</div>
+            </div>
+
+            <div class="d-flex align-items-center mb-3 text-muted small">
+              <i class="bi bi-shield-check me-2 text-success"></i>
+              <span>Passwords must be at least 8 characters.</span>
+            </div>
+
+            <button type="submit" class="btn btn-warning w-100 fw-semibold rounded-pill py-2 text-dark border-0">Create account</button>
+          </form>
+
+          <hr class="mt-4 mb-3">
+          <div class="text-center">
+            <span class="small text-muted">Already have an account?</span>
+            <a href="{% url 'accounts:login' %}" class="small fw-semibold text-decoration-none ms-1">Sign in</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function(){
+  const ccSel = document.getElementById('id_country_code');
+  const uField = document.getElementById('id_username');
+  const eField = document.getElementById('id_email');
+  const pField = document.getElementById('id_phone');
+  const emailGroup = document.getElementById('emailGroup');
+  const phoneGroup = document.getElementById('phoneGroup');
+  const usernameGroup = document.getElementById('usernameGroup');
+  const usernameErr = document.getElementById('usernameErr');
+
+  const phoneRe = /^[0-9]{10}$/;
+  const emailRe = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+
+  // Auto-detect country code
+  const ccMap = {IN:'+91',SG:'+65',MV:'+960',LK:'+94',BT:'+975',NP:'+977'};
+  if (ccSel) {
+    fetch('https://ipapi.co/json/')
+      .then(r=>r.json())
+      .then(d=>{ if(ccMap[d.country_code]) ccSel.value=ccMap[d.country_code]; })
+      .catch(()=>{});
+  }
+
+  // Toggle country code visibility + auto-fill email/phone
+  if (uField) {
+    uField.addEventListener('input', function(){
+      const v = this.value.trim();
+      usernameErr.classList.add('d-none');
+      if (v.includes('@')) {
+        // Email entered — hide country code, show phone field, auto-fill email
+        if (ccSel) ccSel.style.display = 'none';
+        if (eField) eField.value = v;
+        emailGroup.classList.add('d-none');
+        phoneGroup.classList.remove('d-none');
+      } else {
+        // Phone entered — show country code, show email field, auto-fill phone
+        if (ccSel) ccSel.style.display = '';
+        if (pField && phoneRe.test(v)) pField.value = v;
+        emailGroup.classList.remove('d-none');
+        phoneGroup.classList.add('d-none');
+      }
+    });
+
+    uField.addEventListener('blur', function(){
+      const v = this.value.trim();
+      if (!v) return;
+      if (v.toLowerCase() === 'admin') return;
+      if (!phoneRe.test(v) && !emailRe.test(v)) {
+        usernameErr.textContent = 'Enter a valid 10-digit mobile number or email address.';
+        usernameErr.classList.remove('d-none');
+        usernameGroup.style.borderColor = '#dc3545';
+      } else {
+        usernameErr.classList.add('d-none');
+        usernameGroup.style.borderColor = '#ced4da';
+      }
+    });
+
+    // Trigger on load if value exists
+    if (uField.value) uField.dispatchEvent(new Event('input'));
+  }
+
+  // Password match check
+  const p1 = document.getElementById('id_password1');
+  const p2 = document.getElementById('id_password2');
+  const pwErr = document.getElementById('pwMatchErr');
+  if (p2) {
+    p2.addEventListener('blur', function(){
+      if (p1 && p2.value && p1.value !== p2.value) {
+        pwErr.textContent = 'Passwords do not match.';
+        pwErr.classList.remove('d-none');
+      } else {
+        pwErr.classList.add('d-none');
+      }
+    });
+  }
+})();
+</script>
+{% endblock %}

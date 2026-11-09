@@ -1,0 +1,106 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Support Tickets{% endblock %}
+{% block page_title %}Support Tickets{% endblock %}
+{% block active_nav %}support{% endblock %}
+
+{% block content %}
+<!-- Filters -->
+<form method="get" class="row g-2 mb-3 align-items-end">
+  <div class="col-6 col-md-3">
+    <label class="form-label small mb-1">Status</label>
+    <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Statuses</option>
+      {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label small mb-1">Type</label>
+    <select name="ticket_type" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Types</option>
+      {% for val, label in type_choices %}
+        <option value="{{ val }}" {% if type_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    <label class="form-label small mb-1">Role</label>
+    <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
+      <option value="">All Roles</option>
+      {% for val, label in role_choices %}
+        <option value="{{ val }}" {% if role_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-6 col-md-3">
+    {% if status_filter or type_filter or role_filter %}
+      <a href="{% url 'admin_panel:support_tickets' %}" class="btn btn-sm btn-outline-secondary w-100">Clear Filters</a>
+    {% endif %}
+  </div>
+</form>
+
+{% if tickets %}
+  <!-- Desktop -->
+  <div class="card border-0 shadow-sm d-none d-md-block">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Subject</th>
+          <th>From</th>
+          <th>Role</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Date</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+        <tr>
+          <td class="text-muted small">{{ ticket.pk }}</td>
+          <td>{{ ticket.subject }}</td>
+          <td>{{ ticket.submitted_by.username }}</td>
+          <td><span class="badge bg-light text-dark border">{{ ticket.get_role_display }}</span></td>
+          <td><span class="badge bg-light text-dark border">{{ ticket.get_ticket_type_display }}</span></td>
+          <td><span class="badge {{ ticket.status_badge_class }}">{{ ticket.get_status_display }}</span></td>
+          <td><span class="badge {{ ticket.priority_badge_class }}">{{ ticket.get_priority_display }}</span></td>
+          <td class="text-muted small">{{ ticket.created_at|date:"d M Y" }}</td>
+          <td>
+            <a href="{% url 'admin_panel:support_respond' ticket.pk %}" class="btn btn-sm btn-outline-success">Respond</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile -->
+  <div class="d-md-none">
+    {% for ticket in tickets %}
+    <div class="card border-0 shadow-sm mb-2 p-3">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="fw-semibold">{{ ticket.subject }}</div>
+          <div class="text-muted small mt-1">
+            {{ ticket.submitted_by.username }} · {{ ticket.get_role_display }} · {{ ticket.created_at|date:"d M Y" }}
+          </div>
+        </div>
+        <span class="badge {{ ticket.status_badge_class }}">{{ ticket.get_status_display }}</span>
+      </div>
+      <div class="mt-2">
+        <a href="{% url 'admin_panel:support_respond' ticket.pk %}" class="btn btn-sm btn-outline-success">Respond</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+{% else %}
+  <div class="card border-0 shadow-sm p-5 text-center text-muted">
+    <i class="bi bi-inbox fs-1 mb-2"></i>
+    <p class="mb-0">No tickets found.</p>
+  </div>
+{% endif %}
+{% endblock %}

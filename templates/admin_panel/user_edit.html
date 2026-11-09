@@ -1,0 +1,140 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Edit User: {{ u.username }}{% endblock %}
+{% block page_title %}Edit User: {{ u.username }}{% endblock %}
+{% block active_nav %}user_list{% endblock %}
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <div class="row g-3">
+
+    <!-- Account fields -->
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm p-3">
+        <h6 class="fw-semibold mb-3">Account Details</h6>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Username</label>
+          <input type="text" class="form-control" value="{{ u.username }}" disabled>
+          <div class="form-text">Username cannot be changed.</div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label small fw-semibold">First Name</label>
+            <input type="text" name="first_name" class="form-control" value="{{ u.first_name }}">
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-semibold">Last Name</label>
+            <input type="text" name="last_name" class="form-control" value="{{ u.last_name }}">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Email</label>
+          <input type="email" name="email" class="form-control" value="{{ u.email }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Phone</label>
+          <input type="text" name="phone" class="form-control" value="{{ u.phone }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Role</label>
+
+          {# Single-role policy: one account = one role. #}
+          <div class="border rounded p-3 mb-2">
+            {% for value, label in role_choices %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="role" value="{{ value }}"
+                     id="role_{{ value }}" {% if value == u.role %}checked{% endif %}>
+              <label class="form-check-label" for="role_{{ value }}">{{ label }}</label>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="form-text">
+            Each account holds exactly one role. Changing it moves the account to the new role —
+            for a second role, create a separate account.
+          </div>
+        </div>
+        <div class="form-check form-switch mb-2">
+          <input class="form-check-input" type="checkbox" name="is_active" value="1" id="isActive"
+                 {% if u.is_active %}checked{% endif %}>
+          <label class="form-check-label" for="isActive">Account Active</label>
+        </div>
+        <div class="mb-3 mt-3">
+          <label class="form-label small fw-semibold">Linked Marketplace <span class="text-muted">(Customer role only)</span></label>
+          <select name="distributor_id" class="form-select">
+            <option value="">— None —</option>
+            {% for d in distributors %}
+            <option value="{{ d.pk }}" {% if u.distributor_id == d.pk %}selected{% endif %}>
+              {{ d.company_name }} ({{ d.area }})
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Assign a marketplace so this customer can browse and order products.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Supplier profile fields -->
+    {% if supplier %}
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm p-3">
+        <h6 class="fw-semibold mb-3"><i class="bi bi-shop me-2"></i>Supplier Profile</h6>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Company Name</label>
+          <input type="text" name="company_name" class="form-control" value="{{ supplier.company_name }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Status</label>
+          <select name="supplier_status" class="form-select">
+            <option value="approved" {% if supplier.status == 'approved' %}selected{% endif %}>Approved</option>
+            <option value="suspended" {% if supplier.status == 'suspended' %}selected{% endif %}>Suspended</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Marketplace profile fields -->
+    {% if distributor %}
+    <div class="col-12 col-md-6">
+      <div class="card border-0 shadow-sm p-3">
+        <h6 class="fw-semibold mb-3"><i class="bi bi-truck me-2"></i>Marketplace Profile</h6>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Company Name</label>
+          <input type="text" name="company_name" class="form-control" value="{{ distributor.company_name }}">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Service Area</label>
+          <input type="text" name="area" class="form-control" value="{{ distributor.area }}">
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-4">
+            <label class="form-label small fw-semibold">Delivery ₹</label>
+            <input type="number" name="delivery_charge" class="form-control" step="0.01" value="{{ distributor.delivery_charge }}">
+          </div>
+          <div class="col-4">
+            <label class="form-label small fw-semibold">Free above ₹</label>
+            <input type="number" name="free_delivery_above" class="form-control" step="0.01" value="{{ distributor.free_delivery_above }}">
+          </div>
+          <div class="col-4">
+            <label class="form-label small fw-semibold">Margin %</label>
+            <input type="number" name="default_margin_percent" class="form-control" step="0.5" value="{{ distributor.default_margin_percent }}">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Status</label>
+          <select name="dist_status" class="form-select">
+            <option value="active" {% if distributor.status == 'active' %}selected{% endif %}>Active</option>
+            <option value="suspended" {% if distributor.status == 'suspended' %}selected{% endif %}>Suspended</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+  </div>
+
+  <div class="mt-3 d-flex gap-2">
+    <button type="submit" class="btn btn-success px-4">Save Changes</button>
+    <a href="{% url 'admin_panel:user_detail' u.pk %}" class="btn btn-outline-secondary">Cancel</a>
+  </div>
+</form>
+{% endblock %}

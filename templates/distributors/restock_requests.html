@@ -1,0 +1,97 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Restock Requests{% endblock %}
+{% block page_title %}📋 Restock Requests{% endblock %}
+{% block active_nav %}restock_requests{% endblock %}
+{% block content %}
+
+<!-- Status filter tabs -->
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3">
+  <a href="?" class="btn btn-sm {% if not status_filter %}btn-success{% else %}btn-outline-secondary{% endif %}">All</a>
+  {% for val, label in status_choices %}
+  <a href="?status={{ val }}" class="btn btn-sm {% if status_filter == val %}btn-success{% else %}btn-outline-secondary{% endif %}">
+    {{ label }}
+  </a>
+  {% endfor %}
+  <a href="{% url 'distributors:my_stock' %}" class="btn btn-sm btn-outline-primary ms-auto">
+    <i class="bi bi-boxes me-1"></i>Back to My Stock
+  </a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Product</th>
+          <th>Variant / Size</th>
+          <th>Qty Requested</th>
+          <th>Fulfillment</th>
+          <th>Requested On</th>
+          <th>Status</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr>
+          <td class="text-muted">{{ r.pk }}</td>
+          <td class="fw-semibold">
+            {% if r.is_loose %}{{ r.product.name }}{% else %}{{ r.variant.product.name }}{% endif %}
+          </td>
+          <td>
+            {% if r.is_loose %}
+              <span class="badge bg-info text-dark">🌾 Loose bulk</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ r.variant.label }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.is_loose %}
+              {{ r.quantity_grams|floatformat:0 }}g ({{ r.quantity_grams|divisibleby:1000 }}kg)
+              <span class="badge bg-info text-dark ms-1">Loose</span>
+            {% else %}
+              {{ r.quantity_requested }}
+            {% endif %}
+          </td>
+          <td class="small">
+            {% if r.fulfillment_method == 'stockist_pickup' %}🚗 Stockist pickup
+            {% elif r.fulfillment_method == 'supplier_transport' %}🚛 Transport
+            {% elif r.fulfillment_method == 'supplier_courier' %}📦 Courier
+            {% else %}<span class="text-muted">Pending</span>{% endif %}
+          </td>
+          <td class="text-muted">{{ r.requested_at|date:"d M Y, H:i" }}</td>
+          <td>
+            {% if r.status == 'pending' %}
+              <span class="badge bg-warning text-dark">⏳ Pending</span>
+            {% elif r.status == 'approved' %}
+              <span class="badge bg-info text-dark">✅ Approved by Stockist</span>
+            {% elif r.status == 'stockist_picked' %}
+              <span class="badge bg-primary">📦 Picked by Stockist</span>
+            {% elif r.status == 'dispatched' %}
+              <span class="badge bg-primary">📦 Picked by Stockist</span>
+              {% if r.tracking_info %}<div class="small text-muted">{{ r.tracking_info }}</div>{% endif %}
+            {% elif r.status == 'in_transit' %}
+              <span class="badge bg-info">🚚 In Transit</span>
+            {% elif r.status == 'delivered' %}
+              <span class="badge bg-success">✓ Delivered</span>
+            {% elif r.status == 'rejected' %}
+              <span class="badge bg-danger">Rejected</span>
+            {% endif %}
+          </td>
+          <td class="text-muted">{{ r.note|default:"—" }}</td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+            No restock requests yet. Go to
+            <a href="{% url 'distributors:my_stock' %}">My Stock</a> to request.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

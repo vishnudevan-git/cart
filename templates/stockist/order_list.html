@@ -1,0 +1,76 @@
+{% extends 'stockist/base_stockist.html' %}
+{% block active_nav %}orders{% endblock %}
+{% block title %}Orders — Stockist{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-bag-check me-2"></i>Orders to Fulfill</h4>
+  <div class="d-flex gap-2">
+    <span class="badge bg-warning text-dark fs-6">{{ pending_pickup }} Need Pickup</span>
+    <span class="badge bg-info text-dark fs-6">{{ in_transit }} In Transit</span>
+  </div>
+</div>
+
+<!-- Filter -->
+<div class="mb-3">
+  <form method="get" class="d-flex gap-2 flex-wrap">
+    <select name="status" class="form-select form-select-sm w-auto" onchange="this.form.submit()">
+      <option value="">All Statuses</option>
+      <option value="confirmed" {% if status_filter == 'confirmed' %}selected{% endif %}>Confirmed (Need Pickup)</option>
+      <option value="stockist_picked" {% if status_filter == 'stockist_picked' %}selected{% endif %}>Picked (In Transit)</option>
+    </select>
+  </form>
+</div>
+
+{% if orders %}
+<div class="table-responsive">
+  <table class="table table-hover align-middle">
+    <thead class="table-dark">
+      <tr>
+        <th>Order #</th>
+        <th>Customer</th>
+        <th>Marketplace</th>
+        <th>Items</th>
+        <th>Total</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for order in orders %}
+      <tr>
+        <td><strong>#{{ order.id }}</strong></td>
+        <td>{{ order.customer.get_full_name|default:order.customer.username }}</td>
+        <td>{{ order.distributor.company_name|default:"—" }}</td>
+        <td>
+          {% for item in order.items.all %}
+            <small class="d-block">{{ item.variant_label|default:"—" }} × {{ item.quantity }}</small>
+          {% endfor %}
+        </td>
+        <td>₹{{ order.total_amount }}</td>
+        <td>
+          {% if order.status == 'confirmed' %}
+            <span class="badge bg-warning text-dark">Confirmed — Needs Pickup</span>
+          {% elif order.status == 'stockist_picked' %}
+            <span class="badge bg-info text-dark">Picked — In Transit</span>
+          {% endif %}
+        </td>
+        <td><small>{{ order.created_at|date:"d M, H:i" }}</small></td>
+        <td>
+          <a href="{% url 'stockist:order_detail' order.pk %}" class="btn btn-sm btn-outline-primary">
+            {% if order.status == 'confirmed' %}Pick Up{% else %}Deliver{% endif %}
+          </a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-bag-check fs-1 d-block mb-2"></i>
+  No orders to fulfill right now.
+</div>
+{% endif %}
+{% endblock %}

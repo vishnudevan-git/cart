@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Supplier Shipment Routing — Live Explainer</title>
+<style>
+  :root {
+    --bg:#0f172a; --panel:#1e293b; --panel2:#243247; --line:#334155;
+    --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --ok:#34d399;
+    --warn:#fbbf24; --skip:#f87171; --chip:#2d3b52;
+  }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5;
+  }
+  header {
+    padding:22px 26px; border-bottom:1px solid var(--line);
+    background:linear-gradient(135deg,#0ea5e9 0%,#1e293b 100%);
+  }
+  header h1 { margin:0 0 4px; font-size:22px; }
+  header p { margin:0; color:#e0f2fe; font-size:13px; }
+  .wrap { max-width:1150px; margin:0 auto; padding:22px 26px 60px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:12px; margin-bottom:22px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:14px 16px; }
+  .card .big { font-size:28px; font-weight:700; }
+  .card .lbl { color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.04em; }
+  h2 { font-size:15px; margin:26px 0 10px; color:var(--accent); text-transform:uppercase; letter-spacing:.05em; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--muted); margin-bottom:12px; }
+  .legend span { display:inline-flex; align-items:center; gap:6px; }
+  .dot { width:11px; height:11px; border-radius:50%; display:inline-block; }
+  .dot.supplier{background:#a78bfa;} .dot.ok{background:var(--ok);} .dot.skip{background:var(--skip);} .dot.target{background:var(--accent);}
+  table { width:100%; border-collapse:collapse; background:var(--panel); border:1px solid var(--line); border-radius:12px; overflow:hidden; font-size:13px; }
+  th,td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--line); }
+  th { background:var(--panel2); color:var(--muted); font-weight:600; font-size:11px; text-transform:uppercase; letter-spacing:.04em; cursor:pointer; user-select:none; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:#22304a; }
+  .chainrow { display:flex; align-items:center; gap:4px; flex-wrap:wrap; }
+  .node {
+    padding:3px 9px; border-radius:7px; font-size:11px; font-weight:600;
+    border:1px solid var(--line); background:var(--chip); white-space:nowrap;
+  }
+  .node.supplier { background:#4c1d95; border-color:#6d28d9; color:#ede9fe; }
+  .node.passed { background:#064e3b; border-color:#059669; color:#d1fae5; }
+  .node.skip { background:#450a0a; border-color:#b91c1c; color:#fecaca; text-decoration:line-through; opacity:.75; }
+  .node.target { background:#0c4a6e; border-color:var(--accent); color:#e0f2fe; box-shadow:0 0 0 2px rgba(56,189,248,.25); }
+  .arrow { color:var(--muted); font-size:11px; }
+  .pill { padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; }
+  .pill.collect { background:#334155; color:#cbd5e1; }
+  .pill.send { background:#1e40af; color:#dbeafe; }
+  .pill.st-delayed{background:#92400e;color:#fef3c7;}
+  .pill.st-unavailable{background:#7f1d1d;color:#fecaca;}
+  .pill.st-awaiting{background:#78350f;color:#fde68a;}
+  .pill.st-confirmed{background:#065f46;color:#a7f3d0;}
+  .pill.st-dispatched{background:#1e3a8a;color:#bfdbfe;}
+  .pill.st-received{background:#1f2937;color:#e5e7eb;}
+  .pill.st-cancelled{background:#4b5563;color:#e5e7eb;}
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:12px; }
+  .toolbar input, .toolbar select {
+    background:var(--panel2); border:1px solid var(--line); color:var(--text);
+    border-radius:8px; padding:7px 10px; font-size:13px;
+  }
+  .btn { background:var(--accent); color:#06283d; border:none; border-radius:8px; padding:7px 14px; font-weight:700; cursor:pointer; font-size:13px; }
+  .btn.ghost { background:transparent; color:var(--accent); border:1px solid var(--accent); }
+  .muted { color:var(--muted); }
+  .empty { text-align:center; padding:26px; color:var(--muted); }
+  .err { background:#450a0a; border:1px solid #b91c1c; color:#fecaca; padding:10px 14px; border-radius:8px; margin-bottom:14px; }
+  .updated { font-size:11px; color:var(--muted); }
+  .tabs { display:flex; gap:8px; margin:6px 0 16px; }
+  .tab { padding:7px 14px; border-radius:8px; cursor:pointer; font-size:13px; border:1px solid var(--line); background:var(--panel); }
+  .tab.active { background:var(--accent); color:#06283d; font-weight:700; border-color:var(--accent); }
+</style>
+</head>
+<body>
+<header>
+  <h1>🚚 Supplier Shipment Routing</h1>
+  <p>Live view of how each product is routed into the chain, and which tiers it skips. Data is read straight from the database.</p>
+</header>
+
+<div class="wrap">
+  <div id="err"></div>
+
+  <div class="toolbar">
+    <button class="btn" id="refreshBtn">↻ Refresh live data</button>
+    <span class="updated" id="updated"></span>
+  </div>
+
+  <div class="cards" id="summaryCards"></div>
+
+  <h2>The chain</h2>
+  <div class="legend">
+    <span><i class="dot supplier"></i> Supplier (origin)</span>
+    <span><i class="dot ok"></i> Tier that handles it</span>
+    <span><i class="dot target"></i> First receiver (target)</span>
+    <span><i class="dot skip"></i> Skipped — never sees the order</span>
+  </div>
+  <div class="muted" style="font-size:12px;margin-bottom:10px">
+    Rule: every tier <em>before</em> the target is skipped. Skipped tiers do not see the order and are not notified.
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="products">Products &amp; routing</div>
+    <div class="tab" data-tab="shipments">Live shipments</div>
+  </div>
+
+  <!-- Products tab -->
+  <div id="tab-products">
+    <div class="toolbar">
+      <input type="text" id="prodSearch" placeholder="Filter by product / supplier…">
+      <select id="targetFilter">
+        <option value="">All targets</option>
+        <option value="stockist">stockist</option>
+        <option value="distributor">distributor</option>
+        <option value="shop">shop</option>
+        <option value="customer">customer</option>
+      </select>
+    </div>
+    <table id="prodTable">
+      <thead>
+        <tr>
+          <th data-sort="name">Product</th>
+          <th data-sort="supplier">Supplier</th>
+          <th data-sort="mode">Mode</th>
+          <th data-sort="target">Route (skipped tiers struck out)</th>
+        </tr>
+      </thead>
+      <tbody><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+
+  <!-- Shipments tab -->
+  <div id="tab-shipments" style="display:none">
+    <table id="shipTable">
+      <thead>
+        <tr>
+          <th>Order</th><th>Product</th><th>Supplier</th>
+          <th>Mode</th><th>Status</th><th>Route</th><th>When</th>
+        </tr>
+      </thead>
+      <tbody><tr><td colspan="7" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const API = '/supplier-shipment/api/';
+let CHAIN = ['supplier','stockist','distributor','shop','customer'];
+let PRODUCTS = [];
+let SHIPMENTS = [];
+let sortKey = 'name', sortDir = 1;
+
+function showErr(msg){ document.getElementById('err').innerHTML = msg ? `<div class="err">${msg}</div>` : ''; }
+
+async function fetchJSON(action){
+  const r = await fetch(`${API}?action=${action}`);
+  if(!r.ok) throw new Error(`${action}: HTTP ${r.status}`);
+  const d = await r.json();
+  if(!d.ok) throw new Error(d.error || `${action} failed`);
+  return d;
+}
+
+function renderSummary(s){
+  CHAIN = s.chain || CHAIN;
+  const el = document.getElementById('summaryCards');
+  const cards = [];
+  cards.push(`<div class="card"><div class="big">${s.total_products}</div><div class="lbl">Products</div></div>`);
+  cards.push(`<div class="card"><div class="big">${s.total_shipments}</div><div class="lbl">Shipment lines</div></div>`);
+  Object.entries(s.targets).forEach(([k,v])=>{
+    cards.push(`<div class="card"><div class="big">${v.count}</div><div class="lbl">→ ${k}</div></div>`);
+  });
+  el.innerHTML = cards.join('');
+}
+
+// Build the visual chain for a given target.
+function chainHTML(target, skipped){
+  const skip = new Set(skipped || []);
+  const parts = [];
+  CHAIN.forEach((tier,i)=>{
+    let cls = 'node';
+    if(tier === 'supplier') cls += ' supplier';
+    else if(tier === target) cls += ' target';
+    else if(skip.has(tier)) cls += ' skip';
+    else cls += ' passed';
+    parts.push(`<span class="${cls}">${tier}</span>`);
+    if(i < CHAIN.length-1) parts.push('<span class="arrow">→</span>');
+  });
+  return `<div class="chainrow">${parts.join('')}</div>`;
+}
+
+function modePill(mode,label){
+  return `<span class="pill ${mode}">${label||mode}</span>`;
+}
+
+function renderProducts(){
+  const q = document.getElementById('prodSearch').value.toLowerCase();
+  const tf = document.getElementById('targetFilter').value;
+  let rows = PRODUCTS.filter(p=>{
+    const hit = (p.name+' '+p.supplier+' '+p.sku).toLowerCase().includes(q);
+    const tok = !tf || p.target === tf;
+    return hit && tok;
+  });
+  rows.sort((a,b)=>{
+    const av=(a[sortKey]||'')+'', bv=(b[sortKey]||'')+'';
+    return av.localeCompare(bv)*sortDir;
+  });
+  const tb = document.querySelector('#prodTable tbody');
+  if(!rows.length){ tb.innerHTML = '<tr><td colspan="4" class="empty">No products match.</td></tr>'; return; }
+  tb.innerHTML = rows.map(p=>`
+    <tr>
+      <td><strong>${p.name}</strong><br><span class="muted" style="font-size:11px">${p.sku||''}</span></td>
+      <td>${p.supplier}</td>
+      <td>${modePill(p.mode,p.mode_label)}</td>
+      <td>${chainHTML(p.target, p.skipped)}</td>
+    </tr>`).join('');
+}
+
+function renderShipments(){
+  const tb = document.querySelector('#shipTable tbody');
+  if(!SHIPMENTS.length){ tb.innerHTML = '<tr><td colspan="7" class="empty">No shipment lines yet. Place an order with a supplier product, then open the supplier Orders page.</td></tr>'; return; }
+  tb.innerHTML = SHIPMENTS.map(s=>`
+    <tr>
+      <td>#${s.order_id}</td>
+      <td>${s.product}<br><span class="muted" style="font-size:11px">${s.variant} ×${s.qty}</span></td>
+      <td>${s.supplier}</td>
+      <td>${modePill(s.mode,s.mode_label)}</td>
+      <td><span class="pill st-${s.status}">${s.status_label}</span>${s.tracking_reference?`<br><span class="muted" style="font-size:11px">${s.carrier||''} ${s.tracking_reference}</span>`:''}</td>
+      <td>${chainHTML(s.target, s.skipped)}</td>
+      <td class="muted">${s.created_at}</td>
+    </tr>`).join('');
+}
+
+async function loadAll(){
+  showErr('');
+  try {
+    const [summary, prods, ships] = await Promise.all([
+      fetchJSON('summary'), fetchJSON('products'), fetchJSON('shipments')
+    ]);
+    renderSummary(summary);
+    PRODUCTS = prods.products; renderProducts();
+    SHIPMENTS = ships.shipments; renderShipments();
+    document.getElementById('updated').textContent = 'Updated ' + new Date().toLocaleTimeString();
+  } catch(e){
+    showErr('Could not load live data: ' + e.message + '. Are you logged in / is the server running?');
+  }
+}
+
+// events
+document.getElementById('refreshBtn').addEventListener('click', loadAll);
+document.getElementById('prodSearch').addEventListener('input', renderProducts);
+document.getElementById('targetFilter').addEventListener('change', renderProducts);
+document.querySelectorAll('#prodTable th[data-sort]').forEach(th=>{
+  th.addEventListener('click', ()=>{
+    const k = th.dataset.sort;
+    if(sortKey===k) sortDir*=-1; else { sortKey=k; sortDir=1; }
+    renderProducts();
+  });
+});
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const tab = t.dataset.tab;
+    document.getElementById('tab-products').style.display = tab==='products'?'':'none';
+    document.getElementById('tab-shipments').style.display = tab==='shipments'?'':'none';
+  });
+});
+
+loadAll();
+</script>
+</body>
+</html>

@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="{{ LANGUAGE_CODE }}" {% if dark_mode %}data-bs-theme="dark"{% endif %}>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Dashboard - {{ brand_name|default:ui_brand_name }}{% endblock %}</title>
+  {% load i18n static %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="{% static 'css/premium-ui.css' %}?v=20261031c" rel="stylesheet">
+  <style>
+    :root { --env-ribbon-h: {% if show_env_ribbon %}34px{% else %}0px{% endif %}; }
+    body { font-family: var(--ui-font-family); font-size: 14px; }
+    body { padding-top: var(--env-ribbon-h); }
+    h1,h2,h3,h4,h5,h6 { font-family: var(--ui-font-family); font-weight: 700; }
+    .fw-semibold { font-weight: 600 !important; }
+    .btn { font-weight: 600; }
+    :root { --sidebar-w: 240px; }
+    body { background: #f4f6f9; }
+
+    .env-ribbon {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1080;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .78rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+    .env-ribbon.env-demo { background: linear-gradient(135deg, #b45309, #f97316); }
+    .env-ribbon.env-prod { background: linear-gradient(135deg, #065f46, #0f766e); }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--green);
+      color: #fff;
+      width: var(--sidebar-w);
+      position: fixed;
+      top: var(--env-ribbon-h); left: 0;
+      height: calc(100vh - var(--env-ribbon-h));
+      overflow-y: auto;
+      z-index: 1040;
+      transition: transform .25s ease;
+    }
+    .sidebar .brand {
+      font-size: 1.1rem; font-weight: 700;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid rgba(255,255,255,.2);
+      white-space: nowrap;
+    }
+    .sidebar .nav-link {
+      color: rgba(255,255,255,.85);
+      padding: .55rem 1.25rem;
+      white-space: nowrap;
+    }
+    .sidebar .nav-link:hover,
+    .sidebar .nav-link.active {
+      color: #fff;
+      background: rgba(255,255,255,.15);
+      border-radius: 4px;
+    }
+    .sidebar .nav-link i { margin-right: .45rem; }
+
+    /* Main content */
+    .main-content {
+      margin-left: var(--sidebar-w);
+      padding: 1.5rem;
+      min-height: 100vh;
+      transition: margin-left .25s ease;
+    }
+
+    /* Desktop collapsed sidebar (shared across all logins) */
+    @media (min-width: 768px) {
+      body.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+      body.sidebar-collapsed .main-content { margin-left: 0; }
+    }
+    .sidebar-toggle-desktop {
+      display: none;
+    }
+    @media (min-width: 768px) {
+      .sidebar-toggle-desktop { display: inline-flex; }
+    }
+    .topbar {
+      background: #fff;
+      padding: .75rem 1.25rem;
+      border-bottom: 1px solid #dee2e6;
+      margin: -1.5rem -1.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .stat-card { border-left: 4px solid var(--green); }
+
+    /* Sidebar overlay for mobile */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 1039;
+    }
+    .sidebar-overlay.show { display: block; }
+
+    /* Mobile */
+    @media (max-width: 767.98px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; padding: 1rem; }
+      .topbar { margin: -1rem -1rem 1rem; }
+    }
+  </style>
+  {% include 'partials/theme_shared.html' %}
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+{% if show_env_ribbon %}
+<div class="env-ribbon env-{{ env_mode }}">
+  {{ env_label }} Environment
+</div>
+{% endif %}
+
+<!-- Sidebar overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  {% if brand_logo %}
+  <div class="brand">
+    {% include 'partials/brand_mark.html' with logo_height='28px' invert=True %}
+  </div>
+  {% else %}
+  <div class="brand" style="padding: 1rem 1.25rem; color: #fff; font-size: 0.9rem; opacity: 0.8;">
+    Dashboard
+  </div>
+  {% endif %}
+  <nav class="nav flex-column mt-2 pb-4">
+    {% block sidebar %}{% endblock %}
+    <hr style="border-color:rgba(255,255,255,.2);margin:.5rem 1rem">
+    {% if active_role == 'supplier' %}
+      <a class="nav-link" href="{% url 'suppliers:storefront' %}"><i class="bi bi-shop-window"></i> My Storefront</a>
+    {% elif active_role == 'distributor' %}
+      <a class="nav-link" href="{% url 'distributors:storefront' %}"><i class="bi bi-shop"></i> Storefront</a>
+    {% else %}
+      <a class="nav-link" href="{% url 'products:home' %}"><i class="bi bi-shop"></i> Storefront</a>
+    {% endif %}
+    <div class="px-3 pb-3 mt-2">
+      <a href="{% url 'accounts:logout' %}" class="text-decoration-none">
+        <span style="background:linear-gradient(135deg,#f43b47,#ff6b35);color:#fff;padding:.3rem .8rem;border-radius:8px;font-size:.85rem;font-weight:700;display:inline-flex;align-items:center;gap:.4rem">
+          <i class="bi bi-box-arrow-right"></i>Logout
+        </span>
+      </a>
+    </div>
+  </nav>
+</div>
+
+<!-- Main content -->
+<div class="main-content">
+  <div class="topbar">
+    <div class="d-flex align-items-center gap-2">
+      <!-- Hamburger (mobile only) -->
+      <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="openSidebar()" aria-label="Open menu">
+        <i class="bi bi-list fs-5"></i>
+      </button>
+      <!-- Collapse toggle (desktop only) — shared across all logins -->
+      <button class="btn btn-sm btn-outline-secondary sidebar-toggle-desktop" onclick="toggleSidebarDesktop()"
+              aria-label="Hide or show menu" title="Hide / show menu">
+        <i class="bi bi-list fs-5"></i>
+      </button>
+      <h6 class="mb-0 fw-semibold">{% block page_title %}Dashboard{% endblock %}</h6>
+    </div>
+    <span class="text-muted small d-flex align-items-center gap-3">
+      {{ user.get_full_name|default:user.username }}
+
+
+      {# Single-role policy: no role switcher — one account, one role. #}
+      <!-- Dark mode toggle -->
+      <a href="{% url 'accounts:toggle_dark' %}" class="text-muted text-decoration-none" title="Toggle dark mode">
+        <i class="bi {% if dark_mode %}bi-sun-fill{% else %}bi-moon-fill{% endif %}"></i>
+      </a>
+      {% comment %}Customer-only surface: the dashboards (admin/supplier/marketplace/…)
+      are business consoles, not shopping accounts — no personal profile/address.{% endcomment %}
+      {% if active_role == 'customer' %}
+      <a href="{% url 'accounts:profile' %}" class="text-muted text-decoration-none" title="My profile">
+        <i class="bi bi-person-circle"></i>
+      </a>
+      {% endif %}
+      <a href="{% url 'accounts:change_password' %}" class="text-muted text-decoration-none" title="Change password">
+        <i class="bi bi-shield-lock"></i>
+      </a>
+      <a href="{% url 'accounts:logout' %}" class="text-decoration-none ms-1" title="Logout">
+        <span style="background:linear-gradient(135deg,#f43b47,#ff6b35);color:#fff;padding:.25rem .6rem;border-radius:8px;font-size:.8rem;font-weight:700">
+          <i class="bi bi-box-arrow-right me-1"></i>Logout
+        </span>
+      </a>
+    </span>
+  </div>
+
+  {% for message in messages %}
+    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show">
+      {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+  {% endfor %}
+
+  {% if request.session.impersonator_id %}
+  <div class="alert alert-warning d-flex justify-content-between align-items-center py-2 mb-3" style="border-left:4px solid #f59e0b">
+    <span><i class="bi bi-eye-fill me-2"></i>Viewing as <strong>{{ request.user.username }}</strong> ({{ request.user.role }}). You are impersonating this account.</span>
+    <a href="{% url 'admin_panel:impersonate_return' %}" class="btn btn-sm btn-warning fw-semibold">
+      <i class="bi bi-arrow-left-circle me-1"></i>Return to Admin
+    </a>
+  </div>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{% static 'js/premium-ui.js' %}?v=20261031b"></script>
+<script src="{% static 'js/datatable.js' %}?v=20261031b"></script>
+
+<!-- ── Global Confirm Modal ───────────────────────────────────────────────── -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true" style="--bs-backdrop-opacity: 0.5;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-xl" style="border-radius: 12px; transition: all 0.3s ease;">
+      <div class="modal-header border-0 pb-0 pt-4 px-4">
+        <div class="d-flex align-items-center gap-3 flex-grow-1">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: #e8f5e9; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+            <span id="confirmIcon"></span>
+          </div>
+          <div>
+            <h5 class="modal-title fw-bold mb-0 lh-1" id="confirmTitle" style="font-size: 1.1rem;">Are you sure?</h5>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="flex-shrink: 0;"></button>
+      </div>
+      <div class="modal-body px-4 py-3">
+        <p class="text-muted mb-0 lh-base" id="confirmMessage" style="font-size: 0.95rem;"></p>
+      </div>
+      <div class="modal-footer border-0 p-4 pt-3 d-flex gap-2" style="justify-content: flex-end;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 6px; font-weight: 500; padding: 6px 16px;">Cancel</button>
+        <button type="button" class="btn" id="confirmBtn" style="border-radius: 6px; font-weight: 500; padding: 6px 16px;">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Global Toast ───────────────────────────────────────────────────────── -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="globalToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive">
+    <div class="d-flex">
+      <div class="toast-body d-flex align-items-center gap-2">
+        <span id="toastIcon" class="fs-5"></span>
+        <span id="toastMessage"></span>
+      </div>
+      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Sidebar (mobile slide-in) ──────────────────────────────────────────────
+  function openSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebarOverlay').classList.add('show');
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+  }
+
+  // ── Sidebar collapse (desktop) — shared across all logins, remembered ──────
+  function toggleSidebarDesktop() {
+    const collapsed = document.body.classList.toggle('sidebar-collapsed');
+    try { localStorage.setItem('kiroSidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+  }
+  // Apply the remembered state before paint to avoid a flash.
+  (function () {
+    try {
+      if (localStorage.getItem('kiroSidebarCollapsed') === '1') {
+        document.body.classList.add('sidebar-collapsed');
+      }
+    } catch (e) {}
+  })();
+
+  // ── Toast helper ─────────────────────────────────────────────────────────
+  function showToast(message, type = 'success') {
+    const toast = document.getElementById('globalToast');
+    const icons = { success: '✅', danger: '🗑️', warning: '⚠️', info: 'ℹ️' };
+    const colors = { success: 'text-bg-success', danger: 'text-bg-danger', warning: 'text-bg-warning', info: 'text-bg-info' };
+    toast.className = `toast align-items-center border-0 shadow ${colors[type] || 'text-bg-success'}`;
+    document.getElementById('toastIcon').textContent = icons[type] || '✅';
+    document.getElementById('toastMessage').textContent = message;
+    new bootstrap.Toast(toast, { delay: 3000 }).show();
+  }
+
+  // ── Confirm Modal helper ──────────────────────────────────────────────────
+  // Usage: data-confirm="message" data-confirm-title="Title" data-confirm-type="danger|warning|success"
+  // On any <form> or <a> with data-confirm attribute
+  let _pendingAction = null;
+
+  function showConfirm({ title, message, type = 'danger', icon, onConfirm }) {
+    const modal = document.getElementById('confirmModal');
+    const icons = { danger: '🗑️', warning: '⚠️', success: '✅', info: 'ℹ️' };
+    const btnColors = { danger: 'btn-danger', warning: 'btn-warning', success: 'btn-success', info: 'btn-info' };
+    document.getElementById('confirmTitle').textContent = title || 'Are you sure?';
+    document.getElementById('confirmMessage').textContent = message || '';
+    document.getElementById('confirmIcon').textContent = icon || icons[type] || '⚠️';
+    const btn = document.getElementById('confirmBtn');
+    btn.className = `btn ${btnColors[type] || 'btn-danger'}`;
+    btn.textContent = type === 'danger' ? 'Yes, Delete' : type === 'warning' ? 'Yes, Proceed' : 'Confirm';
+    _pendingAction = onConfirm;
+    new bootstrap.Modal(modal).show();
+  }
+
+  document.getElementById('confirmBtn').addEventListener('click', function () {
+    bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
+    if (_pendingAction) { _pendingAction(); _pendingAction = null; }
+  });
+
+  // ── Auto-wire data-confirm on forms ──────────────────────────────────────
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+    const msg = form.dataset.confirm;
+    if (!msg) return;
+    e.preventDefault();
+    showConfirm({
+      title: form.dataset.confirmTitle || 'Are you sure?',
+      message: msg,
+      type: form.dataset.confirmType || 'danger',
+      icon: form.dataset.confirmIcon || null,
+      onConfirm: () => { form.removeAttribute('data-confirm'); form.submit(); }
+    });
+  });
+
+  // ── Auto-wire data-confirm on links AND buttons ──────────────────────────
+  // A link navigates to its href after Confirm. A button inside a <form>
+  // submits that form (with the button's own name/value, via requestSubmit) -
+  // it used to navigate to "undefined" because a button has no href.
+  document.addEventListener('click', function (e) {
+    const el = e.target.closest('[data-confirm]');
+    if (!el || el.tagName === 'FORM') return;
+    e.preventDefault();
+    showConfirm({
+      title: el.dataset.confirmTitle || 'Are you sure?',
+      message: el.dataset.confirm,
+      type: el.dataset.confirmType || 'danger',
+      icon: el.dataset.confirmIcon || null,
+      onConfirm: () => {
+        if (el.href) {
+          window.location.href = el.href;
+        } else if (el.form) {
+          if (el.form.requestSubmit) el.form.requestSubmit(el); else el.form.submit();
+        }
+      }
+    });
+  });
+
+  // ── Auto-wire data-assign-confirm on selects ──────────────────────────────
+  // Usage: add data-assign-confirm="true" to a <select> inside a <form>
+  document.addEventListener('change', function (e) {
+    const sel = e.target;
+    if (!sel.dataset.assignConfirm) return;
+    const form = sel.closest('form');
+    if (!form) return;
+    const label = sel.options[sel.selectedIndex]?.text || '';
+    const userName = form.dataset.userName || 'this user';
+    if (!sel.value) return;
+    showConfirm({
+      title: 'Assign Marketplace?',
+      message: `Assign "${label}" to ${userName}?`,
+      type: 'warning',
+      icon: '🏪',
+      onConfirm: () => form.submit()
+    });
+  });
+
+  // ── Show Django messages as toasts ───────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.alert[data-auto-toast]').forEach(function (el) {
+      const type = el.classList.contains('alert-success') ? 'success'
+                 : el.classList.contains('alert-danger') ? 'danger'
+                 : el.classList.contains('alert-warning') ? 'warning' : 'info';
+      showToast(el.textContent.trim(), type);
+      el.remove();
+    });
+  });
+</script>
+{% block extra_js %}{% endblock %}
+</body>
+</html>

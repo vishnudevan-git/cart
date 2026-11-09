@@ -1,0 +1,24 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}{{ item.name }}{% endblock %}
+{% block page_title %}{{ item.name }}{% endblock %}
+{% block content %}
+{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+<a href="{% url 'rentals:dist_list' %}" class="btn btn-sm btn-outline-secondary mb-3">← Rentals</a>
+<div class="card border-0 shadow-sm mb-3" style="max-width:640px">
+  {% if item.image %}<img src="{{ item.image.url }}" class="card-img-top" style="max-height:240px;object-fit:cover" alt="{{ item.name }}">{% endif %}
+  <div class="card-body">
+    <h4 class="fw-bold mb-1">{{ item.name }}</h4>
+    <div class="text-success fw-bold fs-5">₹{{ item.rent_per_day }} <span class="text-muted fw-normal fs-6">/ day</span></div>
+    <p class="text-muted small">{{ item.distributor.company_name }} · {{ item.units }} unit(s)</p>
+    <div class="alert alert-warning py-2 small">If damaged or lost you settle the item cost <b>₹{{ item.item_cost }}</b> with the owner directly. You pay rent <b>offline</b> — the amount is recorded and the owner marks it received.</div>
+    <div class="d-flex flex-wrap gap-1 mb-3">
+      {% for d in grid %}<span class="badge {% if d.blocked %}bg-secondary{% elif d.free == 0 %}bg-danger{% else %}bg-success-subtle text-success border{% endif %}" style="min-width:2.6rem">{{ d.day|date:"d" }}<br>{% if d.blocked %}away{% elif d.free == 0 %}full{% else %}{{ d.free }}✓{% endif %}</span>{% endfor %}
+    </div>
+    <form method="post" class="row g-2 align-items-end" style="max-width:420px">{% csrf_token %}
+      <div class="col-6"><label class="form-label small">Start day</label><input type="date" name="start_day" min="{{ today }}" value="{{ today }}" class="form-control form-control-sm"></div>
+      <div class="col-3"><label class="form-label small">Days</label><input type="number" name="days" min="1" value="1" class="form-control form-control-sm"></div>
+      <div class="col-3"><button class="btn btn-success btn-sm w-100">Request</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,293 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Hierarchy{% endblock %}
+{% block page_title %}Partner Hierarchy{% endblock %}
+{% block active_nav %}hierarchy{% endblock %}
+{% block content %}
+
+<style>
+  .hx-tree { --indent: 1.5rem; }
+  .hx-node { position: relative; padding: .5rem .75rem; border-radius: .5rem; }
+  .hx-node + .hx-node { margin-top: .4rem; }
+  .hx-children { margin-left: var(--indent); border-left: 2px solid rgba(0,0,0,.08); padding-left: var(--indent); }
+  .hx-label { font-weight: 600; }
+  .hx-meta { font-size: .8rem; }
+  .hx-chip { font-size: .72rem; }
+  .hx-empty { font-size: .82rem; }
+  .hx-move { font-size: .75rem; }
+  .hx-move select { max-width: 200px; }
+  .hx-toggle { width: 1.5rem; height: 1.5rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .hx-toggle i { font-size: .8rem; }
+  .hx-node.hx-collapsed > .hx-children { display: none; }
+</style>
+
+<!-- Compact toolbar: counts + legend + controls on one tight row -->
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2 small">
+  <span class="badge bg-primary-subtle text-primary border"><i class="bi bi-boxes me-1"></i>{{ stockist_count }} Stockists</span>
+  <span class="badge bg-info-subtle text-info border"><i class="bi bi-diagram-3 me-1"></i>{{ wholesaler_count }} Distributors</span>
+  <span class="badge bg-success-subtle text-success border"><i class="bi bi-shop-window me-1"></i>{{ shop_count }} Marketplaces</span>
+  <span class="badge bg-secondary-subtle text-secondary border"><i class="bi bi-shop me-1"></i>{{ supplier_count }} Suppliers</span>
+
+  <div class="ms-auto d-flex flex-wrap gap-1">
+    <button type="button" id="hxExpandAll" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-plus-square me-1"></i>Expand all</button>
+    <button type="button" id="hxCollapseAll" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-dash-square me-1"></i>Collapse all</button>
+    {% if show_suspended %}
+      <a href="{% url 'admin_panel:hierarchy' %}" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-eye-slash me-1"></i>Hide suspended</a>
+    {% else %}
+      <a href="{% url 'admin_panel:hierarchy' %}?show_suspended=1" class="btn btn-sm btn-outline-secondary py-0"><i class="bi bi-eye me-1"></i>Show suspended</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm p-3 hx-tree">
+  {% for node in tree %}
+  <!-- Stockist -->
+  <div class="hx-node bg-primary bg-opacity-10">
+    <div class="d-flex flex-wrap align-items-center gap-2">
+      <button type="button" class="hx-toggle btn btn-sm btn-light border p-0" aria-label="Toggle"><i class="bi bi-dash-lg"></i></button>
+      <i class="bi bi-boxes text-primary"></i>
+      <a href="{% url 'admin_panel:stockist_list' %}" class="hx-label text-decoration-none">{{ node.obj.company_name }} <span class="text-muted fw-normal">(Stockist)</span></a>
+      {% if node.obj.status == 'active' %}<span class="badge bg-success hx-chip">active</span>{% else %}<span class="badge bg-danger hx-chip">suspended</span>{% endif %}
+      <span class="text-muted hx-meta ms-auto">
+        {{ node.wholesaler_count }} distributor{{ node.wholesaler_count|pluralize }} ·
+        {{ node.shop_count }} shop{{ node.shop_count|pluralize }} ·
+        {{ node.customer_total }} customer{{ node.customer_total|pluralize }}
+      </span>
+    </div>
+
+    <!-- Move ALL distributors off this stockist -->
+    {% if node.wholesalers and active_stockists|length > 1 %}
+    <form method="post" class="hx-move d-flex flex-wrap align-items-center gap-1 mt-2"
+          data-confirm="Move ALL {{ node.wholesaler_count }} distributor(s) off {{ node.obj.company_name }} to the selected stockist?"
+          data-confirm-title="Move all distributors?" data-confirm-type="warning" data-confirm-icon="⚠️">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="move_all">
+      <input type="hidden" name="from_stockist_pk" value="{{ node.obj.pk }}">
+      <span class="text-muted"><i class="bi bi-arrow-left-right me-1"></i>Move all distributors to:</span>
+      <select name="to_stockist_pk" class="form-select form-select-sm" required>
+        <option value="">— choose stockist —</option>
+        {% for st in active_stockists %}
+          {% if st.pk != node.obj.pk %}<option value="{{ st.pk }}">{{ st.company_name }}</option>{% endif %}
+        {% endfor %}
+      </select>
+      <button type="submit" class="btn btn-sm btn-outline-primary">Move all</button>
+    </form>
+    {% endif %}
+
+    {% if node.wholesalers %}
+    <div class="hx-children mt-2">
+      {% for wn in node.wholesalers %}
+      <!-- Wholesale Distributor -->
+      <div class="hx-node bg-info bg-opacity-10">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <button type="button" class="hx-toggle btn btn-sm btn-light border p-0" aria-label="Toggle"><i class="bi bi-dash-lg"></i></button>
+          <i class="bi bi-diagram-3 text-info"></i>
+          <a href="{% url 'admin_panel:wholesaler_detail' wn.obj.pk %}" class="hx-label text-decoration-none">{{ wn.obj.company_name }} <span class="text-muted fw-normal">(Distributor)</span></a>
+          {% if wn.obj.status == 'active' %}<span class="badge bg-success hx-chip">active</span>{% else %}<span class="badge bg-danger hx-chip">suspended</span>{% endif %}
+          <span class="text-muted hx-meta ms-auto">{{ wn.shop_count }} shop{{ wn.shop_count|pluralize }} · {{ wn.customer_total }} customer{{ wn.customer_total|pluralize }}</span>
+        </div>
+
+        <!-- Move this distributor to another stockist -->
+        <form method="post" class="hx-move d-flex flex-wrap align-items-center gap-1 mt-2"
+              data-confirm="Move {{ wn.obj.company_name }} to the selected stockist? Future restock & pricing will use the new stockist."
+              data-confirm-title="Move distributor?" data-confirm-type="warning" data-confirm-icon="⚠️">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="move_wholesaler">
+          <input type="hidden" name="wholesaler_pk" value="{{ wn.obj.pk }}">
+          <span class="text-muted"><i class="bi bi-arrow-left-right me-1"></i>Stockist:</span>
+          <select name="stockist_pk" class="form-select form-select-sm">
+            <option value="">— none (use default) —</option>
+            {% for st in active_stockists %}
+              <option value="{{ st.pk }}" {% if st.pk == wn.obj.stockist_id %}selected{% endif %}>{{ st.company_name }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-outline-primary">Move</button>
+        </form>
+
+        {% if wn.shops %}
+        <div class="hx-children mt-2">
+          {% for shop in wn.shops %}
+          <!-- Marketplace / Shop -->
+          <div class="hx-node bg-success bg-opacity-10">
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <i class="bi bi-shop-window text-success"></i>
+              <a href="{% url 'admin_panel:distributor_detail' shop.pk %}" class="hx-label text-decoration-none">{{ shop.company_name }} <span class="text-muted fw-normal">(Marketplace)</span></a>
+              {% if shop.status == 'active' %}<span class="badge bg-success hx-chip">active</span>{% else %}<span class="badge bg-danger hx-chip">suspended</span>{% endif %}
+              <span class="text-muted hx-meta ms-auto">
+                <i class="bi bi-people me-1"></i>{{ shop.customer_count }} customer{{ shop.customer_count|pluralize }} ·
+                <i class="bi bi-receipt me-1"></i>{{ shop.order_count }} order{{ shop.order_count|pluralize }}
+              </span>
+            </div>
+            <!-- Move this shop to another distributor -->
+            <form method="post" class="hx-move d-flex flex-wrap align-items-center gap-1 mt-2"
+                  data-confirm="Move shop {{ shop.company_name }} to the selected distributor?"
+                  data-confirm-title="Move shop?" data-confirm-type="warning" data-confirm-icon="⚠️">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="move_shop">
+              <input type="hidden" name="shop_pk" value="{{ shop.pk }}">
+              <span class="text-muted"><i class="bi bi-arrow-left-right me-1"></i>Distributor:</span>
+              <select name="wholesaler_pk" class="form-select form-select-sm">
+                <option value="">— none (detach) —</option>
+                {% for w in all_wholesalers %}
+                  <option value="{{ w.pk }}" {% if w.pk == shop.wholesaler_id %}selected{% endif %}>{{ w.company_name }}</option>
+                {% endfor %}
+              </select>
+              <button type="submit" class="btn btn-sm btn-outline-success">Move</button>
+            </form>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="hx-children mt-2 text-muted hx-empty"><i class="bi bi-dash-circle me-1"></i>No shops yet.</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="hx-children mt-2 text-muted hx-empty"><i class="bi bi-dash-circle me-1"></i>No distributors assigned to this stockist.</div>
+    {% endif %}
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">No stockists yet.</p>
+  {% endfor %}
+
+  <!-- Distributors with no stockist assigned -->
+  {% if unassigned_wholesalers %}
+  <div class="hx-node bg-warning bg-opacity-10 mt-3">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-exclamation-triangle text-warning"></i>
+      <span class="hx-label">Distributors with no stockist assigned</span>
+      <span class="badge bg-warning text-dark hx-chip">{{ unassigned_wholesalers|length }}</span>
+    </div>
+    <div class="hx-children mt-2">
+      {% for wn in unassigned_wholesalers %}
+      <div class="hx-node bg-info bg-opacity-10">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <i class="bi bi-diagram-3 text-info"></i>
+          <a href="{% url 'admin_panel:wholesaler_detail' wn.obj.pk %}" class="hx-label text-decoration-none">{{ wn.obj.company_name }} <span class="text-muted fw-normal">(Distributor)</span></a>
+          {% if wn.obj.status == 'active' %}<span class="badge bg-success hx-chip">active</span>{% else %}<span class="badge bg-danger hx-chip">suspended</span>{% endif %}
+          <span class="text-muted hx-meta ms-auto">{{ wn.shop_count }} shop{{ wn.shop_count|pluralize }} · {{ wn.customer_total }} customer{{ wn.customer_total|pluralize }}</span>
+        </div>
+        <form method="post" class="hx-move d-flex flex-wrap align-items-center gap-1 mt-2"
+              data-confirm="Assign {{ wn.obj.company_name }} to the selected stockist?"
+              data-confirm-title="Assign distributor?" data-confirm-type="warning" data-confirm-icon="⚠️">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="move_wholesaler">
+          <input type="hidden" name="wholesaler_pk" value="{{ wn.obj.pk }}">
+          <span class="text-muted"><i class="bi bi-arrow-left-right me-1"></i>Assign to stockist:</span>
+          <select name="stockist_pk" class="form-select form-select-sm">
+            <option value="">— none (use default) —</option>
+            {% for st in active_stockists %}<option value="{{ st.pk }}">{{ st.company_name }}</option>{% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-outline-primary">Assign</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Shops with no distributor assigned -->
+  {% if unassigned_shops %}
+  <div class="hx-node bg-warning bg-opacity-10 mt-3">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-exclamation-triangle text-warning"></i>
+      <span class="hx-label">Marketplaces with no distributor assigned</span>
+      <span class="badge bg-warning text-dark hx-chip">{{ unassigned_shops|length }}</span>
+    </div>
+    <div class="hx-children mt-2">
+      {% for shop in unassigned_shops %}
+      <div class="hx-node bg-success bg-opacity-10">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <i class="bi bi-shop-window text-success"></i>
+          <a href="{% url 'admin_panel:distributor_detail' shop.pk %}" class="hx-label text-decoration-none">{{ shop.company_name }} <span class="text-muted fw-normal">(Marketplace)</span></a>
+          {% if shop.status == 'active' %}<span class="badge bg-success hx-chip">active</span>{% else %}<span class="badge bg-danger hx-chip">suspended</span>{% endif %}
+          <span class="text-muted hx-meta ms-auto">
+            <i class="bi bi-people me-1"></i>{{ shop.customer_count }} customer{{ shop.customer_count|pluralize }} ·
+            <i class="bi bi-receipt me-1"></i>{{ shop.order_count }} order{{ shop.order_count|pluralize }}
+          </span>
+        </div>
+        <form method="post" class="hx-move d-flex flex-wrap align-items-center gap-1 mt-2"
+              data-confirm="Attach {{ shop.company_name }} to the selected distributor?"
+              data-confirm-title="Attach shop?" data-confirm-type="warning" data-confirm-icon="⚠️">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="move_shop">
+          <input type="hidden" name="shop_pk" value="{{ shop.pk }}">
+          <span class="text-muted"><i class="bi bi-arrow-left-right me-1"></i>Attach to distributor:</span>
+          <select name="wholesaler_pk" class="form-select form-select-sm">
+            <option value="">— none (detach) —</option>
+            {% for w in all_wholesalers %}<option value="{{ w.pk }}">{{ w.company_name }}</option>{% endfor %}
+          </select>
+          <button type="submit" class="btn btn-sm btn-outline-success">Attach</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+
+<!-- Suppliers (not hard-linked to a single stockist) -->
+<div class="card border-0 shadow-sm p-3 mt-3">
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <i class="bi bi-shop text-dark"></i>
+    <span class="hx-label">Suppliers</span>
+    <span class="badge bg-secondary hx-chip">{{ supplier_count }}</span>
+    <span class="text-muted hx-meta ms-2">A supplier is carried by whichever stockists stock its products — not tied to one.</span>
+  </div>
+  <div class="d-flex flex-wrap gap-2">
+    {% for s in suppliers %}
+    <a href="{% url 'admin_panel:supplier_detail' s.pk %}" class="text-decoration-none">
+      <span class="badge {% if s.status == 'approved' %}bg-light text-dark border{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %} hx-chip">
+        {{ s.company_name }}{% if s.status != 'approved' %} · suspended{% endif %}
+      </span>
+    </a>
+    {% empty %}
+    <span class="text-muted hx-empty">No suppliers yet.</span>
+    {% endfor %}
+  </div>
+</div>
+
+<script>
+(function () {
+  function setCollapsed(node, collapsed) {
+    node.classList.toggle('hx-collapsed', collapsed);
+    var icon = node.querySelector(':scope > div .hx-toggle i');
+    if (icon) icon.className = collapsed ? 'bi bi-plus-lg' : 'bi bi-dash-lg';
+  }
+
+  // Toggle one node when its +/- button is clicked.
+  document.querySelectorAll('.hx-toggle').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      var node = btn.closest('.hx-node');
+      if (node) setCollapsed(node, !node.classList.contains('hx-collapsed'));
+    });
+  });
+
+  // Expand / collapse all parent nodes (those that actually have a toggle).
+  function allTogglableNodes() {
+    return Array.prototype.filter.call(
+      document.querySelectorAll('.hx-node'),
+      function (n) { return n.querySelector(':scope > div .hx-toggle'); }
+    );
+  }
+  var exp = document.getElementById('hxExpandAll');
+  var col = document.getElementById('hxCollapseAll');
+  if (exp) exp.addEventListener('click', function () {
+    allTogglableNodes().forEach(function (n) { setCollapsed(n, false); });
+  });
+  if (col) col.addEventListener('click', function () {
+    allTogglableNodes().forEach(function (n) { setCollapsed(n, true); });
+  });
+
+  // Default view: show down to the Distributor level. Collapse every
+  // Distributor node (bg-info) so its shops are hidden until expanded;
+  // Stockists stay open.
+  document.querySelectorAll('.hx-node.bg-info').forEach(function (n) {
+    if (n.querySelector(':scope > div .hx-toggle')) setCollapsed(n, true);
+  });
+})();
+</script>
+
+{% endblock %}

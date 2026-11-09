@@ -1,0 +1,161 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Commission Rules{% endblock %}
+{% block page_title %}Commission Rules{% endblock %}
+{% block active_nav %}reports{% endblock %}
+
+{% block extra_css %}
+<style>
+  .rule-type-badge { font-size:.72rem; }
+  #ruleTypeHelp { font-size:.8rem; color:#666; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <!-- Add Rule -->
+  <div class="col-12 col-md-4">
+    <div class="card border-0 shadow-sm p-3">
+      <h6 class="fw-semibold mb-1">Add Commission Rule</h6>
+      <p class="text-muted small mb-3">Rules are applied in priority order: Product → Supplier → Overall.</p>
+      <form method="post" action="{% url 'admin_panel:commission_rule_add' %}" id="ruleForm">
+        {% csrf_token %}
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Rule Type</label>
+          <select name="rule_type" class="form-select form-select-sm" id="ruleTypeSelect" onchange="updateRuleForm()">
+            {% for val, label in type_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+          <div id="ruleTypeHelp" class="mt-1"></div>
+        </div>
+
+        <div class="mb-3" id="supplierField" style="display:none">
+          <label class="form-label small fw-semibold">Supplier</label>
+          <select name="supplier" class="form-select form-select-sm">
+            <option value="">— Select Supplier —</option>
+            {% for s in suppliers %}
+              <option value="{{ s.pk }}">{{ s.company_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3" id="productField" style="display:none">
+          <label class="form-label small fw-semibold">Product</label>
+          <select name="product" class="form-select form-select-sm">
+            <option value="">— Select Product —</option>
+            {% for p in products %}
+              <option value="{{ p.pk }}">{{ p.name }} ({{ p.supplier.company_name }})</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="mb-3" id="rateField">
+          <label class="form-label small fw-semibold" id="rateLabel">Commission %</label>
+          <input type="number" name="rate" class="form-control form-control-sm" step="0.5" min="0" max="100" placeholder="e.g. 10">
+        </div>
+
+        <div class="mb-3" id="fixedField" style="display:none">
+          <label class="form-label small fw-semibold" id="fixedLabel">Fixed Amount (₹)</label>
+          <input type="number" name="fixed_amount" class="form-control form-control-sm" step="0.01" min="0" placeholder="e.g. 25.00">
+        </div>
+
+        <button type="submit" class="btn btn-success btn-sm w-100">Add Rule</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Rules List -->
+  <div class="col-12 col-md-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header fw-semibold">Active Rules (Priority: Product → Supplier → Overall)</div>
+      <div class="table-wrap">
+        <table class="table align-middle mb-0">
+          <thead class="table-light">
+            <tr><th>Type</th><th>Applies To</th><th>Rate / Amount</th><th>Status</th><th>Actions</th></tr>
+          </thead>
+          <tbody>
+            {% for rule in rules %}
+            <tr class="{% if not rule.is_active %}table-secondary{% endif %}">
+              <td>
+                <span class="badge
+                  {% if rule.rule_type == 'overall' %}bg-primary
+                  {% elif rule.rule_type == 'supplier' %}bg-info text-dark
+                  {% elif rule.rule_type == 'product' %}bg-warning text-dark
+                  {% else %}bg-secondary{% endif %} rule-type-badge">
+                  {{ rule.get_rule_type_display }}
+                </span>
+              </td>
+              <td class="small">
+                {% if rule.supplier %}{{ rule.supplier.company_name }}
+                {% elif rule.product %}{{ rule.product.name }}
+                {% else %}All{% endif %}
+              </td>
+              <td class="fw-semibold small">
+                {% if rule.rule_type in 'overall,supplier,product' %}
+                  {{ rule.rate }}%
+                {% else %}
+                  ₹{{ rule.fixed_amount }}
+                {% endif %}
+              </td>
+              <td>
+                <span class="badge {% if rule.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                  {% if rule.is_active %}Active{% else %}Inactive{% endif %}
+                </span>
+              </td>
+              <td>
+                <form method="post" action="{% url 'admin_panel:commission_rule_toggle' rule.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-secondary py-0 px-2">
+                    {% if rule.is_active %}Disable{% else %}Enable{% endif %}
+                  </button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-4">No rules yet. The supplier's default commission % will be used.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mt-3 p-3">
+      <h6 class="fw-semibold mb-2">How Priority Works</h6>
+      <div class="small text-muted">
+        <div class="mb-1"><span class="badge bg-warning text-dark me-1">Product</span> Most specific — overrides everything for that product</div>
+        <div class="mb-1"><span class="badge bg-info text-dark me-1">Supplier</span> Applies to all products from that supplier</div>
+        <div class="mb-1"><span class="badge bg-primary me-1">Overall</span> Global fallback for all suppliers/products</div>
+        <div><span class="badge bg-secondary me-1">Default</span> If no rule matches, the supplier's default commission % is used</div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const helps = {
+  overall: 'Applied to all orders when no other rule matches.',
+  supplier: 'Applied to all products from the selected supplier.',
+  product: 'Applied to the selected product (flat %).',
+  product_price: 'Fixed ₹ amount per order item for the selected product.',
+  product_weight: 'Fixed ₹ amount per unit weight/volume for the selected product.',
+};
+
+function updateRuleForm() {
+  const type = document.getElementById('ruleTypeSelect').value;
+  document.getElementById('ruleTypeHelp').textContent = helps[type] || '';
+  document.getElementById('supplierField').style.display = type === 'supplier' ? '' : 'none';
+  document.getElementById('productField').style.display = ['product','product_price','product_weight'].includes(type) ? '' : 'none';
+  const isFixed = ['product_price','product_weight'].includes(type);
+  document.getElementById('rateField').style.display = isFixed ? 'none' : '';
+  document.getElementById('fixedField').style.display = isFixed ? '' : 'none';
+  if (type === 'product_weight') {
+    document.getElementById('fixedLabel').textContent = 'Fixed ₹ per unit weight/volume';
+  } else {
+    document.getElementById('fixedLabel').textContent = 'Fixed ₹ amount per order item';
+  }
+}
+updateRuleForm();
+</script>
+{% endblock %}

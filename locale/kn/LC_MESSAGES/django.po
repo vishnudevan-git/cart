@@ -1,0 +1,270 @@
+# Kannada translations
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: kn\n"
+
+msgid "English"
+msgstr "ಇಂಗ್ಲಿಷ್"
+
+msgid "Tamil"
+msgstr "ತಮಿಳು"
+
+msgid "Telugu"
+msgstr "తెలుగు"
+
+msgid "Kannada"
+msgstr "ಕನ್ನಡ"
+
+msgid "Hindi"
+msgstr "ಹಿಂದಿ"
+
+msgid "French"
+msgstr "ಫ್ರೆಂಚ್"
+
+msgid "Home"
+msgstr "ಮುಖಪುಟ"
+
+msgid "Shop"
+msgstr "ಅಂಗಡಿ"
+
+msgid "Login"
+msgstr "ಲಾಗಿನ್"
+
+msgid "Register"
+msgstr "ನೋಂದಾಯಿಸಿ"
+
+msgid "Logout"
+msgstr "ಲಾಗ್ಔಟ್"
+
+msgid "Profile"
+msgstr "ಪ್ರೊಫೈಲ್"
+
+msgid "My Orders"
+msgstr "ನನ್ನ ಆರ್ಡರ್‌ಗಳು"
+
+msgid "Dashboard"
+msgstr "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್"
+
+msgid "Search products…"
+msgstr "ಉತ್ಪನ್ನಗಳನ್ನು ಹುಡುಕಿ…"
+
+msgid "Add to Cart"
+msgstr "ಕಾರ್ಟ್‌ಗೆ ಸೇರಿಸಿ"
+
+msgid "Checkout"
+msgstr "ಚೆಕ್ಔಟ್"
+
+msgid "Username"
+msgstr "ಬಳಕೆದಾರ ಹೆಸರು"
+
+msgid "Password"
+msgstr "ಪಾಸ್‌ವರ್ಡ್"
+
+msgid "Submit"
+msgstr "ಸಲ್ಲಿಸಿ"
+
+msgid "Cancel"
+msgstr "ರದ್ದು ಮಾಡಿ"
+
+msgid "Save"
+msgstr "ಉಳಿಸಿ"
+
+msgid "Delete"
+msgstr "ಅಳಿಸಿ"
+
+msgid "Edit"
+msgstr "ಸಂಪಾದಿಸಿ"
+
+msgid "Back"
+msgstr "ಹಿಂದೆ"
+
+msgid "Supplier Portal"
+msgstr "ಸಪ್ಲೈಯರ್ ಪೋರ್ಟಲ್"
+
+msgid "Admin Panel"
+msgstr "ನಿರ್ವಾಹಕ ಫಲಕ"
+
+msgid "Storefront"
+msgstr "ಅಂಗಡಿ ಮುಂಭಾಗ"
+
+msgid "Fresh Organic Food, Direct from Farmers"
+msgstr "ರೈತರಿಂದ ನೇರವಾಗಿ ತಾಜಾ ಸಾವಯವ ಆಹಾರ"
+
+msgid "100% Organic & Natural"
+msgstr "100% ಸಾವಯವ ಮತ್ತು ನೈಸರ್ಗಿಕ"
+
+msgid "Fresh from the Farm."
+msgstr "ಹೊಲದಿಂದ ತಾಜಾ."
+
+msgid "Straight to Your Door."
+msgstr "ನೇರವಾಗಿ ನಿಮ್ಮ ಬಾಗಿಲಿಗೆ."
+
+msgid "LaKrish Mart connects you directly with organic farmers and natural food producers. No middlemen. No chemicals. Just pure, honest food — delivered by your trusted local distributor."
+msgstr "LaKrish Mart ನಿಮ್ಮನ್ನು ಸಾವಯವ ರೈತರೊಂದಿಗೆ ನೇರವಾಗಿ ಸಂಪರ್ಕಿಸುತ್ತದೆ. ಮಧ್ಯವರ್ತಿಗಳಿಲ್ಲ. ರಾಸಾಯನಿಕಗಳಿಲ್ಲ. ಶುದ್ಧ ಆಹಾರ — ನಿಮ್ಮ ವಿಶ್ವಾಸಾರ್ಹ ಸ್ಥಳೀಯ ವಿತರಕರಿಂದ."
+
+msgid "Login to Shop"
+msgstr "ಶಾಪಿಂಗ್‌ಗೆ ಲಾಗಿನ್ ಮಾಡಿ"
+
+msgid "Register Free"
+msgstr "ಉಚಿತವಾಗಿ ನೋಂದಾಯಿಸಿ"
+
+msgid "Dry Fruits & Nuts"
+msgstr "ಒಣ ಹಣ್ಣುಗಳು ಮತ್ತು ಬೀಜಗಳು"
+
+msgid "Spices"
+msgstr "ಮಸಾಲೆಗಳು"
+
+msgid "Natural Foods"
+msgstr "ನೈಸರ್ಗಿಕ ಆಹಾರಗಳು"
+
+msgid "Products"
+msgstr "ಉತ್ಪನ್ನಗಳು"
+
+msgid "Farmers"
+msgstr "ರೈತರು"
+
+msgid "Cities"
+msgstr "ನಗರಗಳು"
+
+msgid "Why LaKrish Mart?"
+msgstr "LaKrish Mart ಏಕೆ?"
+
+msgid "We believe food should be honest, clean, and traceable."
+msgstr "ಆಹಾರ ಪ್ರಾಮಾಣಿಕ, ಶುದ್ಧ ಮತ್ತು ಪತ್ತೆಹಚ್ಚಬಹುದಾದದ್ದಾಗಿರಬೇಕು ಎಂದು ನಾವು ನಂಬುತ್ತೇವೆ."
+
+msgid "Direct from Farmers"
+msgstr "ರೈತರಿಂದ ನೇರವಾಗಿ"
+
+msgid "We source directly from certified organic farmers. No unnecessary middlemen, no inflated prices."
+msgstr "ನಾವು ಪ್ರಮಾಣೀಕೃತ ಸಾವಯವ ರೈತರಿಂದ ನೇರವಾಗಿ ಖರೀದಿಸುತ್ತೇವೆ."
+
+msgid "No Chemicals"
+msgstr "ರಾಸಾಯನಿಕಗಳಿಲ್ಲ"
+
+msgid "Every product is free from synthetic pesticides, preservatives, and artificial additives."
+msgstr "ಪ್ರತಿ ಉತ್ಪನ್ನವು ಕೃತಕ ಕೀಟನಾಶಕಗಳು ಮತ್ತು ಸಂರಕ್ಷಕಗಳಿಂದ ಮುಕ್ತವಾಗಿದೆ."
+
+msgid "Home Made Quality"
+msgstr "ಮನೆ ತಯಾರಿಕೆ ಗುಣಮಟ್ಟ"
+
+msgid "Many of our products are handcrafted in small batches — the way your grandmother used to make them."
+msgstr "ನಮ್ಮ ಅನೇಕ ಉತ್ಪನ್ನಗಳನ್ನು ಸಣ್ಣ ಬ್ಯಾಚ್‌ಗಳಲ್ಲಿ ಕೈಯಿಂದ ತಯಾರಿಸಲಾಗುತ್ತದೆ."
+
+msgid "Local Delivery"
+msgstr "ಸ್ಥಳೀಯ ಡೆಲಿವರಿ"
+
+msgid "Your local distributor delivers fresh to your doorstep. Fast, reliable, and community-driven."
+msgstr "ನಿಮ್ಮ ಸ್ಥಳೀಯ ವಿತರಕರು ತಾಜಾ ಉತ್ಪನ್ನಗಳನ್ನು ನಿಮ್ಮ ಮನೆ ಬಾಗಿಲಿಗೆ ತಲುಪಿಸುತ್ತಾರೆ."
+
+msgid "What We Offer"
+msgstr "ನಾವು ಏನು ನೀಡುತ್ತೇವೆ"
+
+msgid "A curated selection of nature's best — in every size you need."
+msgstr "ಪ್ರಕೃತಿಯ ಅತ್ಯುತ್ತಮ ಆಯ್ಕೆ — ನಿಮಗೆ ಬೇಕಾದ ಪ್ರತಿ ಗಾತ್ರದಲ್ಲಿ."
+
+msgid "Dry Fruits"
+msgstr "ಒಣ ಹಣ್ಣುಗಳು"
+
+msgid "Dates, Apricots, Raisins"
+msgstr "ಖರ್ಜೂರ, ಆಪ್ರಿಕಾಟ್, ಒಣದ್ರಾಕ್ಷಿ"
+
+msgid "Nuts"
+msgstr "ಬೀಜಗಳು"
+
+msgid "Almonds, Cashews, Walnuts"
+msgstr "ಬಾದಾಮಿ, ಗೋಡಂಬಿ, ವಾಲ್‌ನಟ್"
+
+msgid "Pepper, Cardamom, Cinnamon"
+msgstr "ಮೆಣಸು, ಏಲಕ್ಕಿ, ದಾಲ್ಚಿನ್ನಿ"
+
+msgid "Seeds"
+msgstr "ಬೀಜಗಳು"
+
+msgid "Chia, Flax, Sunflower"
+msgstr "ಚಿಯಾ, ಅಗಸೆ, ಸೂರ್ಯಕಾಂತಿ"
+
+msgid "Turmeric, Honey, Coconut Oil"
+msgstr "ಅರಿಶಿನ, ಜೇನುತುಪ್ಪ, ತೆಂಗಿನ ಎಣ್ಣೆ"
+
+msgid "Cold-pressed oils, raw honey"
+msgstr "ಕೋಲ್ಡ್-ಪ್ರೆಸ್ಡ್ ಎಣ್ಣೆಗಳು, ಕಚ್ಚಾ ಜೇನುತುಪ್ಪ"
+
+msgid "How It Works"
+msgstr "ಇದು ಹೇಗೆ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತದೆ"
+
+msgid "Simple, transparent, and community-powered."
+msgstr "ಸರಳ, ಪಾರದರ್ಶಕ ಮತ್ತು ಸಮುದಾಯ-ಚಾಲಿತ."
+
+msgid "Create your free account. Use your distributor's invite code to shop from their store."
+msgstr "ನಿಮ್ಮ ಉಚಿತ ಖಾತೆ ರಚಿಸಿ. ವಿತರಕರ ಆಹ್ವಾನ ಕೋಡ್ ಬಳಸಿ."
+
+msgid "Browse & Choose"
+msgstr "ಬ್ರೌಸ್ ಮಾಡಿ ಆಯ್ಕೆ ಮಾಡಿ"
+
+msgid "See your distributor's curated product list with their prices. Pick your size and quantity."
+msgstr "ವಿತರಕರ ಉತ್ಪನ್ನ ಪಟ್ಟಿಯನ್ನು ಬೆಲೆಗಳೊಂದಿಗೆ ನೋಡಿ."
+
+msgid "Place Order"
+msgstr "ಆರ್ಡರ್ ಮಾಡಿ"
+
+msgid "Add to cart and checkout. Pay on delivery or via UPI. No advance payment required."
+msgstr "ಕಾರ್ಟ್‌ಗೆ ಸೇರಿಸಿ ಮತ್ತು ಚೆಕ್ಔಟ್ ಮಾಡಿ. ಡೆಲಿವರಿಯಲ್ಲಿ ಅಥವಾ UPI ಮೂಲಕ ಪಾವತಿಸಿ."
+
+msgid "Get Delivered"
+msgstr "ಡೆಲಿವರಿ ಪಡೆಯಿರಿ"
+
+msgid "Your local distributor delivers fresh organic products right to your door."
+msgstr "ನಿಮ್ಮ ಸ್ಥಳೀಯ ವಿತರಕರು ತಾಜಾ ಸಾವಯವ ಉತ್ಪನ್ನಗಳನ್ನು ನಿಮ್ಮ ಬಾಗಿಲಿಗೆ ತಲುಪಿಸುತ್ತಾರೆ."
+
+msgid "Our Promise to You"
+msgstr "ನಿಮಗೆ ನಮ್ಮ ವಾಗ್ದಾನ"
+
+msgid "Certified Organic"
+msgstr "ಪ್ರಮಾಣೀಕೃತ ಸಾವಯವ"
+
+msgid "All products sourced from verified organic farms and natural producers."
+msgstr "ಎಲ್ಲಾ ಉತ್ಪನ್ನಗಳು ಪರಿಶೀಲಿಸಲಾದ ಸಾವಯವ ಜಮೀನುಗಳಿಂದ."
+
+msgid "Fair Prices"
+msgstr "ನ್ಯಾಯಯುತ ಬೆಲೆಗಳು"
+
+msgid "Direct sourcing means better prices for you and fair pay for farmers."
+msgstr "ನೇರ ಖರೀದಿ ಎಂದರೆ ನಿಮಗೆ ಉತ್ತಮ ಬೆಲೆ ಮತ್ತು ರೈತರಿಗೆ ನ್ಯಾಯಯುತ ವೇತನ."
+
+msgid "Fresh Stock"
+msgstr "ತಾಜಾ ಸ್ಟಾಕ್"
+
+msgid "Products are sourced in small batches to ensure freshness and quality."
+msgstr "ತಾಜಾತನ ಮತ್ತು ಗುಣಮಟ್ಟ ಖಚಿತಪಡಿಸಲು ಸಣ್ಣ ಬ್ಯಾಚ್‌ಗಳಲ್ಲಿ ಉತ್ಪನ್ನಗಳನ್ನು ತರಲಾಗುತ್ತದೆ."
+
+msgid "Community First"
+msgstr "ಸಮುದಾಯ ಮೊದಲು"
+
+msgid "We support local distributors and farmers in your neighbourhood."
+msgstr "ನಾವು ನಿಮ್ಮ ನೆರೆಹೊರೆಯ ಸ್ಥಳೀಯ ವಿತರಕರು ಮತ್ತು ರೈತರನ್ನು ಬೆಂಬಲಿಸುತ್ತೇವೆ."
+
+msgid "Organic Certified"
+msgstr "ಸಾವಯವ ಪ್ರಮಾಣೀಕೃತ"
+
+msgid "Artificial Additives"
+msgstr "ಕೃತಕ ಸೇರ್ಪಡೆಗಳು"
+
+msgid "Farmer Partners"
+msgstr "ರೈತ ಪಾಲುದಾರರು"
+
+msgid "Happy Customers"
+msgstr "ಸಂತೋಷದ ಗ್ರಾಹಕರು"
+
+msgid "Ready to eat clean?"
+msgstr "ಶುದ್ಧವಾಗಿ ತಿನ್ನಲು ಸಿದ್ಧರಿದ್ದೀರಾ?"
+
+msgid "Join thousands of families who have switched to organic living with LaKrish Mart."
+msgstr "LaKrish Mart ನೊಂದಿಗೆ ಸಾವಯವ ಜೀವನಕ್ಕೆ ಬದಲಾದ ಸಾವಿರಾರು ಕುಟುಂಬಗಳಿಗೆ ಸೇರಿ."
+
+msgid "Create Free Account"
+msgstr "ಉಚಿತ ಖಾತೆ ರಚಿಸಿ"
+
+msgid "Have a distributor code? Enter it during registration to shop from your local store."
+msgstr "ವಿತರಕ ಕೋಡ್ ಇದೆಯೇ? ನೋಂದಣಿ ಸಮಯದಲ್ಲಿ ನಮೂದಿಸಿ."

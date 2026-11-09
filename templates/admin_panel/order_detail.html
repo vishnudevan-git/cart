@@ -1,0 +1,77 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Order #{{ order.id }}{% endblock %}
+{% block page_title %}Order #{{ order.id }}{% endblock %}
+{% block active_nav %}order_list{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <!-- Items -->
+  <div class="col-12 col-md-8">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header fw-semibold">Order Items</div>
+      <!-- Desktop -->
+      <div class="table-wrap d-none d-sm-block">
+        <table class="table align-middle mb-0">
+          <thead class="table-light"><tr><th>Product</th><th>Supplier</th><th>Qty</th><th>Price</th><th>Subtotal</th><th>Supplier stage</th></tr></thead>
+          <tbody>
+            {% for item in order.items.all %}
+            <tr {% if item.supplier_shipment.status == 'unavailable' %}class="table-danger"{% elif item.supplier_shipment.status == 'delayed' %}class="table-warning"{% endif %}>
+              <td>{{ item.product.name|default:"(deleted)" }}</td>
+              <td>{{ item.product.supplier.company_name|default:"—" }}</td>
+              <td>{{ item.quantity }}</td>
+              <td>₹{{ item.price }}</td>
+              <td class="fw-semibold">₹{{ item.subtotal }}</td>
+              <td>
+                {% if item.supplier_shipment %}
+                  {% include 'partials/supplier_stage.html' with ship=item.supplier_shipment audience='receiver' %}
+                  {% if item.supplier_shipment.issue_note %}
+                    <div class="small text-muted mt-1"><i class="bi bi-lock me-1"></i>Supplier note: {{ item.supplier_shipment.issue_note }}</div>
+                  {% endif %}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <!-- Mobile -->
+      <div class="d-sm-none p-2">
+        {% for item in order.items.all %}
+        <div class="d-flex justify-content-between py-2 border-bottom small">
+          <div>
+            <div class="fw-semibold">{{ item.product.name|default:"(deleted)" }}</div>
+            <div class="text-muted">{{ item.product.supplier.company_name|default:"—" }} · ₹{{ item.price }} × {{ item.quantity }}</div>
+          </div>
+          <span class="fw-bold">₹{{ item.subtotal }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      <div class="card-footer text-end fw-bold">Total: ₹{{ order.total_amount }}</div>
+    </div>
+  </div>
+
+  <!-- Info + Status -->
+  <div class="col-12 col-md-4">
+    <div class="card border-0 shadow-sm p-3 mb-3">
+      <h6 class="fw-semibold mb-3">Customer Info</h6>
+      <div class="small">
+        <p class="mb-1"><strong>Name:</strong> {{ order.customer.get_full_name|default:order.customer.username }}</p>
+        <p class="mb-1"><strong>Phone:</strong> {{ order.phone }}</p>
+        <p class="mb-0"><strong>Address:</strong> {{ order.address }}</p>
+      </div>
+    </div>
+    <div class="card border-0 shadow-sm p-3">
+      <h6 class="fw-semibold mb-3">Update Status</h6>
+      <form method="post" action="{% url 'admin_panel:update_order_status' order.pk %}">
+        {% csrf_token %}
+        <select name="status" class="form-select mb-2">
+          {% for val, label in order.STATUS_CHOICES %}
+            <option value="{{ val }}" {% if order.status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-success w-100">Update Status</button>
+      </form>
+    </div>
+  </div>
+</div>
+<a href="{% url 'admin_panel:order_list' %}" class="btn btn-outline-secondary mt-2">← Back to Orders</a>
+{% endblock %}

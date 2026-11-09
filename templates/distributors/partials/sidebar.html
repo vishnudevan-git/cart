@@ -1,0 +1,15 @@
+<a class="nav-link {% if active_nav == 'dashboard' %}active{% endif %}" href="{% url 'distributors:dashboard' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+<a class="nav-link {% if active_nav == 'product_catalogue' %}active{% endif %}" href="{% url 'distributors:product_catalogue' %}"><i class="bi bi-grid"></i> Product Catalogue</a>
+<a class="nav-link {% if active_nav == 'own_products' %}active{% endif %}" href="{% url 'distributors:own_product_list' %}"><i class="bi bi-basket"></i> My Own Products</a>
+<a class="nav-link {% if active_nav == 'orders' %}active{% endif %}" href="{% url 'distributors:order_list' %}"><i class="bi bi-receipt"></i> Orders</a>
+<a class="nav-link {% if active_nav == 'customers' %}active{% endif %}" href="{% url 'distributors:customer_list' %}"><i class="bi bi-people"></i> Customers</a>
+<a class="nav-link {% if active_nav == 'claim_customer' %}active{% endif %}" href="{% url 'distributors:claim_customer' %}"><i class="bi bi-person-plus"></i> Link Customer</a>
+<a class="nav-link {% if active_nav == 'my_stock' %}active{% endif %}" href="{% url 'distributors:my_stock' %}"><i class="bi bi-boxes"></i> My Stock</a>
+{% if site_settings.rentals_enabled %}<a class="nav-link {% if active_nav == 'rentals' %}active{% endif %}" href="{% url 'rentals:shop_items' %}"><i class="bi bi-tools"></i> Rentals</a>{% endif %}
+<a class="nav-link {% if active_nav == 'delivery_zones' %}active{% endif %}" href="{% url 'distributors:delivery_zones' %}"><i class="bi bi-geo-alt"></i> Delivery Zones</a>
+<a class="nav-link {% if active_nav == 'reward_settings' %}active{% endif %}" href="{% url 'distributors:reward_settings' %}"><i class="bi bi-gift"></i> Reward Points</a>
+<a class="nav-link {% if active_nav == 'earnings' %}active{% endif %}" href="{% url 'distributors:earnings' %}"><i class="bi bi-currency-rupee"></i> Earnings</a>
+<a class="nav-link {% if active_nav == 'price_history' %}active{% endif %}" href="{% url 'distributors:price_history' %}"><i class="bi bi-graph-up"></i> Price History</a>
+<a class="nav-link {% if active_nav == 'restock_requests' %}active{% endif %}" href="{% url 'distributors:restock_requests' %}"><i class="bi bi-arrow-repeat"></i> Restock Requests</a>
+<a class="nav-link {% if active_nav == 'settings' %}active{% endif %}" href="{% url 'distributors:settings' %}"><i class="bi bi-gear"></i> Settings</a>
+<a class="nav-link {% if active_nav == 'support' %}active{% endif %}" href="{% url 'support:my_tickets' %}"><i class="bi bi-headset"></i> Support</a>

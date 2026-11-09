@@ -1,0 +1,113 @@
+{% extends 'stockist/base_stockist.html' %}
+{% block active_nav %}orders{% endblock %}
+{% block title %}Order #{{ order.id }} — Stockist{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h4 class="mb-0"><i class="bi bi-bag-check me-2"></i>Order #{{ order.id }}</h4>
+  <a href="{% url 'stockist:order_list' %}" class="btn btn-sm btn-outline-secondary">← Back to Orders</a>
+</div>
+
+<div class="row g-4">
+  <!-- Order Items -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-dark text-white">
+        <strong>Items to Collect from Supplier</strong>
+      </div>
+      <div class="card-body p-0">
+        {% if not_ready_count %}
+        <div class="alert alert-warning m-3 mb-0 py-2 small">
+          <i class="bi bi-hourglass-split me-1"></i>
+          {{ not_ready_count }} item{{ not_ready_count|pluralize }} not packed by the supplier yet. Check the status column before you go.
+        </div>
+        {% endif %}
+        <table class="table mb-0 align-middle">
+          <thead class="table-light">
+            <tr>
+              <th>Product</th>
+              <th>Supplier</th>
+              <th>Pack Size</th>
+              <th>Qty</th>
+              <th>Supplier status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in order.items.all %}
+            <tr>
+              <td><strong>{{ item.product.name }}</strong></td>
+              <td>{{ item.product.supplier.company_name }}</td>
+              <td>{{ item.variant_label|default:"—" }}</td>
+              <td><span class="badge bg-primary fs-6">{{ item.quantity }}</span></td>
+              <td>
+                {% if item.supplier_shipment %}
+                  {% if item.supplier_shipment.target == 'stockist' %}
+                    {% include 'partials/supplier_stage.html' with ship=item.supplier_shipment audience='receiver' %}
+                  {% else %}
+                    <span class="text-muted small">Goes direct to {{ item.supplier_shipment.get_target_display }}. Not for you to collect.</span>
+                  {% endif %}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Status & Actions -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-dark text-white"><strong>Delivery Info</strong></div>
+      <div class="card-body">
+        <p class="mb-1"><strong>Marketplace:</strong> {{ order.distributor.company_name|default:"—" }}</p>
+        <p class="mb-1"><strong>Customer:</strong> {{ order.customer.get_full_name|default:order.customer.username }}</p>
+        <p class="mb-1"><strong>Address:</strong> {{ order.address }}</p>
+        <p class="mb-0"><strong>Phone:</strong> {{ order.phone }}</p>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+      <div class="card-header bg-dark text-white"><strong>Current Status</strong></div>
+      <div class="card-body">
+        {% if order.status == 'confirmed' %}
+          <div class="alert alert-warning mb-3">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <strong>Action needed:</strong> Go to supplier and pick up these items.
+          </div>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="pick">
+            <button type="submit" class="btn btn-warning w-100">
+              <i class="bi bi-bag-check me-1"></i> Mark as Picked from Supplier
+            </button>
+          </form>
+
+        {% elif order.status == 'stockist_picked' %}
+          <div class="alert alert-info mb-3">
+            <i class="bi bi-truck me-1"></i>
+            <strong>Items picked.</strong> Now deliver to marketplace: <strong>{{ order.distributor.company_name }}</strong>
+          </div>
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="deliver">
+            <button type="submit" class="btn btn-success w-100">
+              <i class="bi bi-building-check me-1"></i> Delivered to Marketplace
+            </button>
+          </form>
+
+        {% elif order.status == 'at_distributor' %}
+          <div class="alert alert-success mb-0">
+            <i class="bi bi-check-circle me-1"></i>
+            <strong>Done!</strong> Items delivered to distributor. Your job is complete.
+          </div>
+
+        {% else %}
+          <span class="badge bg-secondary">{{ order.get_status_display }}</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% comment %}Shared customer account sidebar. Pass `active` =
+profile | addresses | orders | password | rewards | rentals.
+Single source of truth — previously duplicated (and drifting) across
+profile / addresses / my_rewards.{% endcomment %}
+{% with act=" fw-bold border-start border-4 border-success text-success" base="list-group-item list-group-item-action border-0" %}
+<div class="list-group rounded-0 border-0">
+  <div class="text-muted small fw-bold mb-2 ps-3">PERSONAL DETAILS</div>
+  <a href="{% url 'accounts:profile' %}" class="{{ base }}{% if active == 'profile' %}{{ act }}{% endif %}">Edit Profile</a>
+  <a href="{% url 'accounts:addresses' %}" class="{{ base }}{% if active == 'addresses' %}{{ act }}{% endif %}">Delivery Addresses</a>
+
+  <div class="text-muted small fw-bold mt-4 mb-2 ps-3">MY ACCOUNT</div>
+  <a href="{% url 'orders:order_list' %}" class="{{ base }}{% if active == 'orders' %}{{ act }}{% endif %}">My Orders</a>
+  {% if site_settings.rentals_enabled %}<a href="{% url 'rentals:customer_bookings' %}" class="{{ base }}{% if active == 'rentals' %}{{ act }}{% endif %}">🛠️ My Rentals</a>{% endif %}
+  <a href="{% url 'accounts:change_password' %}" class="{{ base }}{% if active == 'password' %}{{ act }}{% endif %}">Change Password</a>
+  <a href="{% url 'accounts:my_rewards' %}" class="{{ base }}{% if active == 'rewards' %}{{ act }}{% endif %}">🎁 Reward Points</a>
+</div>
+{% endwith %}

@@ -1,0 +1,15 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% block title %}Delete Product{% endblock %}
+{% block page_title %}Delete Product{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='product_list' %}{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm p-4" style="max-width:400px">
+  <h5>Delete "{{ product.name }}"?</h5>
+  <p class="text-muted">This action cannot be undone.</p>
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-danger">Yes, Delete</button>
+    <a href="{% url 'suppliers:product_list' %}" class="btn btn-outline-secondary ms-2">Cancel</a>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product Lifecycle and Price Flow Visualizer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-1: #fffaf2;
+      --bg-2: #e6f4ea;
+      --ink: #1e2a2f;
+      --muted: #5e6d74;
+      --line: #d5dfdd;
+      --card: #ffffff;
+      --supplier: #2a9d8f;
+      --stockist: #f4a261;
+      --distributor: #e76f51;
+      --customer: #457b9d;
+      --state: #264653;
+      --ok: #0f8b8d;
+      --warn: #b08900;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Space Grotesk", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 5% 10%, rgba(244, 162, 97, 0.14), transparent 42%),
+        radial-gradient(circle at 90% 20%, rgba(42, 157, 143, 0.16), transparent 36%),
+        linear-gradient(145deg, var(--bg-1), var(--bg-2));
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1200px, 94vw);
+      margin: 28px auto 36px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero {
+      background: linear-gradient(120deg, #ffffff 0%, #f5fbfa 100%);
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 14px 40px rgba(32, 58, 67, 0.08);
+      animation: riseIn 480ms ease-out;
+    }
+
+    .kicker {
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin: 8px 0 4px;
+      font-family: "Fraunces", serif;
+      font-size: clamp(26px, 3.2vw, 44px);
+      line-height: 1.1;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      box-shadow: 0 10px 28px rgba(30, 42, 47, 0.05);
+      animation: riseIn 550ms ease-out;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .inputs {
+      display: grid;
+      gap: 10px;
+    }
+
+    .field {
+      display: grid;
+      gap: 5px;
+    }
+
+    label {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    input[type="number"], select {
+      width: 100%;
+      border: 1px solid #cad6d3;
+      border-radius: 10px;
+      padding: 10px 12px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #ffffff;
+    }
+
+    input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: #216869;
+    }
+
+    .preset-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .preset-btn {
+      border: 1px solid #b9cbc7;
+      background: #f4fbfa;
+      color: #20434a;
+      border-radius: 999px;
+      padding: 7px 12px;
+      font-weight: 700;
+      font-size: 12px;
+      cursor: pointer;
+      transition: transform 140ms ease, box-shadow 140ms ease;
+    }
+
+    .preset-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 14px rgba(35, 83, 78, 0.14);
+    }
+
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .metric {
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      padding: 10px;
+      background: #fdfefe;
+    }
+
+    .metric .name {
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--muted);
+      letter-spacing: 0.07em;
+      font-weight: 700;
+    }
+
+    .metric .val {
+      margin-top: 4px;
+      font-size: 24px;
+      font-weight: 700;
+      font-family: "Fraunces", serif;
+    }
+
+    .flow-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .flow-row {
+      display: grid;
+      grid-template-columns: 180px 1fr 110px;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 10px;
+      border: 1px solid #e3eaea;
+      border-radius: 12px;
+      background: #ffffff;
+    }
+
+    .role {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .bar-wrap {
+      height: 14px;
+      border-radius: 999px;
+      background: #eef4f2;
+      overflow: hidden;
+    }
+
+    .bar {
+      height: 100%;
+      border-radius: 999px;
+      width: 0;
+      transition: width 350ms ease;
+    }
+
+    .r-supplier { background: var(--supplier); }
+    .r-stockist { background: var(--stockist); }
+    .r-distributor { background: var(--distributor); }
+    .r-customer { background: var(--customer); }
+
+    .price {
+      text-align: right;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .timeline {
+      display: grid;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .state {
+      border: 1px solid #dce7e4;
+      border-left: 5px solid var(--state);
+      border-radius: 12px;
+      padding: 10px 12px;
+      background: #fbfefd;
+      display: grid;
+      gap: 4px;
+    }
+
+    .state .head {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .state .name {
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .state .owner {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      font-weight: 700;
+    }
+
+    .state .note {
+      font-size: 13px;
+      color: #304247;
+    }
+
+    .logic {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #314247;
+      line-height: 1.5;
+      background: #f8fcfb;
+      border: 1px dashed #c5d8d2;
+      border-radius: 12px;
+      padding: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      border-radius: 999px;
+      padding: 4px 9px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-left: 6px;
+    }
+
+    .badge.ok { background: #d9f4f5; color: #0c5f65; }
+    .badge.warn { background: #fff2cc; color: #765b00; }
+
+    @keyframes riseIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @media (max-width: 980px) {
+      .grid { grid-template-columns: 1fr; }
+      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .flow-row { grid-template-columns: 1fr; }
+      .price { text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div class="kicker">Interactive Learning View</div>
+      <h1>Product Life Cycle with Price Flow</h1>
+      <p class="sub">See how one product moves from Supplier to Customer, and how each role changes price and state at every step.</p>
+    </section>
+
+    <section class="grid">
+      <aside class="card">
+        <h2>Live Selectors</h2>
+        <div class="inputs">
+          <div class="field">
+            <label for="distributorSelect">Marketplace</label>
+            <select id="distributorSelect"></select>
+          </div>
+          <div class="field" id="stockistField">
+            <label for="stockistSelect">Stockist</label>
+            <select id="stockistSelect"></select>
+          </div>
+          <div class="field">
+            <label for="productSelect">Visible Products (for selected marketplace)</label>
+            <select id="productSelect"></select>
+          </div>
+          <div class="field">
+            <label for="variantSelect">Variant</label>
+            <select id="variantSelect"></select>
+          </div>
+          <div class="field">
+            <label for="chargeScopeView">Stockist Charge Scopes Used</label>
+            <input id="chargeScopeView" type="text" value="Loading..." readonly>
+          </div>
+
+          <div class="logic" id="metaBlock"></div>
+        </div>
+
+        <div class="logic" id="logicBlock"></div>
+      </aside>
+
+      <section class="card">
+        <h2>Role Price Snapshot</h2>
+        <div class="summary">
+          <article class="metric">
+            <div class="name">Supplier Set Price</div>
+            <div class="val" id="mSupplier">Rs 0</div>
+          </article>
+          <article class="metric">
+            <div class="name">Stockist Price</div>
+            <div class="val" id="mStockist">Rs 0</div>
+          </article>
+          <article class="metric">
+            <div class="name">Marketplace Price</div>
+            <div class="val" id="mMarketplace">Rs 0</div>
+          </article>
+          <article class="metric">
+            <div class="name">Customer Pays</div>
+            <div class="val" id="mCustomer">Rs 0</div>
+          </article>
+        </div>
+
+        <div class="flow-grid">
+          <div class="flow-row">
+            <div class="role">Supplier to Stockist</div>
+            <div class="bar-wrap"><div id="barSupplier" class="bar r-supplier"></div></div>
+            <div id="pSupplier" class="price">Rs 0</div>
+          </div>
+          <div class="flow-row">
+            <div class="role">Stockist to Marketplace</div>
+            <div class="bar-wrap"><div id="barStockist" class="bar r-stockist"></div></div>
+            <div id="pStockist" class="price">Rs 0</div>
+          </div>
+          <div class="flow-row">
+            <div class="role">Marketplace to Customer</div>
+            <div class="bar-wrap"><div id="barMarketplace" class="bar r-distributor"></div></div>
+            <div id="pMarketplace" class="price">Rs 0</div>
+          </div>
+          <div class="flow-row">
+            <div class="role">Final Customer Checkout</div>
+            <div class="bar-wrap"><div id="barCustomer" class="bar r-customer"></div></div>
+            <div id="pCustomer" class="price">Rs 0</div>
+          </div>
+        </div>
+
+        <h2 style="margin-top:16px;">Lifecycle States by Role</h2>
+        <div class="timeline" id="stateList"></div>
+
+        <h2 style="margin-top:16px;">Stockist Charge Breakdown</h2>
+        <div class="timeline" id="chargeList"></div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const inputs = {
+        productSelect: document.getElementById('productSelect'),
+        variantSelect: document.getElementById('variantSelect'),
+        distributorSelect: document.getElementById('distributorSelect'),
+        stockistSelect: document.getElementById('stockistSelect'),
+        chargeScopeView: document.getElementById('chargeScopeView'),
+        stockistField: document.getElementById('stockistField')
+      };
+
+      const out = {
+        mSupplier: document.getElementById('mSupplier'),
+        mStockist: document.getElementById('mStockist'),
+        mMarketplace: document.getElementById('mMarketplace'),
+        mCustomer: document.getElementById('mCustomer'),
+        pSupplier: document.getElementById('pSupplier'),
+        pStockist: document.getElementById('pStockist'),
+        pMarketplace: document.getElementById('pMarketplace'),
+        pCustomer: document.getElementById('pCustomer'),
+        barSupplier: document.getElementById('barSupplier'),
+        barStockist: document.getElementById('barStockist'),
+        barMarketplace: document.getElementById('barMarketplace'),
+        barCustomer: document.getElementById('barCustomer'),
+        metaBlock: document.getElementById('metaBlock'),
+        logicBlock: document.getElementById('logicBlock'),
+        stateList: document.getElementById('stateList'),
+        chargeList: document.getElementById('chargeList')
+      };
+
+      const stateTemplate = [
+        { name: 'Product Drafted', owner: 'Supplier', note: 'Supplier creates product with base cost and stock details.' },
+        { name: 'Quality and Role Validation', owner: 'Admin', note: 'Admin validates supplier, role permissions, and product readiness.' },
+        { name: 'Supplier Listing Active', owner: 'Supplier', note: 'Supplier sell price is available to downstream role.' },
+        { name: 'Stockist Procurement', owner: 'Stockist', note: 'Stockist charges are resolved by scope priority: Product > Supplier > Global.' },
+        { name: 'Marketplace Catalogue Pricing', owner: 'Marketplace', note: 'Marketplace margin mode/value comes from actual distributor product settings.' },
+        { name: 'Customer Order and Checkout', owner: 'Customer', note: 'Customer sees distributor final sell price at checkout.' },
+        { name: 'Order Fulfillment and Settlement', owner: 'All Roles', note: 'Delivery, payment, and settlement complete the lifecycle.' }
+      ];
+
+      function r(v) {
+        return Math.round(v);
+      }
+
+      function money(v) {
+        return 'Rs ' + r(v);
+      }
+
+      function renderStates(flags) {
+        out.stateList.innerHTML = '';
+        stateTemplate.forEach((s, idx) => {
+          const item = document.createElement('article');
+          item.className = 'state';
+
+          const capBadge = idx === 4 && flags.capApplied
+            ? '<span class="badge warn">cap applied</span>'
+            : '';
+          const mrpBadge = idx === 4 && flags.mrpApplied
+            ? '<span class="badge ok">mrp bounded</span>'
+            : '';
+
+          item.innerHTML =
+            '<div class="head">' +
+              '<div class="name">' + (idx + 1) + '. ' + s.name + capBadge + mrpBadge + '</div>' +
+              '<div class="owner">' + s.owner + '</div>' +
+            '</div>' +
+            '<div class="note">' + s.note + '</div>';
+
+          out.stateList.appendChild(item);
+        });
+      }
+
+      function setOptions(selectEl, items, getValue, getLabel) {
+        selectEl.innerHTML = '';
+        items.forEach((it) => {
+          const op = document.createElement('option');
+          op.value = getValue(it);
+          op.textContent = getLabel(it);
+          selectEl.appendChild(op);
+        });
+      }
+
+      function renderChargeBreakdown(charges) {
+        out.chargeList.innerHTML = '';
+        if (!charges || !charges.length) {
+          const item = document.createElement('article');
+          item.className = 'state';
+          item.innerHTML = '<div class="name">No stockist charges found</div><div class="note">This product currently has no active charge rows for selected stockist/supplier/product scope.</div>';
+          out.chargeList.appendChild(item);
+          inputs.chargeScopeView.value = 'None';
+          return;
+        }
+
+        const scopes = new Set();
+        charges.forEach((c) => {
+          scopes.add(c.scope);
+          const item = document.createElement('article');
+          item.className = 'state';
+          item.innerHTML =
+            '<div class="head">' +
+              '<div class="name">' + c.stage + '</div>' +
+              '<div class="owner">' + c.scope + '</div>' +
+            '</div>' +
+            '<div class="note">' + c.type + ' | value ' + c.value + ' | amount Rs ' + r(c.amount) + '</div>';
+          out.chargeList.appendChild(item);
+        });
+        inputs.chargeScopeView.value = Array.from(scopes).join(', ');
+      }
+
+      function renderPrices(data) {
+        const supplier = data.price.supplier;
+        const stockist = data.price.stockist;
+        const distributor = data.price.distributor_live;
+        const customer = data.price.customer;
+
+        out.mSupplier.textContent = money(supplier);
+        out.mStockist.textContent = money(stockist);
+        out.mMarketplace.textContent = money(distributor);
+        out.mCustomer.textContent = money(customer);
+
+        out.pSupplier.textContent = money(supplier);
+        out.pStockist.textContent = money(stockist);
+        out.pMarketplace.textContent = money(distributor);
+        out.pCustomer.textContent = money(customer);
+
+        const maxPrice = Math.max(supplier, stockist, distributor, customer, 1);
+        out.barSupplier.style.width = ((supplier / maxPrice) * 100).toFixed(2) + '%';
+        out.barStockist.style.width = ((stockist / maxPrice) * 100).toFixed(2) + '%';
+        out.barMarketplace.style.width = ((distributor / maxPrice) * 100).toFixed(2) + '%';
+        out.barCustomer.style.width = ((customer / maxPrice) * 100).toFixed(2) + '%';
+
+        const stockistGain = stockist - supplier;
+        const distributorGain = distributor - stockist;
+
+        out.metaBlock.innerHTML =
+          '<strong>Live source:</strong> Product ' + data.product.name + ' | Variant ' + data.variant.label + '<br>' +
+          'Marketplace mode: <strong>' + data.distributor.margin_mode + '</strong> value <strong>' + data.distributor.margin_value + '</strong><br>' +
+          'Unit: <strong>' + data.product.master_unit + '</strong> | unit_grams: <strong>' + data.variant.unit_grams + '</strong> | show_mrp: <strong>' + data.product.show_mrp + '</strong>';
+
+        out.logicBlock.innerHTML =
+          '<strong>Live pricing path:</strong> Supplier -> Stockist (charges) -> Marketplace -> Customer<br>' +
+          'Supplier: <strong>' + money(supplier) + '</strong> | ' +
+          'Stockist gain: <strong>' + money(stockistGain) + '</strong> | ' +
+          'Marketplace gain: <strong>' + money(distributorGain) + '</strong> | ' +
+          'Customer: <strong>' + money(customer) + '</strong>' +
+          '<br>' +
+          (data.distributor.auto_list_margin_cap_percent === null
+            ? '<span class="badge warn">No global cap configured for this marketplace</span>'
+            : 'Cap setting: <strong>' + data.distributor.auto_list_margin_cap_percent + '%</strong>') +
+          (data.price.used_live_dvp ? ' <span class="badge ok">Using saved live marketplace variant price</span>' : ' <span class="badge warn">Using calculated fallback (no saved variant price)</span>') +
+          (data.price.below_stockist
+            ? '<br><span class="badge warn">Warning: live marketplace price is below current stockist cost by ' + money(data.price.loss_amount) + '</span> This usually means an older saved distributor price is still active while stockist charges changed later.'
+            : '');
+
+        renderStates({ capApplied: data.price.cap_applied, mrpApplied: data.price.mrp_applied });
+        renderChargeBreakdown(data.stockist.charges_breakdown);
+      }
+
+      async function fetchJSON(url) {
+        const r = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+        if (!r.ok) throw new Error('Request failed: ' + r.status);
+        return await r.json();
+      }
+
+      async function loadVariants() {
+        const productId = inputs.productSelect.value;
+        const distributorId = inputs.distributorSelect.value;
+        if (!productId) return;
+        const data = await fetchJSON(
+          '/product-lifecycle/api/?action=variants&product_id=' + encodeURIComponent(productId)
+          + '&distributor_id=' + encodeURIComponent(distributorId)
+        );
+        setOptions(inputs.variantSelect, data.variants, (v) => v.id, (v) => v.label + ' | Rs ' + r(v.selling_price));
+      }
+
+      async function loadProductsForMarketplace() {
+        const distributorId = inputs.distributorSelect.value;
+        if (!distributorId) return;
+        const data = await fetchJSON('/product-lifecycle/api/?action=products&distributor_id=' + encodeURIComponent(distributorId));
+        if (!data.products.length) {
+          inputs.productSelect.innerHTML = '';
+          inputs.variantSelect.innerHTML = '';
+          out.logicBlock.textContent = 'No storefront-visible products found for this distributor with current rules.';
+          return;
+        }
+        setOptions(inputs.productSelect, data.products, (p) => p.id, (p) => p.name + ' | ' + p.supplier);
+      }
+
+      async function loadPrice() {
+        const pid = inputs.productSelect.value;
+        const vid = inputs.variantSelect.value;
+        const did = inputs.distributorSelect.value;
+        const sid = inputs.stockistSelect.value;
+        if (!pid || !vid || !did || !sid) return;
+
+        const url = '/product-lifecycle/api/?action=price'
+          + '&product_id=' + encodeURIComponent(pid)
+          + '&variant_id=' + encodeURIComponent(vid)
+          + '&distributor_id=' + encodeURIComponent(did)
+          + '&stockist_id=' + encodeURIComponent(sid);
+
+        const data = await fetchJSON(url);
+        if (!data.ok) return;
+        renderPrices(data);
+      }
+
+      async function init() {
+        try {
+          const data = await fetchJSON('/product-lifecycle/api/?action=init');
+          setOptions(inputs.distributorSelect, data.distributors, (d) => d.id, (d) => d.name);
+          setOptions(inputs.stockistSelect, data.stockists, (s) => s.id, (s) => s.name);
+
+          if ((data.stockists || []).length <= 1) {
+            inputs.stockistField.style.display = 'none';
+          } else {
+            inputs.stockistField.style.display = '';
+          }
+
+          if (data.preferred_distributor_id) {
+            inputs.distributorSelect.value = String(data.preferred_distributor_id);
+          }
+          await loadProductsForMarketplace();
+          await loadVariants();
+          await loadPrice();
+        } catch (e) {
+          out.logicBlock.textContent = 'Failed to load realtime data: ' + e.message;
+        }
+      }
+
+      inputs.productSelect.addEventListener('change', async function () {
+        await loadVariants();
+        await loadPrice();
+      });
+
+      inputs.distributorSelect.addEventListener('change', async function () {
+        await loadProductsForMarketplace();
+        await loadVariants();
+        await loadPrice();
+      });
+
+      inputs.variantSelect.addEventListener('change', loadPrice);
+      inputs.stockistSelect.addEventListener('change', loadPrice);
+
+      init();
+    })();
+  </script>
+</body>
+</html>

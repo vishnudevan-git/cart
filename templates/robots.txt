@@ -1,0 +1,8 @@
+User-agent: *
+Disallow: /django-admin/
+Disallow: /admin-panel/
+Disallow: /accounts/
+Disallow: /cart/
+Disallow: /orders/
+Allow: /
+Sitemap: https://yourdomain.com/sitemap.xml

@@ -1,0 +1,301 @@
+/* Premium UI Layer: glassmorphism + micro-interactions + motion */
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.52);
+  --glass-shadow: 0 10px 30px rgba(18, 44, 24, 0.12);
+  --premium-ease: cubic-bezier(.22, .61, .36, 1);
+  --motion-multiplier: 1;
+  --hover-lift: 6px;
+  --image-zoom-scale: 1.07;
+}
+
+/* Global motion profiles */
+html[data-motion-profile='low'] {
+  --motion-multiplier: 0.68;
+  --hover-lift: 4px;
+  --image-zoom-scale: 1.035;
+}
+
+html[data-motion-profile='medium'] {
+  --motion-multiplier: 1;
+  --hover-lift: 6px;
+  --image-zoom-scale: 1.07;
+}
+
+html[data-motion-profile='high'] {
+  --motion-multiplier: 1.22;
+  --hover-lift: 8px;
+  --image-zoom-scale: 1.095;
+}
+
+/* Sticky headers */
+.navbar.sticky-top,
+.topbar {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(12px) saturate(1.2);
+  -webkit-backdrop-filter: blur(12px) saturate(1.2);
+  border-bottom: 1px solid var(--glass-border) !important;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.07);
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 1020;
+}
+
+/* Glass cards for product + category */
+.product-card,
+.category-card,
+.category-card.card {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  backdrop-filter: blur(8px) saturate(1.15);
+  -webkit-backdrop-filter: blur(8px) saturate(1.15);
+  box-shadow: var(--glass-shadow);
+  transition:
+    transform calc(.34s * var(--motion-multiplier)) var(--premium-ease),
+    box-shadow calc(.34s * var(--motion-multiplier)) var(--premium-ease),
+    border-color calc(.34s * var(--motion-multiplier)) var(--premium-ease);
+  overflow: hidden;
+}
+
+.product-card:hover,
+.category-card:hover {
+  transform: translateY(calc(-1 * var(--hover-lift)));
+  box-shadow: 0 18px 40px rgba(14, 35, 22, 0.18);
+  border-color: rgba(255, 255, 255, 0.78) !important;
+}
+
+/* Image zoom on hover with clipped boundaries */
+.product-card .position-relative,
+.category-card {
+  overflow: hidden;
+}
+
+.product-card .card-img-top,
+.category-card img {
+  transition:
+    transform calc(.5s * var(--motion-multiplier)) var(--premium-ease),
+    filter calc(.5s * var(--motion-multiplier)) var(--premium-ease);
+  transform-origin: center;
+}
+
+.product-card:hover .card-img-top,
+.category-card:hover img {
+  transform: scale(var(--image-zoom-scale));
+  filter: saturate(1.05);
+}
+
+/* Action buttons */
+.btn-shop-all,
+.btn-add-cart,
+.btn-buy-now,
+#buyNowBtn {
+  position: relative;
+  overflow: hidden;
+  transition:
+    transform calc(.2s * var(--motion-multiplier)) var(--premium-ease),
+    box-shadow calc(.28s * var(--motion-multiplier)) ease,
+    background-color calc(.32s * var(--motion-multiplier)) ease,
+    border-color calc(.32s * var(--motion-multiplier)) ease,
+    color calc(.32s * var(--motion-multiplier)) ease;
+}
+
+#buyNowBtn {
+  padding-right: 2rem;
+}
+
+#buyNowBtn::after {
+  content: '→';
+  position: absolute;
+  top: 50%;
+  right: .7rem;
+  transform: translateY(-50%) translateX(-4px);
+  opacity: 0;
+  transition:
+    transform calc(.25s * var(--motion-multiplier)) var(--premium-ease),
+    opacity calc(.25s * var(--motion-multiplier)) ease;
+}
+
+.btn-shop-all:hover,
+.btn-add-cart:hover,
+.btn-buy-now:hover,
+#buyNowBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.14);
+}
+
+#buyNowBtn:hover::after {
+  transform: translateY(-50%) translateX(0);
+  opacity: 1;
+}
+
+/* Slight premium gradient for CTA buttons while preserving theme */
+.btn-add-cart,
+#addToCartBtn {
+  background-image: linear-gradient(140deg, rgba(46, 125, 50, 0.95), rgba(56, 142, 60, 0.98));
+  color: #fff !important;
+}
+
+.btn-buy-now,
+#buyNowBtn {
+  background-image: linear-gradient(140deg, rgba(255, 193, 7, 0.95), rgba(255, 167, 38, 0.98));
+  border-color: rgba(245, 124, 0, 0.45);
+  color: #111 !important;
+}
+
+/* Favorite heart pop */
+.js-fav-icon {
+  transform-origin: center;
+}
+
+.js-fav-btn:hover .js-fav-icon {
+  filter: brightness(1.1) saturate(1.25);
+}
+
+.heart-pop {
+  animation: heartPop calc(.34s * var(--motion-multiplier)) var(--premium-ease);
+}
+
+@keyframes heartPop {
+  0% { transform: scale(1); }
+  35% { transform: scale(1.32); }
+  70% { transform: scale(.92); }
+  100% { transform: scale(1); }
+}
+
+/* Discount shimmer / pulse */
+.discount-badge,
+.product-card .badge.bg-danger,
+#discBadge.badge {
+  position: relative;
+  overflow: hidden;
+  background-image: linear-gradient(135deg, #e53935, #ef5350) !important;
+  animation: badgePulse calc(2.8s * var(--motion-multiplier)) ease-in-out infinite;
+}
+
+.discount-badge:hover,
+.product-card .badge.bg-danger:hover,
+#discBadge.badge:hover {
+  transform: scale(1.04);
+  filter: brightness(1.08) saturate(1.1);
+}
+
+.discount-badge::after,
+.product-card .badge.bg-danger::after,
+#discBadge.badge::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 35%, rgba(255, 255, 255, 0.34) 50%, transparent 65%);
+  transform: translateX(-120%);
+  animation: badgeShimmer calc(2.8s * var(--motion-multiplier)) ease-in-out infinite;
+}
+
+/* Compact product-card badge: disable shimmer overlay to prevent edge artifact */
+.product-card-badge::after {
+  display: none !important;
+}
+
+.product-card-badge {
+  animation: none !important;
+  filter: none !important;
+}
+
+@keyframes badgeShimmer {
+  0%, 70% { transform: translateX(-120%); }
+  100% { transform: translateX(140%); }
+}
+
+@keyframes badgePulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(229, 57, 53, 0); }
+  50% { box-shadow: 0 0 0.65rem rgba(229, 57, 53, 0.35); }
+}
+
+/* Smooth dropdown open */
+.dropdown-menu {
+  display: block;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .22s ease, transform .22s var(--premium-ease), visibility .22s ease;
+  pointer-events: none;
+}
+
+.dropdown-menu.show {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* Premium focus ring palette */
+.btn:focus-visible,
+.btn:focus,
+.form-select:focus,
+.form-control:focus,
+.dropdown-toggle:focus {
+  border-color: rgba(46, 125, 50, 0.75) !important;
+  box-shadow: 0 0 0 .22rem rgba(46, 125, 50, 0.22) !important;
+}
+
+/* Hardware-accelerated select interaction cue */
+.form-select,
+.variant-select {
+  transition: transform .18s var(--premium-ease), box-shadow .22s ease, border-color .22s ease;
+  will-change: transform;
+}
+
+.form-select:hover,
+.variant-select:hover {
+  border-color: rgba(46, 125, 50, 0.45);
+}
+
+.form-select:focus,
+.variant-select:focus {
+  transform: translateY(-1px);
+}
+
+/* Add-to-cart transient success state */
+.btn-added-state {
+  background-image: linear-gradient(135deg, #2e7d32, #43a047) !important;
+  border-color: rgba(27, 94, 32, 0.55) !important;
+  color: #fff !important;
+}
+
+/* Scroll reveal */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity .54s ease, transform .54s var(--premium-ease);
+}
+
+.reveal-on-scroll.is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Respect accessibility settings */
+@media (prefers-reduced-motion: reduce) {
+  .product-card,
+  .category-card,
+  .btn-shop-all,
+  .btn-add-cart,
+  .btn-buy-now,
+  .reveal-on-scroll,
+  .dropdown-menu,
+  .js-fav-icon,
+  .discount-badge,
+  .product-card .badge.bg-danger,
+  #discBadge.badge {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+}
+
+/* Wide tables scroll inside their own wrapper — the page itself must never
+   scroll horizontally (mobile-first rule). lakrish.css has the same rule for
+   the storefront; dashboards load only this file. */
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }

@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-5 text-center">
+  <div class="card border-0 shadow-sm p-5 mx-auto" style="max-width:500px">
+    <h4>⏳ Account Pending Approval</h4>
+    <p class="text-muted">Your supplier account for <strong>{{ supplier.company_name }}</strong> is under review. You'll be able to access your portal once the admin approves your account.</p>
+    <a href="{% url 'accounts:logout' %}" class="btn btn-outline-secondary">Logout</a>
+  </div>
+</div>
+{% endblock %}

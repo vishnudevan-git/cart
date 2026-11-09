@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}{{ item.name }}{% endblock %}
+{% block content %}
+<div class="container py-3" style="max-width:640px">
+  {% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+  <a href="{% url 'rentals:customer_list' %}" class="btn btn-sm btn-outline-secondary mb-3">← Rentals</a>
+  <div class="card border-0 shadow-sm mb-3">
+    {% if item.image %}<img src="{{ item.image.url }}" class="card-img-top" style="max-height:260px;object-fit:cover" alt="{{ item.name }}">{% endif %}
+    <div class="card-body">
+      <h4 class="fw-bold mb-1">{{ item.name }}</h4>
+      <div class="text-success fw-bold fs-5">₹{{ item.rent_per_day }} <span class="text-muted fw-normal fs-6">/ day</span></div>
+      <p class="text-muted small mb-2">{{ item.get_category_display }} · {{ item.units }} unit(s)</p>
+      {% if item.description %}<p class="mb-2">{{ item.description }}</p>{% endif %}
+      <div class="alert alert-warning py-2 small mb-0">If damaged or lost, you settle the item cost <b>₹{{ item.item_cost }}</b> with the owner directly (offline). The shop is not responsible.</div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-body">
+      <div class="d-flex justify-content-between mb-2">
+        <span class="fw-semibold">Book it</span>
+        <span class="badge bg-success-subtle text-success">Wallet ₹{{ balance }}</span>
+      </div>
+      <div class="small text-muted mb-2">Availability (next 14 days):</div>
+      <div class="d-flex flex-wrap gap-1 mb-3">
+        {% for d in grid %}
+          <span class="badge {% if d.blocked %}bg-secondary{% elif d.free == 0 %}bg-danger{% else %}bg-success-subtle text-success border{% endif %}" style="min-width:2.6rem">
+            {{ d.day|date:"d" }}<br>{% if d.blocked %}away{% elif d.free == 0 %}full{% else %}{{ d.free }}✓{% endif %}
+          </span>
+        {% endfor %}
+      </div>
+      <form method="post" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <div class="col-6"><label class="form-label small">Start day</label><input type="date" name="start_day" min="{{ today }}" value="{{ today }}" class="form-control form-control-sm"></div>
+        <div class="col-3"><label class="form-label small">Days</label><input type="number" name="days" min="1" value="1" class="form-control form-control-sm"></div>
+        <div class="col-3"><button class="btn btn-success btn-sm w-100">Book</button></div>
+      </form>
+      <div class="form-text">Rent is paid from your wallet. Load it with cash at the shop if it is short.</div>
+    </div>
+  </div>
+</div>
+{% endblock %}

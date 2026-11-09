@@ -1,0 +1,78 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Respond to Ticket #{{ ticket.pk }}{% endblock %}
+{% block page_title %}Respond to Ticket #{{ ticket.pk }}{% endblock %}
+{% block active_nav %}support{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'admin_panel:support_tickets' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to Tickets
+  </a>
+</div>
+
+<div class="row g-3">
+  <!-- Ticket details -->
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header  fw-semibold">Ticket Details</div>
+      <div class="card-body">
+        <h6 class="fw-bold">{{ ticket.subject }}</h6>
+        <div class="row g-2 small text-muted mb-3">
+          <div class="col-6"><strong>From:</strong> {{ ticket.submitted_by.username }}</div>
+          <div class="col-6"><strong>Role:</strong> {{ ticket.get_role_display }}</div>
+          <div class="col-6"><strong>Type:</strong> {{ ticket.get_ticket_type_display }}</div>
+          <div class="col-6"><strong>Submitted:</strong> {{ ticket.created_at|date:"d M Y, H:i" }}</div>
+        </div>
+        <hr>
+        <p style="white-space: pre-wrap;">{{ ticket.description }}</p>
+        {% if ticket.image %}
+          <div class="mt-3">
+            <p class="small text-muted mb-1">Attached image:</p>
+            <img src="{{ ticket.image.url }}" class="img-fluid rounded" style="max-height:300px;" alt="Ticket image">
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <!-- Respond form -->
+  <div class="col-lg-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header  fw-semibold">Update &amp; Respond</div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Status</label>
+            <select name="status" class="form-select">
+              {% for val, label in status_choices %}
+                <option value="{{ val }}" {% if ticket.status == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Priority</label>
+            <select name="priority" class="form-select">
+              {% for val, label in priority_choices %}
+                <option value="{{ val }}" {% if ticket.priority == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Response to User</label>
+            <textarea name="admin_response" class="form-control" rows="6"
+                      placeholder="Write your response here...">{{ ticket.admin_response }}</textarea>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100">
+            <i class="bi bi-check-circle me-1"></i>Save Response
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

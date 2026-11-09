@@ -1,0 +1,176 @@
+{% extends 'stockist/base_stockist.html' %}
+{% block title %}Marketplace Restock Requests{% endblock %}
+{% block page_title %}🚚 Marketplace Restock Requests{% endblock %}
+{% block active_nav %}distributor_restock{% endblock %}
+{% block content %}
+
+{% if pending_count %}
+<div class="alert alert-warning py-2 small mb-3">
+  <i class="bi bi-bell-fill me-1"></i>
+  <strong>{{ pending_count }}</strong> pending distributor restock request(s).
+  Collect from supplier and deliver to distributor.
+</div>
+{% endif %}
+
+<!-- Status tabs -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="?status=pending" class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-secondary{% endif %}">
+    Pending {% if pending_count %}<span class="badge bg-danger ms-1">{{ pending_count }}</span>{% endif %}
+  </a>
+  {% for val, label in status_choices %}{% if val != 'pending' %}
+  <a href="?status={{ val }}" class="btn btn-sm {% if status_filter == val %}btn-success{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
+  {% endif %}{% endfor %}
+  <a href="?status=" class="btn btn-sm {% if not status_filter %}btn-secondary{% else %}btn-outline-secondary{% endif %}">All</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr>
+          <th>#</th><th>Marketplace</th><th>Product</th><th>Size</th>
+          <th>Qty</th><th>Supplier</th><th>Method</th><th>Requested</th><th>Status</th><th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr class="{% if r.status == 'pending' %}table-warning{% elif r.status == 'stockist_picked' %}table-info{% endif %}">
+          <td class="text-muted">{{ r.pk }}</td>
+          <td class="fw-semibold">{{ r.distributor.company_name }}</td>
+          <td>
+            {% if r.is_loose %}{{ r.product.name }}{% else %}{{ r.variant.product.name }}{% endif %}
+          </td>
+          <td>
+            {% if r.is_loose %}
+              <span class="badge bg-info text-dark">🌾 Loose bulk</span>
+            {% else %}
+              <span class="badge bg-secondary">{{ r.variant.label }}</span>
+            {% endif %}
+          </td>
+          <td class="fw-bold">
+            {% if r.is_loose %}
+              {{ r.quantity_grams }}g
+            {% else %}
+              {% if r.loose_grams %}<span class="badge bg-info text-dark">LOOSE {{ r.loose_grams }}g</span>
+              {% else %}{{ r.quantity_requested }}{% endif %}
+            {% endif %}
+          </td>
+          <td class="text-muted">
+            {% if r.is_loose %}{{ r.product.supplier.company_name }}{% else %}{{ r.variant.product.supplier.company_name }}{% endif %}
+          </td>
+          <td class="small">
+            {% if r.fulfillment_method == 'stockist_pickup' %}🚗 You pick up
+            {% elif r.fulfillment_method == 'supplier_transport' %}🚛 Supplier transport
+            {% elif r.fulfillment_method == 'supplier_courier' %}📦 Courier
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-muted">{{ r.requested_at|date:"d M Y, H:i" }}</td>
+          <td>
+            {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
+            {% elif r.status == 'approved' %}<span class="badge bg-info text-dark">Approved — collect &amp; deliver</span>
+            {% elif r.status == 'dispatched' or r.status == 'stockist_picked' %}
+              <span class="badge bg-primary">📦 Picked by Stockist</span>
+              {% if r.tracking_info %}<div class="small text-muted">{{ r.tracking_info }}</div>{% endif %}
+            {% elif r.status == 'delivered' %}<span class="badge bg-success">✓ Delivered</span>
+            {% elif r.status == 'rejected' %}<span class="badge bg-danger">Rejected</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if r.status == 'pending' %}
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="req_id" value="{{ r.pk }}">
+              <input type="hidden" name="action" value="approve">
+              {% if not r.is_loose %}
+              <div class="d-flex align-items-center gap-1 mb-1">
+                <select name="fulfillment_method" class="form-select form-select-sm" style="max-width:170px;font-size:.75rem">
+                  <option value="stockist_pickup">🚗 I'll pick up</option>
+                  <option value="supplier_transport">🚛 Supplier transport</option>
+                  <option value="supplier_courier">📦 Courier</option>
+                </select>
+              </div>
+              {% endif %}
+              <button class="btn btn-sm btn-info">Approve</button>
+            </form>
+            <form method="post" class="d-inline ms-1">
+              {% csrf_token %}
+              <input type="hidden" name="req_id" value="{{ r.pk }}">
+              <input type="hidden" name="action" value="reject">
+              <button class="btn btn-sm btn-outline-danger">Reject</button>
+            </form>
+            {% elif r.status == 'approved' %}
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="req_id" value="{{ r.pk }}">
+              <input type="hidden" name="action" value="picked">
+              <button class="btn btn-sm btn-primary">
+                {% if r.is_loose %}🌾 Stock Collected{% else %}📦 Picked from Supplier{% endif %}
+              </button>
+            </form>
+            {% elif r.status == 'stockist_picked' or r.status == 'dispatched' or r.status == 'in_transit' %}
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="req_id" value="{{ r.pk }}">
+              <input type="hidden" name="action" value="deliver">
+              <button class="btn btn-sm btn-success">✓ Delivered to Marketplace</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="text-center text-muted py-5">
+          <i class="bi bi-inbox fs-2 d-block mb-2"></i>No distributor restock requests.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% comment %}Stage 7: wholesale Distributors keep their own stock too. Delivering
+one of these requests is the ONLY way their stock increases.{% endcomment %}
+<div class="card border-0 shadow-sm mt-4">
+  <div class="card-header bg-white fw-semibold">
+    <i class="bi bi-truck me-1"></i>Restock Requests from Distributors (wholesale)
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr><th>#</th><th>Distributor</th><th>Product</th><th>Pack</th><th>Qty</th><th>Status</th><th>Requested</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in wholesaler_requests %}
+        <tr>
+          <td class="text-muted">#{{ r.pk }}</td>
+          <td class="fw-semibold">{{ r.wholesaler.company_name }}</td>
+          <td>{{ r.variant.product.name }}</td>
+          <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
+          <td class="fw-semibold">{{ r.quantity_requested }}</td>
+          <td>
+            {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
+            {% elif r.status == 'delivered' %}<span class="badge bg-success">Delivered</span>
+            {% else %}<span class="badge bg-danger">Rejected</span>{% endif %}
+          </td>
+          <td class="text-muted">{{ r.requested_at|date:"d M, H:i" }}</td>
+          <td class="text-end">
+            {% if r.status == 'pending' %}
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="kind" value="wholesaler">
+              <input type="hidden" name="req_id" value="{{ r.pk }}">
+              <button name="action" value="deliver" class="btn btn-sm btn-success"
+                      data-confirm="Deliver {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to {{ r.wholesaler.company_name }}?"
+                      data-confirm-type="success" data-confirm-title="Confirm delivery?">Deliver</button>
+              <button name="action" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No requests from wholesale Distributors yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

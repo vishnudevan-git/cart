@@ -1,0 +1,43 @@
+{% extends 'base.html' %}
+{% block title %}Find Your Marketplace — LaKrish Mart{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-6 text-center">
+      <div class="card border-0 shadow-sm p-5">
+        <div style="font-size:4rem">🏪</div>
+        <h4 class="fw-bold mt-3 mb-2">You're not linked to a marketplace yet</h4>
+        <p class="text-muted mb-4">
+          LaKrish Mart works through local distributors. You need a distributor's invite code to browse products and place orders.
+        </p>
+
+        <div class="card bg-light border-0 p-3 mb-4 text-start">
+          <div class="fw-semibold small mb-2">Have an invite code?</div>
+          <form method="get" action="" id="inviteForm">
+            <div class="input-group">
+              <input type="text" id="inviteCode" class="form-control text-uppercase" placeholder="Enter 8-character code" maxlength="8">
+              <button type="button" class="btn btn-success" onclick="applyCode()">Apply</button>
+            </div>
+          </form>
+        </div>
+
+        <p class="text-muted small">
+          Don't have a code? Contact your local LaKrish Mart distributor or ask the admin to link your account.
+        </p>
+
+        <a href="{% url 'accounts:logout' %}" class="btn btn-outline-secondary btn-sm mt-2">Logout</a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+function applyCode() {
+  const code = document.getElementById('inviteCode').value.trim().toUpperCase();
+  if (code.length < 4) { alert('Please enter a valid invite code.'); return; }
+  window.location.href = '/join/' + code + '/';
+}
+document.getElementById('inviteCode').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') applyCode();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,298 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}{% trans "Fresh Organic Food, Direct from Farmers" %}{% endblock %}
+
+{% block extra_css %}
+<style>
+  .hero {
+    background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 50%, #388e3c 100%);
+    min-height: 88vh;
+    display: flex;
+    align-items: center;
+  }
+  .hero h1 { font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1.15; }
+  .feature-icon {
+    width: 64px; height: 64px;
+    background: #e8f5e9;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.75rem;
+    margin: 0 auto 1rem;
+  }
+  .stat-num { font-size: 2rem; font-weight: 700; color: #2e7d32; }
+  .category-pill {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: #f1f8f1; border: 1px solid #c8e6c9;
+    border-radius: 50px; padding: .4rem 1rem;
+    font-size: .9rem; color: #2e7d32; font-weight: 500;
+  }
+  .step-num {
+    width: 36px; height: 36px; border-radius: 50%;
+    background: #2e7d32; color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: .9rem; flex-shrink: 0;
+  }
+  .testimonial-card { border-left: 4px solid #2e7d32; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero -->
+<section class="hero text-white">
+  <div class="container py-5">
+    <div class="row align-items-center g-4">
+      <div class="col-12 col-lg-6">
+        <span class="badge bg-warning text-dark mb-3 px-3 py-2">🌱 {% trans "100% Organic & Natural" %}</span>
+        <h1 class="fw-bold mb-3">
+          {% trans "Fresh from the Farm." %}<br>
+          {% trans "Straight to Your Door." %}
+        </h1>
+        <p class="lead mb-4 opacity-90">
+          {% trans "We connect you directly with organic farmers and natural food producers. No middlemen. No chemicals. Just pure, honest food — delivered by your trusted local distributor." %}
+        </p>
+        <div class="d-flex flex-wrap gap-3">
+          <a href="{% url 'accounts:login' %}" class="btn btn-light btn-lg px-4 fw-semibold">
+            <i class="bi bi-box-arrow-in-right me-2"></i>{% trans "Login to Shop" %}
+          </a>
+          <a href="{% url 'accounts:register' %}" class="btn btn-outline-light btn-lg px-4">
+            <i class="bi bi-person-plus me-2"></i>{% trans "Register Free" %}
+          </a>
+        </div>
+        <div class="mt-4 d-flex flex-wrap gap-3">
+          <span class="category-pill" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">🌿 {% trans "Organic Products" %}</span>
+          <span class="category-pill" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">🥜 {% trans "Dry Fruits & Nuts" %}</span>
+          <span class="category-pill" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">🌶 {% trans "Spices" %}</span>
+          <span class="category-pill" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);color:#fff">🍯 {% trans "Natural Foods" %}</span>
+        </div>
+      </div>
+      <div class="col-12 col-lg-6 text-center d-none d-lg-block">
+        <div style="font-size:10rem;line-height:1">🌿</div>
+        <div class="d-flex justify-content-center gap-4 mt-3">
+          <div class="text-center">
+            <div class="fw-bold fs-3">1000+</div>
+            <div class="opacity-75 small">{% trans "Products" %}</div>
+          </div>
+          <div class="text-center">
+            <div class="fw-bold fs-3">50+</div>
+            <div class="opacity-75 small">{% trans "Farmers" %}</div>
+          </div>
+          <div class="text-center">
+            <div class="fw-bold fs-3">3</div>
+            <div class="opacity-75 small">{% trans "Cities" %}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Why LaKrish Mart -->
+<section class="py-5">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="fw-bold">{% trans "Why Choose Us?" %}</h2>
+      <p class="text-muted">{% trans "We believe food should be honest, clean, and traceable." %}</p>
+    </div>
+    <div class="row g-4 text-center">
+      <div class="col-6 col-md-3">
+        <div class="feature-icon">🌾</div>
+        <h6 class="fw-bold">{% trans "Direct from Farmers" %}</h6>
+        <p class="text-muted small">{% trans "We source directly from certified organic farmers. No unnecessary middlemen, no inflated prices." %}</p>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="feature-icon">🚫</div>
+        <h6 class="fw-bold">{% trans "No Chemicals" %}</h6>
+        <p class="text-muted small">{% trans "Every product is free from synthetic pesticides, preservatives, and artificial additives." %}</p>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="feature-icon">🏠</div>
+        <h6 class="fw-bold">{% trans "Home Made Quality" %}</h6>
+        <p class="text-muted small">{% trans "Many of our products are handcrafted in small batches — the way your grandmother used to make them." %}</p>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="feature-icon">🚴</div>
+        <h6 class="fw-bold">{% trans "Local Delivery" %}</h6>
+        <p class="text-muted small">{% trans "Your local distributor delivers fresh to your doorstep. Fast, reliable, and community-driven." %}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- What We Offer -->
+<section class="py-5" style="background:#f9fdf9">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="fw-bold">{% trans "What We Offer" %}</h2>
+      <p class="text-muted">{% trans "A curated selection of nature's best — in every size you need." %}</p>
+    </div>
+    <div class="row g-3">
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3 h-100">
+          <div class="fs-2 mb-2">🌿</div>
+          <div class="fw-semibold small">{% trans "Organic Products" %}</div>
+          <div class="text-muted" style="font-size:.75rem">{% trans "Turmeric, Honey, Coconut Oil" %}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3 h-100">
+          <div class="fs-2 mb-2">🍇</div>
+          <div class="fw-semibold small">{% trans "Dry Fruits" %}</div>
+          <div class="text-muted" style="font-size:.75rem">{% trans "Dates, Apricots, Raisins" %}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3 h-100">
+          <div class="fs-2 mb-2">🥜</div>
+          <div class="fw-semibold small">{% trans "Nuts" %}</div>
+          <div class="text-muted" style="font-size:.75rem">{% trans "Almonds, Cashews, Walnuts" %}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3 h-100">
+          <div class="fs-2 mb-2">🌶</div>
+          <div class="fw-semibold small">{% trans "Spices" %}</div>
+          <div class="text-muted" style="font-size:.75rem">{% trans "Pepper, Cardamom, Cinnamon" %}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3 h-100">
+          <div class="fs-2 mb-2">🌱</div>
+          <div class="fw-semibold small">{% trans "Seeds" %}</div>
+          <div class="text-muted" style="font-size:.75rem">{% trans "Chia, Flax, Sunflower" %}</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-4 col-lg-2">
+        <div class="card border-0 shadow-sm text-center p-3 h-100">
+          <div class="fs-2 mb-2">🍯</div>
+          <div class="fw-semibold small">{% trans "Natural Foods" %}</div>
+          <div class="text-muted" style="font-size:.75rem">{% trans "Cold-pressed oils, raw honey" %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- How It Works -->
+<section class="py-5">
+  <div class="container">
+    <div class="text-center mb-5">
+      <h2 class="fw-bold">{% trans "How It Works" %}</h2>
+      <p class="text-muted">{% trans "Simple, transparent, and community-powered." %}</p>
+    </div>
+    <div class="row g-4">
+      <div class="col-12 col-md-3">
+        <div class="d-flex gap-3 align-items-start">
+          <div class="step-num">1</div>
+          <div>
+            <h6 class="fw-bold mb-1">{% trans "Register" %}</h6>
+            <p class="text-muted small mb-0">{% trans "Create your free account. Use your distributor's invite code to shop from their store." %}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="d-flex gap-3 align-items-start">
+          <div class="step-num">2</div>
+          <div>
+            <h6 class="fw-bold mb-1">{% trans "Browse & Choose" %}</h6>
+            <p class="text-muted small mb-0">{% trans "See your distributor's curated product list with their prices. Pick your size and quantity." %}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="d-flex gap-3 align-items-start">
+          <div class="step-num">3</div>
+          <div>
+            <h6 class="fw-bold mb-1">{% trans "Place Order" %}</h6>
+            <p class="text-muted small mb-0">{% trans "Add to cart and checkout. Pay on delivery or via UPI. No advance payment required." %}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-3">
+        <div class="d-flex gap-3 align-items-start">
+          <div class="step-num">4</div>
+          <div>
+            <h6 class="fw-bold mb-1">{% trans "Get Delivered" %}</h6>
+            <p class="text-muted small mb-0">{% trans "Your local distributor delivers fresh organic products right to your door." %}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Our Promise -->
+<section class="py-5" style="background: linear-gradient(135deg,#e8f5e9,#f1f8e9)">
+  <div class="container">
+    <div class="row align-items-center g-4">
+      <div class="col-12 col-md-6">
+        <h2 class="fw-bold mb-3">{% trans "Our Promise to You" %}</h2>
+        <div class="d-flex flex-column gap-3">
+          <div class="d-flex gap-3 align-items-start">
+            <i class="bi bi-check-circle-fill text-success fs-5 flex-shrink-0 mt-1"></i>
+            <div><strong>{% trans "Certified Organic" %}</strong> — {% trans "All products sourced from verified organic farms and natural producers." %}</div>
+          </div>
+          <div class="d-flex gap-3 align-items-start">
+            <i class="bi bi-check-circle-fill text-success fs-5 flex-shrink-0 mt-1"></i>
+            <div><strong>{% trans "Fair Prices" %}</strong> — {% trans "Direct sourcing means better prices for you and fair pay for farmers." %}</div>
+          </div>
+          <div class="d-flex gap-3 align-items-start">
+            <i class="bi bi-check-circle-fill text-success fs-5 flex-shrink-0 mt-1"></i>
+            <div><strong>{% trans "Fresh Stock" %}</strong> — {% trans "Products are sourced in small batches to ensure freshness and quality." %}</div>
+          </div>
+          <div class="d-flex gap-3 align-items-start">
+            <i class="bi bi-check-circle-fill text-success fs-5 flex-shrink-0 mt-1"></i>
+            <div><strong>{% trans "Community First" %}</strong> — {% trans "We support local distributors and farmers in your neighbourhood." %}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-6">
+        <div class="row g-3 text-center">
+          <div class="col-6">
+            <div class="card border-0 shadow-sm p-4">
+              <div class="stat-num">100%</div>
+              <div class="text-muted small">{% trans "Organic Certified" %}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="card border-0 shadow-sm p-4">
+              <div class="stat-num">0</div>
+              <div class="text-muted small">{% trans "Artificial Additives" %}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="card border-0 shadow-sm p-4">
+              <div class="stat-num">50+</div>
+              <div class="text-muted small">{% trans "Farmer Partners" %}</div>
+            </div>
+          </div>
+          <div class="col-6">
+            <div class="card border-0 shadow-sm p-4">
+              <div class="stat-num">1000+</div>
+              <div class="text-muted small">{% trans "Happy Customers" %}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="py-5 bg-success text-white text-center">
+  <div class="container">
+    <h2 class="fw-bold mb-2">{% trans "Ready to eat clean?" %}</h2>
+    <p class="lead mb-4 opacity-90">{% trans "Join thousands of families who have switched to organic living with LaKrish Mart." %}</p>
+    <div class="d-flex justify-content-center flex-wrap gap-3">
+      <a href="{% url 'accounts:register' %}" class="btn btn-light btn-lg px-5 fw-semibold">
+        <i class="bi bi-person-plus me-2"></i>{% trans "Create Free Account" %}
+      </a>
+      <a href="{% url 'accounts:login' %}" class="btn btn-outline-light btn-lg px-5">
+        <i class="bi bi-box-arrow-in-right me-2"></i>{% trans "Login" %}
+      </a>
+    </div>
+    <p class="mt-3 opacity-75 small">{% trans "Have a distributor code? Enter it during registration to shop from your local store." %}</p>
+  </div>
+</section>
+
+{% endblock %}

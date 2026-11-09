@@ -1,0 +1,38 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% block title %}Bulk Upload Products{% endblock %}
+{% block page_title %}Bulk Upload Products{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='product_list' %}{% endblock %}
+{% block content %}
+<div class="row mb-4">
+    <div class="col-md-6 mb-3 mb-md-0">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body bg-light">
+                <h5 class="card-title fw-bold">Step 1: Download Template</h5>
+                <p class="text-muted small">Download our standard Excel template. Fill out your products keeping the Category Slugs exactly as they appear in the system.</p>
+                <a href="{% url 'suppliers:download_bulk_template' %}" class="btn btn-outline-primary btn-sm mt-2">
+                    <i class="bi bi-download me-1"></i> Download Template
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title fw-bold">Step 2: Upload Products</h5>
+                <p class="text-muted small">Upload your filled template here. New products will be sent to the admin for approval.</p>
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <input class="form-control form-control-sm" type="file" id="excel_file" name="excel_file" accept=".xlsx,.xls" required>
+                    </div>
+                    <button type="submit" class="btn btn-success btn-sm w-100">
+                        <i class="bi bi-upload me-1"></i> Import Products
+                    </button>
+                    <a href="{% url 'suppliers:product_list' %}" class="btn btn-light btn-sm w-100 mt-2">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

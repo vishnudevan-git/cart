@@ -1,0 +1,161 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}My Customers{% endblock %}
+{% block active_nav %}customers{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm p-3 mb-3">
+  <h6 class="fw-semibold mb-1">Invite New Customers</h6>
+  <p class="text-muted small mb-2">Share this link. Anyone who registers via this link is automatically linked to your store.</p>
+  <div class="input-group input-group-sm">
+    <input type="text" class="form-control" id="inviteLink"
+           value="{{ request.scheme }}://{{ request.get_host }}{% url 'products:set_distributor' dist.invite_code %}" readonly>
+    <button class="btn btn-outline-success" onclick="document.getElementById('inviteLink').select();document.execCommand('copy');alert('Copied!')">
+      <i class="bi bi-clipboard"></i> Copy
+    </button>
+  </div>
+  <div class="mt-1 text-muted small">Or share invite code: <strong>{{ dist.invite_code }}</strong></div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <!-- Desktop -->
+  <div class="table-wrap d-none d-md-block">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr><th>Name</th><th>Mobile / Email</th><th>Phone</th><th>Zone</th><th>Joined</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for cd in customers %}
+        {% with c=cd.user %}
+        <tr>
+          <td class="fw-semibold">{{ c.get_full_name|default:c.username }}</td>
+          <td class="text-muted small">{{ c.username }}</td>
+          <td>{{ c.phone|default:"—" }}</td>
+          <td>
+            {% if cd.zone %}
+              <span class="badge bg-info text-dark">{{ cd.zone.name }}</span>
+              <span class="text-muted small">₹{{ cd.zone.delivery_charge }}</span>
+            {% else %}
+              <span class="text-muted small">Default (₹{{ dist.delivery_charge }})</span>
+            {% endif %}
+          </td>
+          <td>{{ c.date_joined|date:"d M Y" }}</td>
+          <td>
+            <div class="d-flex gap-1">
+              <a href="{% url 'distributors:customer_detail' c.pk %}" class="btn btn-sm btn-outline-primary" title="View">
+                <i class="bi bi-eye"></i>
+              </a>
+              <button class="btn btn-sm btn-outline-secondary" title="Reset Password"
+                      data-bs-toggle="modal" data-bs-target="#resetModal"
+                      data-customer-id="{{ c.pk }}"
+                      data-customer-name="{{ c.get_full_name|default:c.username }}">
+                <i class="bi bi-key"></i>
+              </button>
+              <button class="btn btn-sm btn-outline-danger" title="Remove"
+                      data-bs-toggle="modal" data-bs-target="#deleteModal"
+                      data-customer-id="{{ c.pk }}"
+                      data-customer-name="{{ c.get_full_name|default:c.username }}">
+                <i class="bi bi-trash"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No customers yet. Share your invite link!</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile -->
+  <div class="d-md-none p-2">
+    {% for cd in customers %}
+    {% with c=cd.user %}
+    <div class="d-flex justify-content-between align-items-center py-2 border-bottom small">
+      <div>
+        <div class="fw-semibold">{{ c.get_full_name|default:c.username }}</div>
+        <div class="text-muted small">{{ c.username }} · {{ c.phone|default:"—" }}</div>
+        {% if cd.zone %}<span class="badge bg-info text-dark" style="font-size:.65rem">{{ cd.zone.name }}</span>{% endif %}
+      </div>
+      <div class="d-flex gap-1">
+        <a href="{% url 'distributors:customer_detail' c.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-eye"></i></a>
+        <button class="btn btn-sm btn-outline-secondary"
+                data-bs-toggle="modal" data-bs-target="#resetModal"
+                data-customer-id="{{ c.pk }}"
+                data-customer-name="{{ c.get_full_name|default:c.username }}">
+          <i class="bi bi-key"></i>
+        </button>
+        <button class="btn btn-sm btn-outline-danger"
+                data-bs-toggle="modal" data-bs-target="#deleteModal"
+                data-customer-id="{{ c.pk }}"
+                data-customer-name="{{ c.get_full_name|default:c.username }}">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>
+    {% endwith %}
+    {% empty %}
+    <p class="text-muted text-center py-3">No customers yet.</p>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div class="modal fade" id="resetModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <form method="post" id="resetForm" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-key me-1"></i>Reset Password</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-3">New password for <strong id="resetCustomerName"></strong>.</p>
+          <input type="password" name="new_password" class="form-control form-control-sm"
+                 placeholder="Min. 6 characters" minlength="6" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-circle me-1"></i>Update</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Delete / Unlink Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <form method="post" id="deleteForm" action="">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h6 class="modal-title text-danger"><i class="bi bi-trash me-1"></i>Remove Customer</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small mb-0">Remove <strong id="deleteCustomerName"></strong> from your store? They will no longer be linked to you.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-danger">Remove</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.getElementById('resetModal').addEventListener('show.bs.modal', function(e) {
+    const btn = e.relatedTarget;
+    document.getElementById('resetCustomerName').textContent = btn.dataset.customerName;
+    document.getElementById('resetForm').action = `/distributor/customers/${btn.dataset.customerId}/reset-password/`;
+  });
+  document.getElementById('deleteModal').addEventListener('show.bs.modal', function(e) {
+    const btn = e.relatedTarget;
+    document.getElementById('deleteCustomerName').textContent = btn.dataset.customerName;
+    document.getElementById('deleteForm').action = `/distributor/customers/${btn.dataset.customerId}/delete/`;
+  });
+</script>
+{% endblock %}

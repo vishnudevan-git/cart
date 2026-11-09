@@ -1,0 +1,197 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}User Details - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="h2">{{ user.get_full_name|default:user.username }}</h1>
+            <a href="{% url 'transactions:role_management' %}" class="btn btn-secondary btn-sm">← Back to Users</a>
+            <hr>
+        </div>
+    </div>
+
+    <!-- User Info -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">User Information</h5>
+                </div>
+                <div class="card-body">
+                    <table class="table table-sm">
+                        <tr>
+                            <td><strong>Username:</strong></td>
+                            <td>{{ user.username }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Email:</strong></td>
+                            <td>{{ user.email }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Full Name:</strong></td>
+                            <td>{{ user.get_full_name|default:"Not set" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Phone:</strong></td>
+                            <td>{{ user.phone|default:"N/A" }}</td>
+                        </tr>
+                        <tr>
+                            <td><strong>Status:</strong></td>
+                            <td>
+                                {% if user.is_active %}
+                                    <span class="badge bg-success">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Suspended</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td><strong>Joined:</strong></td>
+                            <td>{{ user.date_joined|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Current Role</h5>
+                </div>
+                <div class="card-body">
+                    <span class="badge bg-primary">{{ user.primary_role }}</span>
+                    <div class="form-text mt-2">
+                        Each account holds exactly one role. A role can be changed, never stacked —
+                        for a second role, create a separate account.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="card border-primary">
+                                <div class="card-header">Change Role</div>
+                                <div class="card-body">
+                                    <form method="POST" action="{% url 'transactions:add_role' user.id %}">
+                                        {% csrf_token %}
+                                        <select name="role" class="form-control form-control-sm mb-2" required>
+                                            <option value="">-- Select Role --</option>
+                                            <option value="admin">Admin</option>
+                                            <option value="supplier">Supplier</option>
+                                            <option value="wholesaler">Distributor</option>
+                                            <option value="distributor">Marketplace</option>
+                                            <option value="stockist">Stockist</option>
+                                            <option value="customer">Customer</option>
+                                        </select>
+                                        <textarea name="reason" class="form-control form-control-sm mb-2" placeholder="Reason..." rows="2"></textarea>
+                                        <button type="submit" class="btn btn-success w-100 btn-sm">Change Role</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card border-warning">
+                                <div class="card-header">Account Status</div>
+                                <div class="card-body">
+                                    {% if user.is_active %}
+                                        <form method="POST" action="{% url 'transactions:suspend_user' user.id %}">
+                                            {% csrf_token %}
+                                            <textarea name="reason" class="form-control form-control-sm mb-2" placeholder="Reason..." rows="2"></textarea>
+                                            <button type="submit" class="btn btn-warning w-100 btn-sm" onclick="return confirm('Suspend this user?')">
+                                                Suspend User
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <form method="POST" action="{% url 'transactions:activate_user' user.id %}">
+                                            {% csrf_token %}
+                                            <textarea name="reason" class="form-control form-control-sm mb-2" placeholder="Reason..." rows="2"></textarea>
+                                            <button type="submit" class="btn btn-success w-100 btn-sm" onclick="return confirm('Activate this user?')">
+                                                Activate User
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="col-md-4">
+                            <div class="card border-danger">
+                                <div class="card-header">Delete User</div>
+                                <div class="card-body">
+                                    <form method="POST" action="{% url 'transactions:delete_user' user.id %}">
+                                        {% csrf_token %}
+                                        <textarea name="reason" class="form-control form-control-sm mb-2" placeholder="Reason..." rows="2"></textarea>
+                                        <button type="submit" class="btn btn-danger w-100 btn-sm" onclick="return confirm('Delete this user?')">
+                                            Delete User
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transaction History -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Role Transaction History</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Event</th>
+                                    <th>Role</th>
+                                    <th>Old Value</th>
+                                    <th>New Value</th>
+                                    <th>Initiated By</th>
+                                    <th>Reason</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for txn in transactions %}
+                                <tr>
+                                    <td><span class="badge bg-secondary">{{ txn.get_event_display }}</span></td>
+                                    <td>{{ txn.role_affected }}</td>
+                                    <td>{{ txn.old_value }}</td>
+                                    <td>{{ txn.new_value }}</td>
+                                    <td>{{ txn.initiated_by.username }}</td>
+                                    <td>{{ txn.reason|truncatewords:10 }}</td>
+                                    <td>{{ txn.created_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-3">No transactions yet</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

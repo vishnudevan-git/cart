@@ -1,0 +1,502 @@
+{% extends 'base.html' %}
+{% block title %}{{ product.name }} — LaKrish Mart{% endblock %}
+
+{% block extra_css %}
+<style>
+  .variant-option {
+    border: 2px solid #dee2e6;
+    border-radius: 8px;
+    padding: .5rem .9rem;
+    cursor: pointer;
+    transition: .15s;
+    background: #fff;
+    text-align: left;
+    width: 100%;
+  }
+  .variant-option:hover { border-color: #2e7d32; }
+  .variant-option.selected { border-color: #2e7d32; background: #f1f8f1; }
+  .variant-option .v-label { font-weight: 600; font-size: .9rem; }
+  .variant-option .v-price { color: #2e7d32; font-weight: 700; }
+  .variant-option .v-mrp { text-decoration: line-through; color: #999; font-size: .8rem; }
+  .variant-option.out-of-stock { opacity: .5; cursor: not-allowed; }
+  /* Image zoom */
+  .product-img-wrap { overflow: hidden; border-radius: .5rem; cursor: zoom-in; }
+  .product-img-wrap img { transition: transform .3s ease; }
+  .product-img-wrap:hover img { transform: scale(1.08); }
+  /* Zoom modal */
+  #imgZoomModal img { max-height: 80vh; object-fit: contain; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="store-utility-strip mb-3">
+  <div class="container d-flex flex-wrap align-items-center justify-content-center justify-content-md-between gap-2 py-2">
+    <span><i class="bi bi-award me-1"></i> Quality checked</span>
+    <span><i class="bi bi-arrow-repeat me-1"></i> Easy replacement support</span>
+    <span><i class="bi bi-shield-lock me-1"></i> Secure payment flow</span>
+  </div>
+</div>
+
+<div class="container mt-3 mb-5">
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{{ store_home_url|default:'/' }}">Home</a></li>
+      <li class="breadcrumb-item"><a href="{{ store_home_url|default:'/' }}">Shop</a></li>
+      <li class="breadcrumb-item active text-truncate" style="max-width:160px">{{ product.name }}</li>
+    </ol>
+  </nav>
+
+  <div class="row g-3 g-md-4">
+    <!-- Image -->
+    <div class="col-12 col-md-5">
+      {% if product.image %}
+        <div class="product-img-wrap" data-bs-toggle="modal" data-bs-target="#imgZoomModal">
+          <img src="{{ product.image.url }}" class="img-fluid w-100" style="max-height:380px;object-fit:cover" alt="{{ product.name }}" id="mainProductImg">
+        </div>
+        <!-- Zoom Modal -->
+        <div class="modal fade" id="imgZoomModal" tabindex="-1">
+          <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content border-0 bg-transparent">
+              <div class="modal-body text-center p-0">
+                <img src="{{ product.image.url }}" class="img-fluid rounded" alt="{{ product.name }}">
+              </div>
+            </div>
+          </div>
+        </div>
+      {% else %}
+        <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height:280px;font-size:5rem">🌿</div>
+      {% endif %}
+    </div>
+
+    <!-- Details -->
+    <div class="col-12 col-md-7 product-detail-rail">
+      <h2 class="h4 fw-bold mb-1">{{ product.name }}</h2>
+      
+      {% if product.review_count > 0 %}
+      <div class="mb-2 d-flex align-items-center" style="font-size: .9rem; color: #ffab00;">
+        <i class="bi bi-star-fill me-1"></i>
+        <span class="fw-bold text-dark">{{ product.rating|floatformat:1 }}</span>
+        <span class="text-secondary ms-1">({{ product.review_count }})</span>
+      </div>
+      {% endif %}
+
+      <p class="text-muted small mb-3">by <strong>{{ product.supplier.company_name }}</strong> &nbsp;·&nbsp; {{ product.category.name }}</p>
+
+      <!-- Dynamic price display -->
+      <div class="mb-3 p-3 rounded-3 product-price-panel" id="priceDisplay">
+        {% with dv=variants_data.0 %}{% if dv %}
+          <span class="fs-3 fw-bold text-success" id="sellingPrice">₹{{ dv.selling_price|floatformat:0 }}</span>
+          {% if product.show_mrp and dv.discount %}
+            <span class="text-muted text-decoration-line-through ms-2" id="mrpPrice">₹{{ dv.mrp|floatformat:0 }}</span>
+            <span id="discBadge" class="d-none"></span>
+          {% else %}
+            <span id="mrpPrice" class="d-none"></span>
+            <span id="discBadge" class="d-none"></span>
+          {% endif %}
+          <div class="mt-1" id="stockBadge">
+            {% if dv.stock > 0 %}
+              <span class="badge bg-success">In Stock</span>
+              <span class="text-muted small ms-1">{{ dv.stock }} left</span>
+            {% else %}
+              <span class="badge bg-danger">Out of Stock</span>
+            {% endif %}
+          </div>
+        {% endif %}{% endwith %}
+      </div>
+
+      <!-- Variant-type selector (Premium / Regular …) — only for multi-variant products -->
+      {% if show_variant_picker %}
+      <div class="mb-3">
+        <div class="fw-semibold small mb-2">Choose Variant:</div>
+        <div class="d-flex flex-wrap gap-2" id="variantTypeOptions">
+          {% for vt in variant_types %}
+          <button type="button"
+            class="variant-type-option btn btn-sm {% if forloop.first %}btn-success{% else %}btn-outline-success{% endif %}"
+            data-variant-type="{{ vt.id }}">
+            {{ vt.name|default:"Standard" }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Pack-size selector (filtered by the chosen variant) -->
+      {% if variants_data %}
+      <div class="mb-3">
+        <div class="fw-semibold small mb-2">Select Size / Weight:</div>
+        <div class="d-flex flex-wrap gap-2" id="variantOptions">
+          {% for vd in variants_data %}
+          <button type="button"
+            class="variant-option {% if forloop.first %}selected{% endif %} {% if not vd.stock %}out-of-stock{% endif %}"
+            data-variant-id="{{ vd.id }}"
+            data-variant-type="{{ vd.variant_type_id }}"
+            data-price="{{ vd.selling_price }}"
+            data-mrp="{{ vd.mrp }}"
+            data-discount="{{ vd.discount }}"
+            data-stock="{{ vd.stock }}"
+            {% if not vd.stock %}disabled{% endif %}>
+            <div class="v-label">{{ vd.label }}</div>
+            <div class="d-flex align-items-center gap-1 flex-wrap">
+              <span class="v-price">₹{{ vd.selling_price|floatformat:0 }}</span>
+              {% if product.show_mrp and vd.discount %}
+                <span class="v-mrp">₹{{ vd.mrp|floatformat:0 }}</span>
+              {% endif %}
+            </div>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
+      <p class="text-secondary small">{{ product.description }}</p>
+
+      <div class="product-assurance-grid mb-3">
+        <div><i class="bi bi-truck"></i> Fast delivery slots</div>
+        <div><i class="bi bi-check2-circle"></i> Freshly packed</div>
+        <div><i class="bi bi-headset"></i> Local support</div>
+      </div>
+
+      <!-- Add to cart -->
+      <div class="mt-3">
+        <!-- Sold by info -->
+        <div class="border rounded p-2 mb-3 small" style="background:#fafafa">
+          <div class="d-flex gap-2 mb-1">
+            <span class="text-muted" style="min-width:80px">Ships from</span>
+            <span class="fw-semibold">{{ distributor.company_name|default:brand_name }}</span>
+          </div>
+          <div class="d-flex gap-2">
+            <span class="text-muted" style="min-width:80px">Sold by</span>
+            <span class="fw-semibold text-success">{{ product.supplier.company_name }}</span>
+          </div>
+        </div>
+
+        {% if not user.is_authenticated or active_role == 'customer' %}
+          <div class="d-grid gap-2">
+            <a href="#" id="addToCartBtn"
+               class="btn btn-success btn-lg btn-add-cart{% if not product.is_in_stock %} disabled{% endif %}">
+              <i class="bi bi-cart-plus me-1"></i> Add to Cart
+            </a>
+            <a href="#" id="buyNowBtn"
+               class="btn btn-warning btn-lg fw-semibold btn-buy-now{% if not product.is_in_stock %} disabled{% endif %}"
+               style="color:#111">
+              <i class="bi bi-lightning-fill me-1"></i> Buy Now
+            </a>
+          </div>
+        {% endif %}
+        <div class="mt-2">
+          <a href="{{ store_home_url|default:'/' }}" class="btn btn-link btn-sm text-muted p-0">← Back</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reviews Section -->
+  <div class="mt-5 pt-3 border-top">
+    <div class="row">
+      <div class="col-md-7">
+        <h4 class="fw-bold mb-4">Customer Reviews</h4>
+        
+        <div class="mb-4">
+          {% if product.reviews.all %}
+            {% for review in product.reviews.all %}
+            <div class="mb-3 pb-3 border-bottom">
+              <div class="d-flex align-items-center mb-2">
+                <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center fw-bold me-2" style="width: 35px; height: 35px;">
+                  {{ review.user.first_name|default:review.user.username|make_list|first|upper }}
+                </div>
+                <div>
+                  <div class="fw-semibold lh-1">{{ review.user.get_full_name|default:review.user.username }}</div>
+                  <div class="small text-muted mt-1">
+                    {{ review.created_at|date:"M d, Y" }}
+                    {% if review.is_verified_purchase %}
+                      &nbsp;<span class="text-success fw-bold" style="font-size:0.7rem;"><i class="bi bi-patch-check-fill"></i> Verified Purchase</span>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="ms-auto text-warning fs-6">
+                  {% for i in "12345"|make_list %}
+                    <i class="bi bi-star-fill{% if forloop.counter > review.rating %} text-muted opacity-25{% endif %}"></i>
+                  {% endfor %}
+                </div>
+              </div>
+              {% if review.comment %}<p class="mb-0 text-secondary">{{ review.comment }}</p>{% endif %}
+            </div>
+            {% endfor %}
+          {% else %}
+            <p class="text-muted">No reviews yet. Be the first to review!</p>
+          {% endif %}
+        </div>
+      </div>
+      
+      <div class="col-md-5">
+        <div class="card bg-light border-0 shadow-sm">
+          <div class="card-body p-4">
+            <h5 class="fw-bold mb-3">Write a Review</h5>
+            {% if user.is_authenticated and user.role == 'customer' %}
+              {% if can_review %}
+                <form method="post" action="{% url 'products:add_review' product.pk %}">
+                  {% csrf_token %}
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold mb-1">Rating</label>
+                    <select name="rating" class="form-select border-success" required>
+                      <option value="5">⭐⭐⭐⭐⭐ Excellent!</option>
+                      <option value="4">⭐⭐⭐⭐ Good</option>
+                      <option value="3">⭐⭐⭐ Okay</option>
+                      <option value="2">⭐⭐ Poor</option>
+                      <option value="1">⭐ Terrible</option>
+                    </select>
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label fw-semibold mb-1">Your Review</label>
+                    <textarea name="comment" rows="3" class="form-control" placeholder="What did you like about this product?"></textarea>
+                  </div>
+                  <button type="submit" class="btn btn-success fw-bold w-100">Submit Review</button>
+                </form>
+              {% else %}
+                <div class="alert alert-info mb-0 small">
+                  Review is allowed only after your order is delivered.
+                </div>
+              {% endif %}
+            {% else %}
+              <div class="alert alert-warning mb-0 small">
+                Please <a href="{% url 'accounts:login' %}" class="fw-bold text-dark">Login</a> to write a review.
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Related -->
+  {% if related %}
+  <div class="mt-5 pt-3 border-top">
+    <h5 class="fw-bold mb-3">Similar Products</h5>
+    <div class="d-flex overflow-auto gap-3 pb-3 px-1" style="scrollbar-width: thin;">
+      {% for p in related %}
+        {% with dv=p.default_variant %}{% if dv %}
+        <div class="card border-0 shadow-sm flex-shrink-0" style="width: 190px;">
+          <a href="{% url 'products:product_detail' p.pk %}" class="text-decoration-none">
+            {% if p.image %}
+              <img src="{{ p.image.url }}" class="card-img-top" style="height:120px;object-fit:cover" alt="{{ p.name }}">
+            {% else %}
+              <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height:120px;">
+                <i data-lucide="leaf" class="product-placeholder-icon"></i>
+              </div>
+            {% endif %}
+          </a>
+          <div class="card-body p-2">
+            <a href="{% url 'products:product_detail' p.pk %}" class="text-decoration-none text-dark">
+              <div class="small fw-semibold mb-2 lh-sm" style="min-height: 2.4em; overflow: hidden;">{{ p.name }}</div>
+            </a>
+            <div>
+              <div class="text-success fw-bold small mb-2">₹{{ dv.selling_price|floatformat:0 }}</div>
+              <a href="{% url 'products:product_detail' p.pk %}" class="btn btn-outline-success btn-sm w-100 py-1" style="font-size:0.75rem">View Item</a>
+            </div>
+          </div>
+        </div>
+        {% endif %}{% endwith %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</div>
+<input type="hidden" id="pageCsrfToken" value="{{ csrf_token }}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/css/lakrish.js?v=7"></script>
+<script>
+const variants = {{ variants_json|safe }};
+const addBtn = document.getElementById('addToCartBtn');
+let selectedVariantId = variants.length ? variants[0].id : null;
+
+// ── Variant-type filtering (Premium / Regular …) ─────────────────────────
+// Each pack button carries data-variant-type. Clicking a variant-type shows
+// only that type's packs and auto-selects the first in-stock one.
+(function () {
+  const typeBtns = document.querySelectorAll('.variant-type-option');
+  if (!typeBtns.length) return;   // single-variant product → no filtering
+
+  function selectPack(btn) {
+    if (!btn) return;
+    document.querySelectorAll('.variant-option').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    btn.click ? null : null;      // no-op; click handler below reads dataset
+    // Reuse the existing click handler to refresh price/stock panel.
+    btn.dispatchEvent(new Event('click'));
+  }
+
+  function showType(typeId) {
+    const packs = document.querySelectorAll('.variant-option');
+    let firstVisible = null, firstInStock = null;
+    packs.forEach(p => {
+      const match = p.dataset.variantType === String(typeId);
+      p.classList.toggle('d-none', !match);
+      if (match) {
+        firstVisible = firstVisible || p;
+        if (!firstInStock && parseInt(p.dataset.stock) > 0) firstInStock = p;
+      }
+    });
+    selectPack(firstInStock || firstVisible);
+  }
+
+  typeBtns.forEach(tb => {
+    tb.addEventListener('click', function () {
+      typeBtns.forEach(b => { b.classList.remove('btn-success'); b.classList.add('btn-outline-success'); });
+      this.classList.remove('btn-outline-success');
+      this.classList.add('btn-success');
+      showType(this.dataset.variantType);
+    });
+  });
+
+  // Initialize to the first variant-type on load.
+  showType(typeBtns[0].dataset.variantType);
+})();
+
+function getCsrfToken() {
+  const pageToken = document.getElementById('pageCsrfToken')?.value;
+  if (pageToken && pageToken !== 'NOTPROVIDED') return pageToken;
+  const formToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+  if (formToken) return formToken;
+  return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+}
+
+document.querySelectorAll('.variant-option').forEach(btn => {
+  btn.addEventListener('click', function() {
+    if (this.disabled) return;
+    document.querySelectorAll('.variant-option').forEach(b => b.classList.remove('selected'));
+    this.classList.add('selected');
+
+    const vid = parseInt(this.dataset.variantId);
+    selectedVariantId = vid;
+    const v = variants.find(x => x.id === vid);
+
+    document.getElementById('sellingPrice').textContent = '₹' + Math.round(v.selling_price || 0);
+    const mrpEl  = document.getElementById('mrpPrice');
+    const discEl = document.getElementById('discBadge');
+    if (v.discount > 0 && {{ product.show_mrp|yesno:"true,false" }}) {
+      mrpEl.textContent = '₹' + Math.round(v.mrp || 0); mrpEl.classList.remove('d-none');
+      discEl.classList.add('d-none');
+    } else {
+      mrpEl.classList.add('d-none'); discEl.classList.add('d-none');
+    }
+    const stockEl = document.getElementById('stockBadge');
+    stockEl.innerHTML = v.stock > 0
+      ? '<span class="badge bg-success">In Stock</span><span class="text-muted small ms-1">' + v.stock + ' left</span>'
+      : '<span class="badge bg-danger">Out of Stock</span>';
+
+    if (addBtn) {
+      if (v.stock === 0) addBtn.classList.add('disabled');
+      else               addBtn.classList.remove('disabled');
+    }
+  });
+});
+
+// Detail page add-to-cart via fetch (same as card)
+if (addBtn) {
+  addBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (this.classList.contains('disabled')) return;
+    const csrfToken = getCsrfToken();
+    const orig = this.innerHTML;
+    this.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+    this.classList.add('disabled');
+
+    fetch(`/cart/add/${selectedVariantId}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'quantity=1',
+    })
+    .then(r => r.json())
+    .then(data => {
+      if (data.success) {
+        this.innerHTML = '<i class="bi bi-check-lg me-1"></i> Added to Cart';
+        this.classList.remove('disabled');
+        this.classList.replace('btn-success', 'btn-outline-success');
+        document.querySelectorAll('[data-cart-badge]').forEach(el => {
+          el.textContent = data.cart_count;
+          el.classList.remove('d-none');
+        });
+        setTimeout(() => {
+          this.innerHTML = '<i class="bi bi-cart-plus me-1"></i> Add to Cart';
+          this.classList.replace('btn-outline-success', 'btn-success');
+        }, 2000);
+      } else {
+        this.innerHTML = orig;
+        this.classList.remove('disabled');
+      }
+    })
+    .catch(() => { this.innerHTML = orig; this.classList.remove('disabled'); });
+  });
+}
+
+// Buy Now — add to cart then redirect to checkout
+const buyNowBtn = document.getElementById('buyNowBtn');
+if (buyNowBtn) {
+  buyNowBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (this.classList.contains('disabled')) return;
+    if (!selectedVariantId) {
+      alert('Please select a product size/weight first.');
+      return;
+    }
+    const csrfToken = getCsrfToken();
+    const origText = this.innerHTML;
+    this.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Please wait...';
+    this.classList.add('disabled');
+    fetch(`/cart/add/${selectedVariantId}/`, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': csrfToken,
+        'X-Requested-With': 'XMLHttpRequest',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: 'quantity=1',
+    })
+    .then(async r => {
+      let data = null;
+      try { data = await r.json(); } catch (_) {}
+      if (!r.ok) {
+        const msg = data?.error || data?.message || ('Server error: ' + r.status);
+        throw new Error(msg);
+      }
+      return data;
+    })
+    .then(data => {
+      if (data.success) {
+        window.location.href = '/orders/checkout/';
+      } else {
+        alert(data.error || 'Could not process. Please try again.');
+        this.innerHTML = origText;
+        this.classList.remove('disabled');
+      }
+    })
+    .catch(err => {
+      console.error('Buy Now error:', err);
+      alert(err?.message || 'Something went wrong. Please try again.');
+      this.innerHTML = origText;
+      this.classList.remove('disabled');
+    });
+  });
+}
+
+// Reset Buy Now button on browser back navigation
+window.addEventListener('pageshow', function(e) {
+  const btn = document.getElementById('buyNowBtn');
+  if (!btn) return;
+
+  // Anchor buttons use Bootstrap's "disabled" class, not the DOM disabled property.
+  const shouldReset = e.persisted || btn.classList.contains('disabled') || /please wait/i.test(btn.textContent || '');
+  if (shouldReset) {
+    btn.innerHTML = '<i class="bi bi-lightning-fill me-1"></i> Buy Now';
+    btn.classList.remove('disabled');
+  }
+});
+
+</script>
+{% endblock %}

@@ -1,0 +1,160 @@
+{% extends 'stockist/base_stockist.html' %}
+{% block title %}Procurement — {{ stockist.company_name }}{% endblock %}
+{% block page_title %}Procurement Billing{% endblock %}
+{% block active_nav %}procurement{% endblock %}
+
+{% block content %}
+{# ── Summary badges ───────────────────────────────────────────────── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-4">
+    <div class="card border-0 shadow-sm p-3">
+      <div class="small text-muted">Total Balance Due</div>
+      <div class="fs-4 fw-bold text-danger">₹{{ total_due }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="card border-0 shadow-sm p-3">
+      <div class="small text-muted">Excess Credit</div>
+      <div class="fs-4 fw-bold text-success">₹{{ total_credit }}</div>
+    </div>
+  </div>
+</div>
+
+{# ── Supplier accounts list ────────────────────────────────────────── #}
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header  d-flex justify-content-between align-items-center">
+    <strong>Supplier Accounts</strong>
+  </div>
+  {% if accounts %}
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Supplier</th>
+          <th class="text-end">Total Invoiced</th>
+          <th class="text-end">Total Paid</th>
+          <th class="text-end">Balance Due</th>
+          <th class="text-end">Excess Credit</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for acc in accounts %}
+        <tr>
+          <td>{{ acc.supplier.company_name }}</td>
+          <td class="text-end">₹{{ acc.total_invoiced }}</td>
+          <td class="text-end">₹{{ acc.total_paid }}</td>
+          <td class="text-end {% if acc.balance_due > 0 %}text-danger fw-semibold{% endif %}">₹{{ acc.balance_due }}</td>
+          <td class="text-end {% if acc.excess_credit > 0 %}text-success fw-semibold{% endif %}">₹{{ acc.excess_credit }}</td>
+          <td class="text-end">
+            <a href="{% url 'stockist:account_detail' acc.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="card-body text-muted small">No supplier accounts yet. Add an invoice below to start.</div>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+{# ── Add Invoice ──────────────────────────────────────────────────── #}
+<div class="col-md-6">
+  <div class="card border-0 shadow-sm">
+    <div class="card-header "><strong>Add Procurement Invoice</strong></div>
+    <div class="card-body">
+      <form method="post" action="{% url 'stockist:create_invoice' %}">
+        {% csrf_token %}
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Supplier</label>
+          <select name="supplier_id" class="form-select form-select-sm" required>
+            <option value="">— select supplier —</option>
+            {% for s in suppliers %}
+            <option value="{{ s.pk }}">{{ s.company_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Invoice Amount (₹)</label>
+          <input type="number" name="total_amount" min="0.01" step="0.01" class="form-control form-control-sm" required placeholder="e.g. 400">
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col">
+            <label class="form-label small fw-semibold">Invoice Date</label>
+            <input type="date" name="invoice_date" class="form-control form-control-sm" value="{% now 'Y-m-d' %}">
+          </div>
+          <div class="col">
+            <label class="form-label small fw-semibold">Due Date (optional)</label>
+            <input type="date" name="due_date" class="form-control form-control-sm">
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Supplier Invoice No. (optional)</label>
+          <input type="text" name="invoice_number" class="form-control form-control-sm" placeholder="e.g. INV-2024-001">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Notes (optional)</label>
+          <textarea name="notes" class="form-control form-control-sm" rows="2"></textarea>
+        </div>
+        <button class="btn btn-sm btn-primary w-100">Add Invoice</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+{# ── Record Payment ────────────────────────────────────────────────── #}
+<div class="col-md-6">
+  <div class="card border-0 shadow-sm">
+    <div class="card-header "><strong>Record Payment to Supplier</strong></div>
+    <div class="card-body">
+      <form method="post" action="{% url 'stockist:create_payment' %}">
+        {% csrf_token %}
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Supplier</label>
+          <select name="supplier_id" class="form-select form-select-sm" required>
+            <option value="">— select supplier —</option>
+            {% for s in suppliers %}
+            <option value="{{ s.pk }}">{{ s.company_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Amount Paid (₹)</label>
+          <input type="number" name="amount" min="0.01" step="0.01" class="form-control form-control-sm" required placeholder="e.g. 600">
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col">
+            <label class="form-label small fw-semibold">Payment Date</label>
+            <input type="date" name="payment_date" class="form-control form-control-sm" value="{% now 'Y-m-d' %}">
+          </div>
+          <div class="col">
+            <label class="form-label small fw-semibold">Method</label>
+            <select name="payment_method" class="form-select form-select-sm">
+              <option value="upi">UPI</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="cash">Cash</option>
+              <option value="cheque">Cheque</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small fw-semibold">Reference / UTR (optional)</label>
+          <input type="text" name="reference" class="form-control form-control-sm" placeholder="e.g. 123456789012">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Note (optional)</label>
+          <input type="text" name="note" class="form-control form-control-sm">
+        </div>
+        <button class="btn btn-sm btn-success w-100">Record Payment &amp; Auto-Allocate</button>
+      </form>
+      <div class="text-muted small mt-2">
+        Payment is applied oldest-invoice-first (FIFO). Any overpayment becomes <strong>excess credit</strong> for future invoices.
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+{% endblock %}

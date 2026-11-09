@@ -1,0 +1,270 @@
+# Hindi translations
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: hi\n"
+
+msgid "English"
+msgstr "अंग्रेज़ी"
+
+msgid "Tamil"
+msgstr "तमिल"
+
+msgid "Telugu"
+msgstr "तेलुगु"
+
+msgid "Kannada"
+msgstr "कन्नड़"
+
+msgid "Hindi"
+msgstr "हिन्दी"
+
+msgid "French"
+msgstr "फ्रेंच"
+
+msgid "Home"
+msgstr "होम"
+
+msgid "Shop"
+msgstr "दुकान"
+
+msgid "Login"
+msgstr "लॉगिन"
+
+msgid "Register"
+msgstr "पंजीकरण करें"
+
+msgid "Logout"
+msgstr "लॉगआउट"
+
+msgid "Profile"
+msgstr "प्रोफ़ाइल"
+
+msgid "My Orders"
+msgstr "मेरे ऑर्डर"
+
+msgid "Dashboard"
+msgstr "डैशबोर्ड"
+
+msgid "Search products…"
+msgstr "उत्पाद खोजें…"
+
+msgid "Add to Cart"
+msgstr "कार्ट में जोड़ें"
+
+msgid "Checkout"
+msgstr "चेकआउट"
+
+msgid "Username"
+msgstr "उपयोगकर्ता नाम"
+
+msgid "Password"
+msgstr "पासवर्ड"
+
+msgid "Submit"
+msgstr "जमा करें"
+
+msgid "Cancel"
+msgstr "रद्द करें"
+
+msgid "Save"
+msgstr "सहेजें"
+
+msgid "Delete"
+msgstr "हटाएं"
+
+msgid "Edit"
+msgstr "संपादित करें"
+
+msgid "Back"
+msgstr "वापस"
+
+msgid "Supplier Portal"
+msgstr "सप्लायर पोर्टल"
+
+msgid "Admin Panel"
+msgstr "एडमिन पैनल"
+
+msgid "Storefront"
+msgstr "स्टोरफ्रंट"
+
+msgid "Fresh Organic Food, Direct from Farmers"
+msgstr "किसानों से सीधे ताज़ा जैविक भोजन"
+
+msgid "100% Organic & Natural"
+msgstr "100% जैविक और प्राकृतिक"
+
+msgid "Fresh from the Farm."
+msgstr "खेत से ताज़ा।"
+
+msgid "Straight to Your Door."
+msgstr "सीधे आपके दरवाज़े तक।"
+
+msgid "LaKrish Mart connects you directly with organic farmers and natural food producers. No middlemen. No chemicals. Just pure, honest food — delivered by your trusted local distributor."
+msgstr "LaKrish Mart आपको सीधे जैविक किसानों से जोड़ता है। कोई बिचौलिया नहीं। कोई रसायन नहीं। शुद्ध भोजन — आपके विश्वसनीय स्थानीय वितरक द्वारा।"
+
+msgid "Login to Shop"
+msgstr "खरीदारी के लिए लॉगिन करें"
+
+msgid "Register Free"
+msgstr "मुफ्त पंजीकरण करें"
+
+msgid "Dry Fruits & Nuts"
+msgstr "सूखे मेवे और नट्स"
+
+msgid "Spices"
+msgstr "मसाले"
+
+msgid "Natural Foods"
+msgstr "प्राकृतिक खाद्य पदार्थ"
+
+msgid "Products"
+msgstr "उत्पाद"
+
+msgid "Farmers"
+msgstr "किसान"
+
+msgid "Cities"
+msgstr "शहर"
+
+msgid "Why LaKrish Mart?"
+msgstr "LaKrish Mart क्यों?"
+
+msgid "We believe food should be honest, clean, and traceable."
+msgstr "हम मानते हैं कि भोजन ईमानदार, स्वच्छ और पता लगाने योग्य होना चाहिए।"
+
+msgid "Direct from Farmers"
+msgstr "किसानों से सीधे"
+
+msgid "We source directly from certified organic farmers. No unnecessary middlemen, no inflated prices."
+msgstr "हम प्रमाणित जैविक किसानों से सीधे खरीदते हैं।"
+
+msgid "No Chemicals"
+msgstr "कोई रसायन नहीं"
+
+msgid "Every product is free from synthetic pesticides, preservatives, and artificial additives."
+msgstr "हर उत्पाद कृत्रिम कीटनाशकों और परिरक्षकों से मुक्त है।"
+
+msgid "Home Made Quality"
+msgstr "घरेलू गुणवत्ता"
+
+msgid "Many of our products are handcrafted in small batches — the way your grandmother used to make them."
+msgstr "हमारे कई उत्पाद छोटे बैचों में हस्तनिर्मित हैं।"
+
+msgid "Local Delivery"
+msgstr "स्थानीय डिलीवरी"
+
+msgid "Your local distributor delivers fresh to your doorstep. Fast, reliable, and community-driven."
+msgstr "आपका स्थानीय वितरक ताज़ा उत्पाद आपके दरवाज़े तक पहुंचाता है।"
+
+msgid "What We Offer"
+msgstr "हम क्या प्रदान करते हैं"
+
+msgid "A curated selection of nature's best — in every size you need."
+msgstr "प्रकृति के सर्वश्रेष्ठ का संग्रह — हर आकार में।"
+
+msgid "Dry Fruits"
+msgstr "सूखे मेवे"
+
+msgid "Dates, Apricots, Raisins"
+msgstr "खजूर, खुबानी, किशमिश"
+
+msgid "Nuts"
+msgstr "नट्स"
+
+msgid "Almonds, Cashews, Walnuts"
+msgstr "बादाम, काजू, अखरोट"
+
+msgid "Pepper, Cardamom, Cinnamon"
+msgstr "काली मिर्च, इलायची, दालचीनी"
+
+msgid "Seeds"
+msgstr "बीज"
+
+msgid "Chia, Flax, Sunflower"
+msgstr "चिया, अलसी, सूरजमुखी"
+
+msgid "Turmeric, Honey, Coconut Oil"
+msgstr "हल्दी, शहद, नारियल तेल"
+
+msgid "Cold-pressed oils, raw honey"
+msgstr "कोल्ड-प्रेस्ड तेल, कच्चा शहद"
+
+msgid "How It Works"
+msgstr "यह कैसे काम करता है"
+
+msgid "Simple, transparent, and community-powered."
+msgstr "सरल, पारदर्शी और समुदाय-संचालित।"
+
+msgid "Create your free account. Use your distributor's invite code to shop from their store."
+msgstr "अपना मुफ्त खाता बनाएं। वितरक के आमंत्रण कोड का उपयोग करें।"
+
+msgid "Browse & Choose"
+msgstr "ब्राउज़ करें और चुनें"
+
+msgid "See your distributor's curated product list with their prices. Pick your size and quantity."
+msgstr "वितरक की उत्पाद सूची देखें और अपना आकार चुनें।"
+
+msgid "Place Order"
+msgstr "ऑर्डर दें"
+
+msgid "Add to cart and checkout. Pay on delivery or via UPI. No advance payment required."
+msgstr "कार्ट में जोड़ें और चेकआउट करें। डिलीवरी पर या UPI से भुगतान करें।"
+
+msgid "Get Delivered"
+msgstr "डिलीवरी पाएं"
+
+msgid "Your local distributor delivers fresh organic products right to your door."
+msgstr "आपका स्थानीय वितरक ताज़े जैविक उत्पाद आपके दरवाज़े तक पहुंचाता है।"
+
+msgid "Our Promise to You"
+msgstr "आपसे हमारा वादा"
+
+msgid "Certified Organic"
+msgstr "प्रमाणित जैविक"
+
+msgid "All products sourced from verified organic farms and natural producers."
+msgstr "सभी उत्पाद सत्यापित जैविक खेतों से प्राप्त किए गए हैं।"
+
+msgid "Fair Prices"
+msgstr "उचित मूल्य"
+
+msgid "Direct sourcing means better prices for you and fair pay for farmers."
+msgstr "सीधी खरीद का मतलब है आपके लिए बेहतर कीमत और किसानों के लिए उचित भुगतान।"
+
+msgid "Fresh Stock"
+msgstr "ताज़ा स्टॉक"
+
+msgid "Products are sourced in small batches to ensure freshness and quality."
+msgstr "ताज़गी और गुणवत्ता सुनिश्चित करने के लिए छोटे बैचों में उत्पाद लिए जाते हैं।"
+
+msgid "Community First"
+msgstr "समुदाय पहले"
+
+msgid "We support local distributors and farmers in your neighbourhood."
+msgstr "हम आपके पड़ोस के स्थानीय वितरकों और किसानों का समर्थन करते हैं।"
+
+msgid "Organic Certified"
+msgstr "जैविक प्रमाणित"
+
+msgid "Artificial Additives"
+msgstr "कृत्रिम योजक"
+
+msgid "Farmer Partners"
+msgstr "किसान भागीदार"
+
+msgid "Happy Customers"
+msgstr "खुश ग्राहक"
+
+msgid "Ready to eat clean?"
+msgstr "स्वच्छ खाने के लिए तैयार हैं?"
+
+msgid "Join thousands of families who have switched to organic living with LaKrish Mart."
+msgstr "LaKrish Mart के साथ जैविक जीवन अपनाने वाले हजारों परिवारों से जुड़ें।"
+
+msgid "Create Free Account"
+msgstr "मुफ्त खाता बनाएं"
+
+msgid "Have a distributor code? Enter it during registration to shop from your local store."
+msgstr "वितरक कोड है? पंजीकरण के दौरान दर्ज करें।"

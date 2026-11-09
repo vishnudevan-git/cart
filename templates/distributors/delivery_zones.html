@@ -1,0 +1,173 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Delivery Zones{% endblock %}
+{% block page_title %}📍 Delivery Zones{% endblock %}
+{% block active_nav %}delivery_zones{% endblock %}
+{% block content %}
+
+<div class="row g-4">
+  <!-- Left: Zone list + Add -->
+  <div class="col-12 col-md-5">
+    <div class="card border-0 shadow-sm p-3 mb-3">
+      <h6 class="fw-semibold mb-3">Your Zones</h6>
+      {% if zones %}
+      <div class="table-responsive">
+        <table class="table table-sm align-middle small mb-0">
+          <thead class="table-light">
+            <tr><th>Zone</th><th>Charge</th><th>Free Above</th><th>Pincodes</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for z in zones %}
+            <tr>
+              <td class="fw-semibold">{{ z.name }}</td>
+              <td>₹{{ z.delivery_charge }}</td>
+              <td>{% if z.free_delivery_above %}₹{{ z.free_delivery_above }}{% else %}—{% endif %}</td>
+              <td class="small text-muted">{{ z.pincodes|default:"—"|truncatechars:30 }}</td>
+              <td>
+                <button class="btn btn-sm btn-outline-primary py-0 px-1 me-1"
+                        onclick="toggleEditZone({{ z.pk }})" type="button" title="Edit">
+                  <i class="bi bi-pencil"></i>
+                </button>
+                <form method="post" class="d-inline">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete_zone">
+                  <input type="hidden" name="zone_id" value="{{ z.pk }}">
+                  <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                          data-confirm="Delete zone '{{ z.name }}'?"
+                          data-confirm-title="Delete Zone" data-confirm-type="danger">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </td>
+            </tr>
+            <!-- Inline edit row -->
+            <tr id="edit-zone-{{ z.pk }}" class="d-none bg-light">
+              <td colspan="5" class="p-2">
+                <form method="post" class="row g-2 align-items-end">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="edit_zone">
+                  <input type="hidden" name="zone_id" value="{{ z.pk }}">
+                  <div class="col-sm-3">
+                    <label class="form-label small mb-0">Name</label>
+                    <input type="text" name="zone_name" class="form-control form-control-sm" value="{{ z.name }}" required>
+                  </div>
+                  <div class="col-sm-2">
+                    <label class="form-label small mb-0">Charge ₹</label>
+                    <input type="number" name="zone_charge" class="form-control form-control-sm" step="0.01" min="0" value="{{ z.delivery_charge }}">
+                  </div>
+                  <div class="col-sm-2">
+                    <label class="form-label small mb-0">Free Above ₹</label>
+                    <input type="number" name="zone_free_above" class="form-control form-control-sm" step="0.01" min="0" value="{{ z.free_delivery_above|default:0 }}">
+                  </div>
+                  <div class="col-sm-3">
+                    <label class="form-label small mb-0">Pincodes</label>
+                    <input type="text" name="zone_pincodes" class="form-control form-control-sm" value="{{ z.pincodes|default:'' }}">
+                  </div>
+                  <div class="col-sm-2 d-flex gap-1">
+                    <button type="submit" class="btn btn-success btn-sm">Save</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="toggleEditZone({{ z.pk }})">Cancel</button>
+                  </div>
+                </form>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="text-muted small mb-0">No zones created yet. Add one below.</p>
+      {% endif %}
+    </div>
+
+    <!-- Add Zone -->
+    <div class="card border-0 shadow-sm p-3">
+      <h6 class="fw-semibold mb-2">Add New Zone</h6>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_zone">
+        <div class="mb-2">
+          <input type="text" name="zone_name" class="form-control form-control-sm" placeholder="Zone name (e.g. Zone A - Nearby)" required>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-6">
+            <label class="form-label small text-muted mb-0">Delivery Charge ₹</label>
+            <input type="number" name="zone_charge" class="form-control form-control-sm" step="0.01" min="0" value="0">
+          </div>
+          <div class="col-6">
+            <label class="form-label small text-muted mb-0">Free Above ₹</label>
+            <input type="number" name="zone_free_above" class="form-control form-control-sm" step="0.01" min="0" value="0">
+          </div>
+        </div>
+        <div class="mb-2">
+          <label class="form-label small text-muted mb-0">Pincodes (comma-separated, optional)</label>
+          <input type="text" name="zone_pincodes" class="form-control form-control-sm" placeholder="e.g. 635109, 635126, 635110">
+        </div>
+        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Zone</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right: Assign customers to zones -->
+  <div class="col-12 col-md-7">
+    <div class="card border-0 shadow-sm p-3">
+      <h6 class="fw-semibold mb-3">Assign Customers to Zones</h6>
+      {% if customers and zones %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="assign_customers">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle small mb-2">
+            <thead class="table-light">
+              <tr><th>Customer</th><th>Phone</th><th>Pincode</th><th>Zone</th></tr>
+            </thead>
+            <tbody>
+              {% for cw in customers %}
+              <tr>
+                <td class="fw-semibold">{{ cw.user.get_full_name|default:cw.user.username }}</td>
+                <td class="text-muted">{{ cw.user.phone|default:"—" }}</td>
+                <td class="text-muted">{{ cw.user.pincode|default:"—" }}</td>
+                <td>
+                  <select name="zone_{{ cw.user.pk }}" class="form-select form-select-sm" style="width:180px">
+                    <option value="">— Default (₹{{ dist.delivery_charge }}) —</option>
+                    {% for z in zones %}
+                      <option value="{{ z.pk }}" {% if cw.zone_id == z.pk %}selected{% endif %}>
+                        {{ z.name }} (₹{{ z.delivery_charge }})
+                      </option>
+                    {% endfor %}
+                  </select>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <button type="submit" class="btn btn-success btn-sm"><i class="bi bi-check-lg me-1"></i>Save Assignments</button>
+      </form>
+      {% elif not zones %}
+      <p class="text-muted small">Create zones first, then assign customers.</p>
+      {% else %}
+      <p class="text-muted small">No customers yet.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm p-3 mt-3">
+  <h6 class="fw-semibold mb-2">How it works</h6>
+  <ul class="small text-muted mb-0">
+    <li>Create zones with different delivery charges (e.g. Nearby ₹20, City ₹40, Outskirts ₹80)</li>
+    <li>Assign each customer to a zone — their delivery charge at checkout will use the zone rate</li>
+    <li>Customers not assigned to any zone use your default delivery charge (₹{{ dist.delivery_charge }})</li>
+    <li>You can also set pincodes per zone — future auto-assignment based on customer pincode</li>
+  </ul>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleEditZone(pk) {
+  const row = document.getElementById('edit-zone-' + pk);
+  row.classList.toggle('d-none');
+}
+</script>
+{% endblock %}

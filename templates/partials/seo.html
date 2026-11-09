@@ -1,0 +1,7 @@
+{% comment %}Include in page head: {% include 'partials/seo.html' with title="..." description="..." %}{% endcomment %}
+<meta name="description" content="{{ description|default:'LaKrish Mart — Fresh organic food, dry fruits, nuts and spices delivered by your local distributor.' }}">
+<meta name="keywords" content="organic food, dry fruits, nuts, spices, natural food, LaKrish Mart">
+<meta property="og:title" content="{{ title|default:'LaKrish Mart' }}">
+<meta property="og:description" content="{{ description|default:'Fresh organic food delivered to your door.' }}">
+<meta property="og:type" content="website">
+<link rel="canonical" href="{{ request.build_absolute_uri }}">

@@ -1,0 +1,270 @@
+# Telugu translations
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: te\n"
+
+msgid "English"
+msgstr "ఇంగ్లీష్"
+
+msgid "Tamil"
+msgstr "తమిళం"
+
+msgid "Telugu"
+msgstr "తెలుగు"
+
+msgid "Kannada"
+msgstr "కన్నడ"
+
+msgid "Hindi"
+msgstr "హిందీ"
+
+msgid "French"
+msgstr "ఫ్రెంచ్"
+
+msgid "Home"
+msgstr "హోమ్"
+
+msgid "Shop"
+msgstr "షాప్"
+
+msgid "Login"
+msgstr "లాగిన్"
+
+msgid "Register"
+msgstr "నమోదు చేయండి"
+
+msgid "Logout"
+msgstr "లాగ్అవుట్"
+
+msgid "Profile"
+msgstr "ప్రొఫైల్"
+
+msgid "My Orders"
+msgstr "నా ఆర్డర్లు"
+
+msgid "Dashboard"
+msgstr "డాష్‌బోర్డ్"
+
+msgid "Search products…"
+msgstr "ఉత్పత్తులను వెతకండి…"
+
+msgid "Add to Cart"
+msgstr "కార్ట్‌కు జోడించు"
+
+msgid "Checkout"
+msgstr "చెక్అవుట్"
+
+msgid "Username"
+msgstr "వినియోగదారు పేరు"
+
+msgid "Password"
+msgstr "పాస్‌వర్డ్"
+
+msgid "Submit"
+msgstr "సమర్పించు"
+
+msgid "Cancel"
+msgstr "రద్దు చేయి"
+
+msgid "Save"
+msgstr "సేవ్ చేయి"
+
+msgid "Delete"
+msgstr "తొలగించు"
+
+msgid "Edit"
+msgstr "సవరించు"
+
+msgid "Back"
+msgstr "వెనక్కి"
+
+msgid "Supplier Portal"
+msgstr "సప్లయర్ పోర్టల్"
+
+msgid "Admin Panel"
+msgstr "అడ్మిన్ ప్యానెల్"
+
+msgid "Storefront"
+msgstr "స్టోర్‌ఫ్రంట్"
+
+msgid "Fresh Organic Food, Direct from Farmers"
+msgstr "రైతుల నుండి నేరుగా తాజా సేంద్రీయ ఆహారం"
+
+msgid "100% Organic & Natural"
+msgstr "100% సేంద్రీయ మరియు సహజ"
+
+msgid "Fresh from the Farm."
+msgstr "పొలం నుండి తాజాగా."
+
+msgid "Straight to Your Door."
+msgstr "నేరుగా మీ తలుపు వద్దకు."
+
+msgid "LaKrish Mart connects you directly with organic farmers and natural food producers. No middlemen. No chemicals. Just pure, honest food — delivered by your trusted local distributor."
+msgstr "LaKrish Mart మిమ్మల్ని సేంద్రీయ రైతులతో నేరుగా కలుపుతుంది. మధ్యవర్తులు లేరు. రసాయనాలు లేవు. స్వచ్ఛమైన ఆహారం — మీ విశ్వసనీయ స్థానిక పంపిణీదారు ద్వారా."
+
+msgid "Login to Shop"
+msgstr "షాపింగ్ కోసం లాగిన్ చేయండి"
+
+msgid "Register Free"
+msgstr "ఉచితంగా నమోదు చేయండి"
+
+msgid "Dry Fruits & Nuts"
+msgstr "డ్రై ఫ్రూట్స్ మరియు నట్స్"
+
+msgid "Spices"
+msgstr "మసాలాలు"
+
+msgid "Natural Foods"
+msgstr "సహజ ఆహారాలు"
+
+msgid "Products"
+msgstr "ఉత్పత్తులు"
+
+msgid "Farmers"
+msgstr "రైతులు"
+
+msgid "Cities"
+msgstr "నగరాలు"
+
+msgid "Why LaKrish Mart?"
+msgstr "LaKrish Mart ఎందుకు?"
+
+msgid "We believe food should be honest, clean, and traceable."
+msgstr "ఆహారం నిజాయితీగా, శుభ్రంగా ఉండాలని మేము నమ్ముతాము."
+
+msgid "Direct from Farmers"
+msgstr "రైతుల నుండి నేరుగా"
+
+msgid "We source directly from certified organic farmers. No unnecessary middlemen, no inflated prices."
+msgstr "మేము ధృవీకరించబడిన సేంద్రీయ రైతుల నుండి నేరుగా సేకరిస్తాము."
+
+msgid "No Chemicals"
+msgstr "రసాయనాలు లేవు"
+
+msgid "Every product is free from synthetic pesticides, preservatives, and artificial additives."
+msgstr "ప్రతి ఉత్పత్తి కృత్రిమ పురుగుమందులు మరియు సంరక్షకాల నుండి విముక్తి."
+
+msgid "Home Made Quality"
+msgstr "ఇంటి నాణ్యత"
+
+msgid "Many of our products are handcrafted in small batches — the way your grandmother used to make them."
+msgstr "మా చాలా ఉత్పత్తులు చిన్న బ్యాచ్‌లలో చేతితో తయారు చేయబడతాయి."
+
+msgid "Local Delivery"
+msgstr "స్థానిక డెలివరీ"
+
+msgid "Your local distributor delivers fresh to your doorstep. Fast, reliable, and community-driven."
+msgstr "మీ స్థానిక పంపిణీదారు తాజాగా మీ ముంగిట్లో అందిస్తారు."
+
+msgid "What We Offer"
+msgstr "మేము ఏమి అందిస్తాము"
+
+msgid "A curated selection of nature's best — in every size you need."
+msgstr "ప్రకృతి యొక్క అత్యుత్తమ ఎంపిక — మీకు అవసరమైన ప్రతి పరిమాణంలో."
+
+msgid "Dry Fruits"
+msgstr "డ్రై ఫ్రూట్స్"
+
+msgid "Dates, Apricots, Raisins"
+msgstr "ఖర్జూరాలు, ఆప్రికాట్లు, ఎండుద్రాక్ష"
+
+msgid "Nuts"
+msgstr "నట్స్"
+
+msgid "Almonds, Cashews, Walnuts"
+msgstr "బాదంపప్పు, జీడిపప్పు, వాల్‌నట్"
+
+msgid "Pepper, Cardamom, Cinnamon"
+msgstr "మిరియాలు, యాలకులు, దాల్చిన చెక్క"
+
+msgid "Seeds"
+msgstr "విత్తనాలు"
+
+msgid "Chia, Flax, Sunflower"
+msgstr "చియా, అవిసె, పొద్దుతిరుగుడు"
+
+msgid "Turmeric, Honey, Coconut Oil"
+msgstr "పసుపు, తేనె, కొబ్బరి నూనె"
+
+msgid "Cold-pressed oils, raw honey"
+msgstr "కోల్డ్-ప్రెస్డ్ నూనెలు, పచ్చి తేనె"
+
+msgid "How It Works"
+msgstr "ఇది ఎలా పని చేస్తుంది"
+
+msgid "Simple, transparent, and community-powered."
+msgstr "సరళమైన, పారదర్శకమైన మరియు సమాజ-ఆధారిత."
+
+msgid "Create your free account. Use your distributor's invite code to shop from their store."
+msgstr "మీ ఉచిత ఖాతాను సృష్టించండి. పంపిణీదారు ఆహ్వాన కోడ్ ఉపయోగించండి."
+
+msgid "Browse & Choose"
+msgstr "బ్రౌజ్ చేసి ఎంచుకోండి"
+
+msgid "See your distributor's curated product list with their prices. Pick your size and quantity."
+msgstr "పంపిణీదారు ఉత్పత్తుల జాబితాను వారి ధరలతో చూడండి."
+
+msgid "Place Order"
+msgstr "ఆర్డర్ చేయండి"
+
+msgid "Add to cart and checkout. Pay on delivery or via UPI. No advance payment required."
+msgstr "కార్ట్‌కు జోడించి చెక్అవుట్ చేయండి. డెలివరీలో లేదా UPI ద్వారా చెల్లించండి."
+
+msgid "Get Delivered"
+msgstr "డెలివరీ పొందండి"
+
+msgid "Your local distributor delivers fresh organic products right to your door."
+msgstr "మీ స్థానిక పంపిణీదారు తాజా సేంద్రీయ ఉత్పత్తులను మీ తలుపు వద్దకు అందిస్తారు."
+
+msgid "Our Promise to You"
+msgstr "మీకు మా వాగ్దానం"
+
+msgid "Certified Organic"
+msgstr "ధృవీకరించబడిన సేంద్రీయ"
+
+msgid "All products sourced from verified organic farms and natural producers."
+msgstr "అన్ని ఉత్పత్తులు ధృవీకరించబడిన సేంద్రీయ పొలాల నుండి."
+
+msgid "Fair Prices"
+msgstr "న్యాయమైన ధరలు"
+
+msgid "Direct sourcing means better prices for you and fair pay for farmers."
+msgstr "నేరుగా సేకరణ అంటే మీకు మెరుగైన ధరలు మరియు రైతులకు న్యాయమైన వేతనం."
+
+msgid "Fresh Stock"
+msgstr "తాజా స్టాక్"
+
+msgid "Products are sourced in small batches to ensure freshness and quality."
+msgstr "తాజాదనం మరియు నాణ్యతను నిర్ధారించడానికి చిన్న బ్యాచ్‌లలో ఉత్పత్తులు సేకరించబడతాయి."
+
+msgid "Community First"
+msgstr "సమాజం మొదట"
+
+msgid "We support local distributors and farmers in your neighbourhood."
+msgstr "మేము మీ పరిసరాల్లోని స్థానిక పంపిణీదారులు మరియు రైతులకు మద్దతు ఇస్తాము."
+
+msgid "Organic Certified"
+msgstr "సేంద్రీయ ధృవీకరించబడింది"
+
+msgid "Artificial Additives"
+msgstr "కృత్రిమ సంకలనాలు"
+
+msgid "Farmer Partners"
+msgstr "రైతు భాగస్వాములు"
+
+msgid "Happy Customers"
+msgstr "సంతోషకరమైన కస్టమర్లు"
+
+msgid "Ready to eat clean?"
+msgstr "శుభ్రంగా తినడానికి సిద్ధంగా ఉన్నారా?"
+
+msgid "Join thousands of families who have switched to organic living with LaKrish Mart."
+msgstr "LaKrish Mart తో సేంద్రీయ జీవనానికి మారిన వేలాది కుటుంబాలలో చేరండి."
+
+msgid "Create Free Account"
+msgstr "ఉచిత ఖాతా సృష్టించండి"
+
+msgid "Have a distributor code? Enter it during registration to shop from your local store."
+msgstr "పంపిణీదారు కోడ్ ఉందా? నమోదు సమయంలో నమోదు చేయండి."

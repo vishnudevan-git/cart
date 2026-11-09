@@ -1,0 +1,69 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Orders{% endblock %}
+{% block page_title %}Orders{% endblock %}
+{% block active_nav %}orders{% endblock %}
+{% block content %}
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  {% for val, label in status_choices %}
+  <a href="?status={{ val }}" class="btn btn-sm {% if status_filter == val %}btn-success{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
+  {% endfor %}
+  <a href="?" class="btn btn-sm {% if not status_filter %}btn-success{% else %}btn-outline-secondary{% endif %}">All</a>
+</div>
+
+<div class="card border-0 shadow-sm d-none d-md-block">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0">
+      <thead class="table-light"><tr><th>Order #</th><th>Customer</th><th>Total</th><th>My Margin</th><th>Reward Given</th><th>Status</th><th>Date</th><th></th></tr></thead>
+      <tbody>
+        {% for order in orders %}
+        <tr>
+          <td>#{{ order.id }}</td>
+          <td>{{ order.customer.username }}</td>
+          <td>₹{{ order.total_amount }}</td>
+          <td class="fw-semibold text-success">
+            ₹{% with margin=0 %}
+              {% for item in order.items.all %}{% with m=item.distributor_margin %}{% endwith %}{% endfor %}
+              {{ order.dist_margin|floatformat:2|default:"—" }}
+            {% endwith %}
+          </td>
+          <td>
+            {% if order.status == 'delivered' %}
+              {% with txn=order.reward_transactions.first %}
+                {% if txn %}
+                  <span class="badge bg-success">₹{{ txn.points }} given</span>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
+              {% endwith %}
+            {% else %}
+              <span class="text-muted small">—</span>
+            {% endif %}
+          </td>
+          <td><span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ order.get_status_display }}</span>{% if order.is_partial_shipment %} <span class="badge bg-info text-dark">Partial</span>{% endif %}</td>
+          <td>{{ order.created_at|date:"d M Y" }}</td>
+          <td><a href="{% url 'distributors:order_detail' order.pk %}" class="btn btn-sm btn-outline-success">Manage</a></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No orders yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+<div class="d-md-none">
+  {% for order in orders %}
+  <div class="card border-0 shadow-sm mb-2 p-3">
+    <div class="d-flex justify-content-between mb-1">
+      <span class="fw-semibold">#{{ order.id }} — {{ order.customer.username }}</span>
+      <span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ order.get_status_display }}</span>{% if order.is_partial_shipment %} <span class="badge bg-info text-dark">Partial</span>{% endif %}
+    </div>
+    <div class="d-flex justify-content-between align-items-center">
+      <span class="text-muted small">{{ order.created_at|date:"d M Y" }} · ₹{{ order.total_amount }}</span>
+      <a href="{% url 'distributors:order_detail' order.pk %}" class="btn btn-sm btn-outline-success">Manage</a>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">No orders yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

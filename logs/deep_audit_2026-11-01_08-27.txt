@@ -1,0 +1,48 @@
+DEEP AUDIT REPORT
+Passed:33 Warnings:3 Errors:0 Fixes:4
+
+WARNINGS:
+  [audit_integrity] [WARN] Active shops linked to a SUSPENDED wholesale Distributor (margin silently lost) — 2
+  [K.Anna Nagar Organics] Distributor 'Chennai Wholesale Distributors' suspended — margin skipped
+  [K.Velachery Fresh Store] Distributor 'Chennai Wholesale Distributors' suspended — margin skipped
+
+FIXES:
+  [cleanup] Soft-deleted audit product 'Audit Pepper 082731'
+  [cleanup] Deleted audit customer 9501082731
+  [cleanup] Deleted audit supplier 9500082731
+  [cleanup] Soft-deleted audit own product
+
+PASSED:
+  [A.add_supplier] Supplier 'AuditSup 082731' created (HTTP 302)
+  [B.add_product] Product 'Audit Pepper 082731' sku=A0SP0001 status=pending variants=2
+  [B.admin_approve] Product approved (HTTP 302)
+  [B.stockist_release] Product charges confirmed and released
+  [C.shop_price] Floor Rs.101.60 → shop sells Rs.116.60 ✓ above floor
+  [D.add_customer] Customer 9501082731 linked to Anna Nagar Organics
+  [E.place_order] Order #43 status=pending total=Rs.264.00
+  [E.payment_row] COD payment row Rs.264.00
+  [F.confirm] confirmed
+  [F.stockist_pick] stockist_picked
+  [F.stockist_deliver] at_distributor
+  [F.out_for_delivery] out_for_delivery
+  [F.delivered] delivered
+  [F.cod_paid] COD fully paid Rs.264.00
+  [F.customer_timeline] 6 steps all done ✓
+  [F.timeline_label] 'At Local Store' label present
+  [F.no_leak] No template syntax leaks
+  [G.partial_batch1] partially_delivered | item1=delivered item2=pending | collected Rs.98.00
+  [G.partial_batch2] fully delivered | Rs.330.00/330.00 paid
+  [H.template_search] Found template 'Lux — Soap Bar' with 2 packs
+  [H.own_product] Own product 'Shop Soap 082731' created (private to Anna Nagar Organics)
+  [H.isolation] Own product NOT visible to Velachery Fresh Store ✓
+  [audit_integrity] clean
+  [J.Admin] HTTP 200 ✓
+  [J.Supplier] HTTP 200 ✓
+  [J.Stockist] HTTP 200 ✓
+  [J.Shop] HTTP 200 ✓
+  [J.Customer] HTTP 200 ✓
+  [K.Anna Nagar Organics] All 10 checked prices ≥ floor ✓
+  [K.Velachery Fresh Store] All 10 checked prices ≥ floor ✓
+  [K.E2E Fresh Store] All 10 checked prices ≥ floor ✓
+  [K.North Chennai Daily Needs] All 10 checked prices ≥ floor ✓
+  [L.log_file] requests_2026-11-01_08-12-53.log | 0 requests | roles seen: set()

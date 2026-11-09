@@ -1,0 +1,94 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Product library{% endblock %}
+{% block page_title %}Product library — bulk import{% endblock %}
+{% block active_nav %}own_products{% endblock %}
+{% block content %}
+
+<div class="d-flex gap-2 mb-3 flex-wrap">
+  <a href="{% url 'distributors:own_product_list' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to my products
+  </a>
+  <a href="{% url 'distributors:own_product_create' %}" class="btn btn-sm btn-outline-success">
+    <i class="bi bi-plus-lg me-1"></i>Add one product manually
+  </a>
+</div>
+
+{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>{% endfor %}
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-3">
+    <p class="text-muted small mb-2">
+      Pick common products from the shared library and import them into your store in one go.
+      Each becomes <strong>your own private product</strong> — set your price &amp; stock after importing.
+    </p>
+    <form method="get" class="d-flex gap-2">
+      <input type="text" name="q" class="form-control form-control-sm" style="max-width:280px"
+             placeholder="Search the library…" value="{{ q }}">
+      <button class="btn btn-sm btn-outline-primary">Search</button>
+      {% if q %}<a href="{% url 'distributors:template_library' %}" class="btn btn-sm btn-outline-secondary">Clear</a>{% endif %}
+    </form>
+  </div>
+</div>
+
+<form method="post">
+  {% csrf_token %}
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <button type="submit" class="btn btn-success btn-sm" id="importBtn" disabled>
+      <i class="bi bi-download me-1"></i>Import selected
+    </button>
+    <span class="text-muted small" id="selCount">0 selected</span>
+    <span class="text-muted small ms-auto">{{ templates|length }} product(s) in library</span>
+  </div>
+
+  <div class="row g-2">
+    {% for t in templates %}
+    <div class="col-12 col-md-6 col-lg-4">
+      <label class="card border h-100 shadow-sm tmpl-card" style="cursor:pointer">
+        <div class="card-body d-flex gap-2 p-2">
+          <input type="checkbox" class="form-check-input tmpl-check mt-1" name="template_ids" value="{{ t.id }}">
+          {% if t.image %}
+            <img src="{{ t.image.url }}" style="width:52px;height:52px;object-fit:cover;border-radius:8px">
+          {% else %}
+            <div style="width:52px;height:52px;background:#eef;border-radius:8px;display:flex;align-items:center;justify-content:center"><i class="bi bi-box-seam text-primary fs-5"></i></div>
+          {% endif %}
+          <div class="flex-fill">
+            <div class="fw-semibold small lh-sm">{{ t.display_name }}</div>
+            <div class="text-muted" style="font-size:.72rem">
+              {{ t.category.name|default:"Uncategorised" }} ·
+              {{ t.variants.count }} pack{{ t.variants.count|pluralize }}
+              {% if t.use_count %}· used {{ t.use_count }}×{% endif %}
+            </div>
+            {% if t.variants.all %}
+            <div class="text-muted mt-1" style="font-size:.7rem">
+              {% for v in t.variants.all|slice:":3" %}<span class="badge bg-light text-dark border me-1">{{ v.label }}</span>{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </label>
+    </div>
+    {% empty %}
+    <div class="col-12">
+      <p class="text-muted text-center py-5">
+        The library is empty{% if q %} for "{{ q }}"{% endif %}.
+        As shops add their own products, common items appear here for everyone to reuse.
+      </p>
+    </div>
+    {% endfor %}
+  </div>
+</form>
+
+<script>
+  (function () {
+    const checks = Array.from(document.querySelectorAll('.tmpl-check'));
+    const btn = document.getElementById('importBtn');
+    const count = document.getElementById('selCount');
+    function update() {
+      const n = checks.filter(c => c.checked).length;
+      count.textContent = n + ' selected';
+      btn.disabled = n === 0;
+    }
+    checks.forEach(c => c.addEventListener('change', update));
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,366 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}User Management{% endblock %}
+{% block page_title %}{% if show_deleted %}Deleted Accounts{% else %}User Management{% endif %}{% endblock %}
+{% block active_nav %}user_list{% endblock %}
+{% block content %}
+
+<!-- Tab bar -->
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  <a href="{% url 'admin_panel:user_list' %}" class="btn btn-sm {% if not show_deleted and not unlinked %}btn-success{% else %}btn-outline-secondary{% endif %}">
+    <i class="bi bi-people me-1"></i>Active Users
+  </a>
+  <a href="{% url 'admin_panel:user_list' %}?unlinked=1" class="btn btn-sm {% if unlinked %}btn-warning{% else %}btn-outline-warning{% endif %}">
+    <i class="bi bi-person-x me-1"></i>No Marketplace
+    {% if unlinked_count %}<span class="badge bg-warning text-dark ms-1">{{ unlinked_count }}</span>{% endif %}
+  </a>
+  <a href="{% url 'admin_panel:user_list' %}?deleted=1" class="btn btn-sm {% if show_deleted %}btn-danger{% else %}btn-outline-danger{% endif %}">
+    <i class="bi bi-trash me-1"></i>Deleted Accounts
+    {% if deleted_count %}<span class="badge bg-danger ms-1">{{ deleted_count }}</span>{% endif %}
+  </a>
+  <div class="ms-auto flex-shrink-0">
+    <a href="{% url 'admin_panel:user_create' %}" class="btn btn-sm btn-primary shadow-sm hover-elevate">
+      <i class="bi bi-person-plus-fill me-1"></i>Add User
+    </a>
+  </div>
+</div>
+
+<!-- Filter bar -->
+{% if not show_deleted %}
+<div class="card border-0 shadow-sm p-3 mb-3">
+  <form method="get" id="filterForm" class="d-flex flex-wrap gap-2 align-items-center">
+    <input type="text" name="q" class="form-control form-control-sm" style="max-width:220px"
+           placeholder="Search username / name / email" value="{{ search }}">
+    <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-search me-1"></i>Search</button>
+    <select name="role" class="form-select form-select-sm" style="max-width:160px"
+            >
+      <option value="">All Roles</option>
+      {% for val, label in role_choices %}
+        <option value="{{ val }}" {% if role_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+      <option value="multi" {% if role_filter == 'multi' %}selected{% endif %}>⚡ Multi Role</option>
+    </select>
+    {% if search or role_filter %}
+    <a href="{% url 'admin_panel:user_list' %}{% if unlinked %}?unlinked=1{% endif %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x me-1"></i>Clear</a>
+    {% endif %}
+    <span class="text-muted small ms-auto">{{ users|length }} user{{ users|length|pluralize }}</span>
+    {% include 'partials/column_toggle.html' with table_id="userTable" count=users|length %}
+  </form>
+</div>
+{% endif %}
+
+<!-- Bulk action toolbar — deleted tab only -->
+{% if show_deleted %}
+<form method="post" action="{% url 'admin_panel:bulk_user_action' %}" id="bulkForm">
+  {% csrf_token %}
+  <div class="d-flex align-items-center gap-2 mb-3 p-2  rounded shadow-sm border" id="bulkToolbar">
+    <div class="form-check mb-0 me-1">
+      <input class="form-check-input" type="checkbox" id="selectAll" title="Select all">
+      <label class="form-check-label small fw-semibold" for="selectAll">All</label>
+    </div>
+    <span class="text-muted small" id="selectedCount">0 selected</span>
+    <button type="submit" name="action" value="restore"
+            class="btn btn-sm btn-success ms-auto bulk-confirm-btn"
+            id="restoreBtn"
+            disabled
+            data-confirm="Restore all selected users?"
+            data-confirm-title="Bulk Restore?"
+            data-confirm-type="success">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Restore Selected
+    </button>
+  </div>
+{% endif %}
+
+<!-- Desktop table -->
+<div class="card border-0 shadow-sm d-none d-md-block">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0" id="userTable">
+      <thead class="table-light">
+        <tr>
+          {% if show_deleted %}<th style="width:40px"><input type="checkbox" class="form-check-input" id="selectAllTable" title="Select all"></th>{% endif %}
+          <th data-col="username">{% include 'partials/sort_header.html' with field="username" label="Name" current_sort=sort %}</th>
+          <th data-col="role">{% include 'partials/sort_header.html' with field="role" label="Role" current_sort=sort %}</th>
+          <th data-col="company">Marketplace / Company</th>
+          <th data-col="phone">Phone</th>
+          <th data-col="status">Status</th>
+          {% if show_deleted %}<th data-col="deleted_at">Deleted At</th><th data-col="deleted_by">Deleted By</th>{% else %}<th data-col="joined">{% include 'partials/sort_header.html' with field="date_joined" label="Joined" current_sort=sort %}</th>{% endif %}
+          <th data-col="actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr class="{% if not u.is_active %}table-secondary{% endif %}">
+          {% if show_deleted %}
+          <td><input type="checkbox" class="form-check-input row-check" name="user_ids" value="{{ u.pk }}"></td>
+          {% endif %}
+          <td data-col="username" class="fw-semibold">
+            {{ u.get_full_name|default:u.username }}
+            <div class="text-muted small fw-normal">{{ u.username }}</div>
+          </td>
+          <td data-col="role">
+            {% for r in u.get_roles_list %}
+            <span class="badge {% if r == 'admin' %}bg-dark{% elif r == 'supplier' %}bg-info text-dark{% elif r == 'distributor' %}bg-warning text-dark{% elif r == 'stockist' %}bg-orange text-dark{% else %}bg-success{% endif %} me-1">
+              {{ r|title }}
+            </span>
+            {% endfor %}
+          </td>
+          <td data-col="company" class="small">
+            {% if u.role == 'customer' and u.distributor %}
+              <i class="bi bi-truck text-muted me-1"></i>{{ u.distributor.company_name }}
+              {% if u.distributor.status == 'suspended' %}
+                <span class="badge bg-danger ms-1">Suspended</span>
+              {% endif %}
+            {% elif u.role == 'supplier' %}
+              {% with s=u.supplier_profile %}{% if s %}<i class="bi bi-shop text-muted me-1"></i>{{ s.company_name }}
+                {% if s.status == 'suspended' %}<span class="badge bg-danger ms-1">Suspended</span>{% endif %}
+              {% else %}—{% endif %}{% endwith %}
+            {% elif u.role == 'distributor' %}
+              {% with d=u.distributor_profile %}{% if d %}<i class="bi bi-truck text-muted me-1"></i>{{ d.company_name }}
+                {% if d.status == 'suspended' %}<span class="badge bg-danger ms-1">Suspended</span>{% endif %}
+              {% else %}—{% endif %}{% endwith %}
+            {% else %}—{% endif %}
+          </td>
+          <td data-col="phone" class="small">{{ u.phone|default:"—" }}</td>
+          <td data-col="status">
+            {% if u.role == 'customer' and u.distributor and u.distributor.status == 'suspended' %}
+              <span class="badge bg-warning text-dark"><i class="bi bi-pause-circle me-1"></i>Can't Shop</span>
+            {% elif u.role == 'distributor' %}
+              {% with d=u.distributor_profile %}
+                {% if d and d.status == 'suspended' %}
+                  <span class="badge bg-danger">Suspended</span>
+                {% else %}
+                  <span class="badge {% if u.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                    {% if u.is_active %}Active{% else %}Inactive{% endif %}
+                  </span>
+                {% endif %}
+              {% endwith %}
+            {% else %}
+              <span class="badge {% if u.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                {% if u.is_active %}Active{% else %}Inactive{% endif %}
+              </span>
+            {% endif %}
+          </td>
+          {% if show_deleted %}
+          <td data-col="deleted_at" class="small text-muted">{{ u.deleted_at|date:"d M Y, H:i"|default:"—" }}</td>
+          <td data-col="deleted_by" class="small text-muted">{{ u.deleted_by|default:"—" }}</td>
+          {% else %}
+          <td data-col="joined" class="small">{{ u.date_joined|date:"d M Y" }}</td>
+          {% endif %}
+          <td data-col="actions">
+            {% if show_deleted %}
+              <button type="submit" formaction="{% url 'admin_panel:user_restore' u.pk %}" formmethod="post" class="btn btn-sm btn-success me-1">Restore</button>
+              {% if not u.is_superuser %}
+              <button type="submit" formaction="{% url 'admin_panel:user_purge' u.pk %}" formmethod="post" class="btn btn-sm btn-outline-danger"
+                      data-confirm="Permanently archive {{ u.username }}? This cannot be undone."
+                      data-confirm-title="Delete permanently?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete permanently</button>
+              {% endif %}
+            {% else %}
+              <div class="d-flex gap-1 flex-wrap align-items-center">
+                <a href="{% url 'admin_panel:user_detail' u.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+
+                {% if u.role == 'customer' and unlinked %}
+                <!-- Assign Marketplace inline — only on No Marketplace tab -->
+                <form method="post" class="d-flex gap-1 align-items-center"
+                      data-user-name="{{ u.get_full_name|default:u.username }}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="assign_distributor">
+                  <input type="hidden" name="user_id" value="{{ u.pk }}">
+                  <select name="distributor_id" class="form-select form-select-sm" style="max-width:150px"
+                          data-assign-confirm="true" title="Assign distributor">
+                    <option value="">— Assign —</option>
+                    {% for d in distributors %}
+                      <option value="{{ d.pk }}" {% if u.distributor_id == d.pk %}selected{% endif %}>{{ d.company_name }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+                {% endif %}
+
+                {% if not u.is_superuser %}
+                <!-- Delete inline -->
+                <form method="post"
+                      data-confirm="This will soft-delete {{ u.username }}. They can be restored from Deleted Accounts."
+                      data-confirm-title="Delete User?"
+                      data-confirm-type="danger">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="user_id" value="{{ u.pk }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete user">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+                {% endif %}
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="text-center text-muted py-4">
+          {% if show_deleted %}No deleted accounts.{% else %}No users found.{% endif %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% if show_deleted %}</div>{% endif %}
+
+<!-- Mobile cards -->
+<div class="d-md-none">
+  {% for u in users %}
+  <div class="card border-0 shadow-sm mb-2 p-3 {% if not u.is_active %}opacity-75{% endif %}">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div>
+        <div class="fw-semibold">{{ u.get_full_name|default:u.username }}</div>
+        <div class="text-muted small">{{ u.username }}</div>
+        {% if u.role == 'customer' and u.distributor %}
+          <div class="text-muted small"><i class="bi bi-truck me-1"></i>{{ u.distributor.company_name }}</div>
+        {% endif %}
+        {% if show_deleted %}
+          <div class="text-danger small">Deleted: {{ u.deleted_at|date:"d M Y"|default:"—" }} by {{ u.deleted_by|default:"—" }}</div>
+        {% endif %}
+      </div>
+      <div class="d-flex flex-column align-items-end gap-1">
+        <div class="d-flex flex-wrap gap-1 justify-content-end">
+          {% for r in u.get_roles_list %}
+          <span class="badge {% if r == 'admin' %}bg-dark{% elif r == 'supplier' %}bg-info text-dark{% elif r == 'distributor' %}bg-warning text-dark{% else %}bg-success{% endif %}">{{ r|title }}</span>
+          {% endfor %}
+        </div>
+        {% if show_deleted %}
+          <button type="submit" formaction="{% url 'admin_panel:user_restore' u.pk %}" formmethod="post" class="btn btn-sm btn-success py-0 px-2">Restore</button>
+          {% if not u.is_superuser %}
+          <button type="submit" formaction="{% url 'admin_panel:user_purge' u.pk %}" formmethod="post" class="btn btn-sm btn-outline-danger py-0 px-2"
+                  data-confirm="Permanently archive {{ u.username }}? This cannot be undone."
+                  data-confirm-title="Delete permanently?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete permanently</button>
+          {% endif %}
+        {% else %}
+          <a href="{% url 'admin_panel:user_detail' u.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+          {% if u.role == 'customer' and unlinked %}
+          <form method="post" class="w-100" data-user-name="{{ u.get_full_name|default:u.username }}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign_distributor">
+            <input type="hidden" name="user_id" value="{{ u.pk }}">
+            <select name="distributor_id" class="form-select form-select-sm" data-assign-confirm="true">
+              <option value="">— Assign Marketplace —</option>
+              {% for d in distributors %}
+                <option value="{{ d.pk }}" {% if u.distributor_id == d.pk %}selected{% endif %}>{{ d.company_name }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          {% endif %}
+          {% if not u.is_superuser %}
+          <form method="post"
+                data-confirm="This will soft-delete {{ u.username }}. They can be restored from Deleted Accounts."
+                data-confirm-title="Delete User?"
+                data-confirm-type="danger">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="user_id" value="{{ u.pk }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">{% if show_deleted %}No deleted accounts.{% else %}No users found.{% endif %}</p>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>window._bulkScriptOwner = true;</script>
+{% if show_deleted %}
+<script>
+(function () {
+  const form = document.getElementById('bulkForm');
+  if (!form) return;
+  const selectAll = document.getElementById('selectAll');
+  const selectAllTable = document.getElementById('selectAllTable');
+  const countEl = document.getElementById('selectedCount');
+  const restoreBtn = document.getElementById('restoreBtn');
+  const deleteBtn = document.getElementById('deleteBtn');
+
+  function updateCount() {
+    const n = form.querySelectorAll('.row-check:checked').length;
+    if (countEl) countEl.textContent = n + ' selected';
+    // Disable/enable buttons based on selection count
+    const hasSelection = n > 0;
+    if (restoreBtn) restoreBtn.disabled = !hasSelection;
+    if (deleteBtn) deleteBtn.disabled = !hasSelection;
+  }
+
+  function syncSelectAll(checked) {
+    if (selectAll) selectAll.checked = checked;
+    if (selectAllTable) selectAllTable.checked = checked;
+  }
+
+  [selectAll, selectAllTable].forEach(el => {
+    if (!el) return;
+    el.addEventListener('change', function () {
+      form.querySelectorAll('.row-check').forEach(cb => cb.checked = this.checked);
+      syncSelectAll(this.checked);
+      updateCount();
+    });
+  });
+
+  form.addEventListener('change', function (e) {
+    if (e.target.classList.contains('row-check')) {
+      const all = form.querySelectorAll('.row-check');
+      const checked = form.querySelectorAll('.row-check:checked');
+      syncSelectAll(all.length === checked.length && all.length > 0);
+      updateCount();
+    }
+  });
+
+  // Handle bulk confirm buttons — intercept click, show confirm, then submit
+  form.querySelectorAll('.bulk-confirm-btn').forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      // Double-check that we have selections before proceeding
+      const selectedCount = form.querySelectorAll('.row-check:checked').length;
+      if (selectedCount === 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        return; // Don't show modal if no selections
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      const actionValue = this.value;
+      const msg = this.dataset.confirm;
+      const title = this.dataset.confirmTitle || 'Are you sure?';
+      const type = this.dataset.confirmType || 'danger';
+      if (typeof showConfirm === 'function') {
+        showConfirm({
+          title, message: msg, type,
+          onConfirm: () => {
+            // inject a hidden input so the action value is submitted
+            let hidden = form.querySelector('input[name="action"]');
+            if (!hidden) {
+              hidden = document.createElement('input');
+              hidden.type = 'hidden';
+              hidden.name = 'action';
+              form.appendChild(hidden);
+            }
+            hidden.value = actionValue;
+            form.submit();
+          }
+        });
+      } else {
+        // fallback if showConfirm not available
+        if (confirm(msg)) {
+          let hidden = form.querySelector('input[name="action"]');
+          if (!hidden) {
+            hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'action';
+            form.appendChild(hidden);
+          }
+          hidden.value = actionValue;
+          form.submit();
+        }
+      }
+    });
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}

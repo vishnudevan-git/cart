@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "lakrish",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["manage.py", "runserver", "0.0.0.0:8888"],
+      "port": 8888
+    }
+  ]
+}

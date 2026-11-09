@@ -1,0 +1,549 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}My Stock{% endblock %}
+{% block page_title %}📦 My Stock{% endblock %}
+{% block active_nav %}my_stock{% endblock %}
+{% block content %}
+
+
+{% comment %}Stage 7g: auto-restock — files the restock REQUEST automatically
+when stock dips; stock still only rises when it is delivered.{% endcomment %}
+<form method="post" class="card border-0 shadow-sm p-3 mb-3">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="auto_restock_settings">
+  <div class="d-flex flex-wrap align-items-end gap-3">
+    <div class="form-check form-switch mb-1">
+      <input class="form-check-input" type="checkbox" name="enabled" value="1"
+             id="autoRestockToggle" {% if dist.auto_restock_enabled %}checked{% endif %}>
+      <label class="form-check-label fw-semibold" for="autoRestockToggle">
+        <i class="bi bi-arrow-repeat me-1"></i>Auto-restock when stock is low
+      </label>
+    </div>
+    <div>
+      <label class="form-label small mb-0">Low-stock level (≤ units)</label>
+      <input type="number" name="threshold" min="0" value="{{ dist.auto_restock_threshold }}"
+             class="form-control form-control-sm" style="width:7rem">
+    </div>
+    <div>
+      <label class="form-label small mb-0">Order this many units</label>
+      <input type="number" name="quantity" min="1" value="{{ dist.auto_restock_quantity }}"
+             class="form-control form-control-sm" style="width:7rem">
+    </div>
+    <div>
+      <label class="form-label small mb-0">Skip items above ₹ (0 = no limit)</label>
+      <input type="number" name="max_price" min="0" step="0.01" value="{{ dist.auto_restock_max_price }}"
+             class="form-control form-control-sm" style="width:8rem"
+             title="High-value items above this supplier price are never auto-ordered">
+    </div>
+    <button class="btn btn-sm btn-success">Save</button>
+    <div class="small text-muted w-100 mb-0">Checks after every sale or manual reduce. Own products are skipped — you set their stock yourself. Direct-supply items are ordered from the supplier.</div>
+  </div>
+</form>
+
+<div class="alert alert-light border small mb-3">
+  <i class="bi bi-shield-check me-1"></i>
+  <strong>Stock rules:</strong> stock increases only when a restock request is delivered.
+  You can <strong>reduce</strong> manually any time (offline sale, own use) — never increase.
+  Your own products <span class="badge bg-success">🏭 Own</span> are the exception: you are their
+  source, so you may set their stock freely.
+</div>
+
+<!-- Stats -->
+<!-- Stats -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div class="text-muted small">Stock is updated automatically when restock orders are delivered by stockist.</div>
+  <a href="{% url 'distributors:restock_requests' %}" class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-list-check me-1"></i>View Restock Requests
+  </a>
+</div>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">Total Variants</div>
+      <div class="fs-4 fw-bold">{{ total_variants }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">In Stock</div>
+      <div class="fs-4 fw-bold text-success">{{ in_stock }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">Low Stock (≤5)</div>
+      <div class="fs-4 fw-bold text-warning">{{ low_stock_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">Out of Stock</div>
+      <div class="fs-4 fw-bold text-danger">{{ out_of_stock }}</div>
+    </div>
+  </div>
+  <div class="col-12 col-md-4">
+    <div class="card border-0 shadow-sm stat-card p-3 border-start border-success border-3">
+      <div class="small text-muted">Total Stock Value</div>
+      <div class="fs-3 fw-bold text-success">₹{{ total_value|floatformat:2 }}</div>
+    </div>
+  </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="card border-0 shadow-sm p-3 mb-3">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <select name="category" class="form-select form-select-sm" style="max-width:180px">
+      <option value="">All Categories</option>
+      {% for c in categories %}
+        <option value="{{ c.pk }}" {% if category_filter == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="supplier" class="form-select form-select-sm" style="max-width:200px">
+      <option value="">All Suppliers</option>
+      {% for s in suppliers %}
+        <option value="{{ s.pk }}" {% if supplier_filter == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.company_name }}</option>
+      {% endfor %}
+    </select>
+    <select name="sort" class="form-select form-select-sm" style="max-width:160px">
+      <option value="category" {% if sort == 'category' %}selected{% endif %}>Sort: Category</option>
+      <option value="supplier" {% if sort == 'supplier' %}selected{% endif %}>Sort: Supplier</option>
+      <option value="product"  {% if sort == 'product'  %}selected{% endif %}>Sort: Product</option>
+      <option value="stock"    {% if sort == 'stock'    %}selected{% endif %}>Sort: Stock (Low→High)</option>
+    </select>
+    <button type="submit" class="btn btn-success btn-sm">Apply</button>
+    <a href="{% url 'distributors:my_stock' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    {% if in_stock_only %}
+      <a href="?category={{ category_filter }}&supplier={{ supplier_filter }}&sort={{ sort }}" class="btn btn-warning btn-sm">
+        <i class="bi bi-eye me-1"></i>Show All
+      </a>
+    {% else %}
+      <a href="?category={{ category_filter }}&supplier={{ supplier_filter }}&sort={{ sort }}&in_stock_only=1" class="btn btn-outline-success btn-sm">
+        <i class="bi bi-boxes me-1"></i>In Stock Only
+      </a>
+    {% endif %}
+  </div>
+</form>
+
+<!-- Stock Table (read-only, grouped by product) -->
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr>
+          <th>Product</th>
+          <th>Category</th>
+          <th>Supplier</th>
+          <th>Sizes &amp; Prices</th>
+          <th>Total Stock</th>
+          <th>Loose Stock</th>
+          <th>Stock Value</th>
+          <th>Restock</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in grouped_stock %}
+        {% with p=g.product %}
+        <!-- Product summary row — click to expand variants -->
+        <tr class="{% if not g.has_stock %}table-danger{% elif g.low_stock %}table-warning{% endif %}"
+            style="cursor:pointer"
+            data-bs-toggle="collapse" data-bs-target="#variants-{{ p.pk }}">
+          <td class="fw-semibold">
+            <i class="bi bi-chevron-right me-1 small text-muted"></i>
+            {{ p.name }}
+            {% if g.source_label %}<span class="badge bg-success ms-1">{{ g.source_label }}</span>{% endif %}
+          </td>
+          <td class="text-muted">{{ p.category.name|default:"—" }}</td>
+          <td class="text-muted">{{ p.supplier.company_name }}</td>
+          <td>
+            {% for s in g.variants %}
+              <span class="badge bg-light text-dark border me-1">{{ s.variant.label }}: ₹{{ s.selling_price }}</span>
+            {% endfor %}
+          </td>
+          <td class="fw-bold {% if not g.has_stock %}text-danger{% elif g.low_stock %}text-warning{% else %}text-success{% endif %}">
+            {{ g.total_qty }}
+            <span class="text-muted fw-normal">({{ g.variants|length }} sizes)</span>
+          </td>
+          <td>
+            {% if g.total_loose_grams > 0 %}
+              <span class="badge bg-info text-dark">{{ g.total_loose_grams }}g</span>
+              <form method="post" class="d-inline-flex gap-1 mt-1" onclick="event.stopPropagation()">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="reduce_loose">
+                <input type="hidden" name="product_id" value="{{ p.pk }}">
+                <input type="number" name="kg" step="0.1" min="0.1" class="form-control form-control-sm" style="width:4.5rem" placeholder="kg">
+                <button class="btn btn-sm btn-outline-danger" title="Reduce loose (offline sale)">−</button>
+              </form>
+            {% else %}—{% endif %}
+          </td>
+          <td class="fw-semibold text-success">₹{{ g.total_value|floatformat:2 }}</td>
+          <td>
+            {% if g.source_label %}
+              {% comment %}Own product — the shop IS the source; nothing to request.{% endcomment %}
+              <span class="text-muted small">Set stock ▾</span>
+            {% else %}
+            <button type="button" class="btn btn-sm btn-outline-warning"
+                    onclick="event.stopPropagation()"
+                    data-bs-toggle="modal" data-bs-target="#restockModal"
+                    data-product-id="{{ p.pk }}"
+                    data-variant-id="{{ g.variants.0.variant.pk }}">
+              <i class="bi bi-arrow-repeat me-1"></i>Request
+            </button>
+            {% endif %}
+          </td>
+        </tr>
+        <!-- Collapsible variant detail -->
+        <tr>
+          <td colspan="8" class="p-0 border-0">
+            <div class="collapse" id="variants-{{ p.pk }}">
+              <table class="table table-sm mb-0 small" style="background:#f8f9fa">
+                <thead><tr class="text-muted">
+                  <th style="width:30px"></th><th>Size</th><th>Price</th>
+                  <th>In Stock</th><th>Batches</th><th>Value</th><th>Updated</th>
+                  <th class="text-end">Adjust</th>
+                </tr></thead>
+                <tbody>
+                  {% for s in g.variants %}
+                  <tr class="{% if s.effective_qty == 0 %}text-danger{% elif s.low_stock %}text-warning{% endif %}">
+                    <td></td>
+                    <td><span class="badge bg-secondary">{{ s.variant.label }}</span></td>
+                    <td>₹{{ s.selling_price }}</td>
+                    <td class="fw-bold">
+                      {{ s.effective_qty }}
+                      {% if s.loose_units %}
+                        <span class="text-muted small">({{ s.quantity }} packed + {{ s.loose_units }} loose)</span>
+                      {% endif %}
+                    </td>
+                    <td>
+                      {% if s.multi_batch %}
+                        <span class="badge bg-warning text-dark" style="cursor:pointer"
+                              data-bs-toggle="collapse" data-bs-target="#b-{{ s.variant.pk }}">
+                          {{ s.batches|length }} batches ▾
+                        </span>
+                        <div class="collapse" id="b-{{ s.variant.pk }}">
+                          {% for b in s.batches %}
+                          <div style="font-size:.72rem" class="text-muted">
+                            #{{ forloop.counter }}: {{ b.quantity }} × ₹{{ b.cost_price }} ({{ b.received_at|date:"d M Y" }})
+                          </div>
+                          {% endfor %}
+                        </div>
+                      {% elif s.batches %}
+                        <span class="text-muted">@ ₹{{ s.batches.0.cost_price }}</span>
+                      {% else %}—{% endif %}
+                    </td>
+                    <td class="text-success">₹{{ s.stock_value|floatformat:2 }}</td>
+                    <td class="text-muted">{{ s.updated_at|date:"d M Y"|default:"—" }}</td>
+                    <td class="text-end">
+                      {% if s.is_own %}
+                      {% comment %}Own product: the shop is the source — set freely, both directions.{% endcomment %}
+                      <form method="post" class="d-inline-flex gap-1 justify-content-end" onclick="event.stopPropagation()">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="own_stock">
+                        <input type="hidden" name="variant_id" value="{{ s.variant.pk }}">
+                        <input type="number" name="stock" min="0" value="{{ s.quantity }}" class="form-control form-control-sm" style="width:5.5rem">
+                        <button class="btn btn-sm btn-outline-success">Set</button>
+                      </form>
+                      {% else %}
+                      <form method="post" class="d-inline-flex gap-1 justify-content-end" onclick="event.stopPropagation()">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="reduce">
+                        <input type="hidden" name="variant_id" value="{{ s.variant.pk }}">
+                        <input type="number" name="units" min="1" max="{{ s.quantity }}" class="form-control form-control-sm" style="width:5rem" placeholder="units">
+                        <button class="btn btn-sm btn-outline-danger" {% if s.quantity == 0 %}disabled{% endif %} title="Offline sale / own use">−</button>
+                      </form>
+                      <form method="post" class="d-inline" onclick="event.stopPropagation()">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="toggle_auto">
+                        <input type="hidden" name="variant_id" value="{{ s.variant.pk }}">
+                        {% if s.auto_exempt %}
+                          <button class="btn btn-sm btn-outline-secondary" title="Auto-restock OFF for this item — click to include">auto ✗</button>
+                        {% else %}
+                          <button class="btn btn-sm btn-outline-success" title="Auto-restock ON for this item — click to exclude">auto ✓</button>
+                        {% endif %}
+                      </form>
+                      {% endif %}
+                    </td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+        {% endwith %}
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">
+          No listed products yet. Go to <a href="{% url 'distributors:product_catalogue' %}">Product Catalogue</a> and list products first.
+        </td></tr>
+        {% endfor %}
+      </tbody>
+      {% if grouped_stock %}
+      <tfoot class="table-light">
+        <tr>
+          <td colspan="6" class="text-end fw-semibold">Total Stock Value:</td>
+          <td class="fw-bold text-success">₹{{ total_value|floatformat:2 }}</td>
+          <td></td>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+  </div>
+</div>
+
+<!-- Restock Request Modal -->
+<div class="modal fade" id="restockModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h6 class="modal-title"><i class="bi bi-arrow-repeat me-1"></i>Request Restock</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body p-0">
+
+        <!-- Product selector -->
+        <div class="p-3 border-bottom">
+          <div class="row g-2">
+            <div class="col-md-5">
+              <label class="form-label small fw-semibold">Supplier</label>
+              <select id="modalSupplierFilter" class="form-select form-select-sm">
+                <option value="">All Suppliers</option>
+                {% for p in products_for_modal %}
+                  <option value="{{ p.supplier_id }}">{{ p.supplier_name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-7">
+              <label class="form-label small fw-semibold">Product</label>
+              <select id="modalProductSelect" class="form-select form-select-sm">
+                <option value="">— Select product —</option>
+                {% for p in products_for_modal %}
+                <option value="{{ p.id }}" data-unit="{{ p.unit }}" data-supplier="{{ p.supplier_id }}">{{ p.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabs: Packed / Loose -->
+        <ul class="nav nav-tabs px-3 pt-2" id="restockTabs">
+          <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabPacked">📦 Packed Sizes</button>
+          </li>
+          <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLoose">⚖️ Loose / Bulk</button>
+          </li>
+        </ul>
+
+        <div class="tab-content p-3">
+
+          <!-- Packed tab -->
+          <div class="tab-pane fade show active" id="tabPacked">
+            <p class="text-muted small mb-2">Enter quantity needed for each size. Leave 0 to skip.</p>
+
+            <div id="packedVariants">
+              <p class="text-muted small">Select a product above.</p>
+            </div>
+            <form method="post" id="packedForm">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="restock">
+              <input type="hidden" name="restock_type" value="packed">
+              <div id="packedInputs"></div>
+              <button type="submit" class="btn btn-warning btn-sm mt-3" id="packedSubmit" disabled>
+                <i class="bi bi-send me-1"></i>Send Restock Request
+              </button>
+            </form>
+          </div>
+
+          <!-- Loose tab -->
+          <div class="tab-pane fade" id="tabLoose">
+            <div class="alert alert-info small py-2">
+              <i class="bi bi-info-circle me-1"></i>
+              Loose stock is stored in grams. Any variant size draws from this pool automatically.
+              e.g. 5kg loose → can fulfill 5×1kg, 10×500g, 20×250g, or any mix.<br>
+              <strong>Your request will be sent to the stockist for approval. Stock is added only after delivery.</strong>
+            </div>
+            <form method="post" id="looseForm">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="restock">
+              <input type="hidden" name="restock_type" value="loose">
+              <input type="hidden" name="product_id" id="looseProductId">
+              <div class="row g-2">
+                <div class="col-12">
+                  <label class="form-label small fw-semibold">Quantity (kg)</label>
+                  <input type="number" name="loose_kg" class="form-control form-control-sm"
+                         step="0.1" min="0.1" placeholder="e.g. 5">
+                  <div class="form-text" id="looseCostHint"></div>
+                </div>
+              </div>
+              <div class="mt-3" id="loosePreview"></div>
+              <button type="submit" class="btn btn-info btn-sm mt-3" id="looseSubmit" disabled>
+                <i class="bi bi-send me-1"></i>Send Loose Stock Request
+              </button>
+            </form>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const productsData = {
+  {% for p in products_for_modal %}
+  "{{ p.id }}": {
+    name: "{{ p.name }}",
+    unit: "{{ p.unit }}",
+    supplier_id: "{{ p.supplier_id }}",
+    variants: [
+      {% for v in p.variants %}
+      { id: {{ v.id }}, label: "{{ v.label }}", stock: {{ v.stock }}, unit_grams: {{ v.unit_grams }}, base_price: {{ v.base_price }} }{% if not forloop.last %},{% endif %}
+      {% endfor %}
+    ],
+    allow_loose: {{ p.allow_loose|yesno:"true,false" }}
+  }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+};
+
+// Supplier filter
+document.getElementById('modalSupplierFilter').addEventListener('change', function() {
+  const sid = this.value;
+  const sel = document.getElementById('modalProductSelect');
+  Array.from(sel.options).forEach(opt => {
+    if (!opt.value) return;
+    opt.hidden = sid ? opt.dataset.supplier !== sid : false;
+  });
+  sel.value = '';
+  sel.dispatchEvent(new Event('change'));
+});
+
+const productSelect = document.getElementById('modalProductSelect');
+
+productSelect.addEventListener('change', function() {
+  const pid = this.value;
+  const packedVariants = document.getElementById('packedVariants');
+  const packedInputs   = document.getElementById('packedInputs');
+  const packedSubmit   = document.getElementById('packedSubmit');
+  const looseSubmit    = document.getElementById('looseSubmit');
+  const looseProductId = document.getElementById('looseProductId');
+
+  packedVariants.innerHTML = '';
+  packedInputs.innerHTML = '';
+  packedSubmit.disabled = true;
+  looseSubmit.disabled = true;
+
+  if (!pid || !productsData[pid]) return;
+
+  const p = productsData[pid];
+  looseProductId.value = pid;
+  looseSubmit.disabled = false;
+
+  // Show/hide Loose tab based on supplier setting
+  const looseTab = document.querySelector('[data-bs-target="#tabLoose"]');
+  const looseTabLi = looseTab ? looseTab.closest('li') : null;
+  if (looseTabLi) {
+    if (p.allow_loose) {
+      looseTabLi.style.display = '';
+    } else {
+      looseTabLi.style.display = 'none';
+      // Switch to packed tab if loose was active
+      document.querySelector('[data-bs-target="#tabPacked"]').click();
+    }
+  }
+
+  // Build packed variant rows
+  const table = document.createElement('table');
+  table.className = 'table table-sm align-middle mb-0';
+  table.innerHTML = '<thead class="table-light"><tr><th>Size</th><th>In Stock</th><th>Admin Price</th><th>Request Qty</th></tr></thead>';
+  const tbody = document.createElement('tbody');
+
+  p.variants.forEach(v => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span class="badge bg-secondary">${v.label}</span></td>
+      <td class="text-muted">${v.stock}</td>
+      <td class="text-muted small">${v.base_price ? '₹' + v.base_price : '—'}</td>
+      <td style="width:100px">
+        <input type="number" class="form-control form-control-sm packed-qty"
+               min="0" value="0" data-vid="${v.id}" placeholder="0">
+      </td>`;
+    tbody.appendChild(tr);
+
+    // Mirror to hidden inputs in the form
+    const hidden = document.createElement('input');
+    hidden.type = 'hidden';
+    hidden.name = `qty_${v.id}`;
+    hidden.value = '0';
+    hidden.id = `hidden_qty_${v.id}`;
+    packedInputs.appendChild(hidden);
+  });
+
+  table.appendChild(tbody);
+  packedVariants.appendChild(table);
+  packedSubmit.disabled = false;
+
+  // Sync qty inputs → hidden form inputs
+  document.querySelectorAll('.packed-qty').forEach(inp => {
+    inp.addEventListener('input', function() {
+      const hid = document.getElementById('hidden_qty_' + this.dataset.vid);
+      if (hid) hid.value = this.value || '0';
+    });
+  });
+
+  // Loose preview
+  updateLoosePreview(p);
+  document.querySelector('#looseForm [name="loose_kg"]').value = '';
+});
+
+function updateLoosePreview(p) {
+  const kgInput = document.querySelector('#looseForm [name="loose_kg"]');
+  const preview = document.getElementById('loosePreview');
+  const costHint = document.getElementById('looseCostHint');
+  if (!kgInput || !preview) return;
+  const kg = parseFloat(kgInput.value) || 0;
+
+  // Show cost per kg from admin price of first variant with unit_grams
+  if (costHint) {
+    const ref = p.variants.find(v => v.unit_grams > 0 && v.base_price > 0);
+    if (ref) {
+      const cpkg = (ref.base_price / ref.unit_grams * 1000).toFixed(2);
+      costHint.textContent = `Admin cost ≈ ₹${cpkg}/kg (based on ${ref.label} price)`;
+    }
+  }
+
+  if (kg <= 0) { preview.innerHTML = ''; return; }
+  const grams = kg * 1000;
+  let html = '<div class="small text-muted mt-2"><strong>This will fulfill:</strong><ul class="mb-0">';
+  p.variants.forEach(v => {
+    if (v.unit_grams > 0) {
+      const packs = Math.floor(grams / v.unit_grams);
+      html += `<li>${v.label}: up to <strong>${packs} packs</strong></li>`;
+    }
+  });
+  html += '</ul></div>';
+  preview.innerHTML = html;
+}
+
+document.querySelector('#looseForm [name="loose_kg"]').addEventListener('input', function() {
+  const pid = productSelect.value;
+  if (pid && productsData[pid]) updateLoosePreview(productsData[pid]);
+});
+
+// Pre-select product when opened from a row button
+document.getElementById('restockModal').addEventListener('show.bs.modal', function(e) {
+  const btn = e.relatedTarget;
+  // Reset: hide loose tab until product selected
+  const looseTabLi = document.querySelector('[data-bs-target="#tabLoose"]')?.closest('li');
+  if (looseTabLi) looseTabLi.style.display = 'none';
+  document.querySelector('[data-bs-target="#tabPacked"]').click();
+
+  if (!btn) return;
+  const pid = btn.dataset.productId;
+  if (pid) {
+    productSelect.value = pid;
+    productSelect.dispatchEvent(new Event('change'));
+  }
+});
+</script>
+{% endblock %}

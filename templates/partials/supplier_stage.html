@@ -1,0 +1,21 @@
+{% comment %}
+Supplier-side stage of one order line, safe for the customer and receivers.
+Expects: ship (SupplierShipment), audience ('customer' | 'receiver').
+Never shows the supplier's private note. Carrier / docket is shown to receivers,
+and to the customer only when the supplier delivers straight to them.
+{% endcomment %}
+{% if ship %}
+  {% with st=ship.public_stage %}
+    <span class="badge {{ st.1 }}"><i class="bi {{ st.2 }} me-1"></i>{{ st.0 }}</span>
+  {% endwith %}
+  {% if ship.public_reason %}
+    <div class="small text-muted mt-1">{{ ship.public_reason }}</div>
+  {% endif %}
+  {% if ship.status == 'dispatched' and ship.tracking_reference %}
+    {% if audience == 'receiver' or ship.target == 'customer' %}
+      <div class="small text-muted mt-1">
+        <i class="bi bi-truck me-1"></i>{% if ship.carrier %}{{ ship.carrier }} · {% endif %}{{ ship.tracking_reference }}
+      </div>
+    {% endif %}
+  {% endif %}
+{% endif %}

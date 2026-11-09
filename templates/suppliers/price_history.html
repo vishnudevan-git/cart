@@ -1,0 +1,7 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% block title %}Price History{% endblock %}
+{% block page_title %}Price History{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='price_history' %}{% endblock %}
+{% block content %}
+{% include 'partials/price_history_content.html' with back_url='suppliers:price_history' role='supplier' %}
+{% endblock %}

@@ -1,0 +1,42 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Stockist Restock Requests{% endblock %}
+{% block page_title %}🔄 Stockist Restock Requests{% endblock %}
+{% block active_nav %}stockist_list{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr><th>Stockist</th><th>Product</th><th>Variant</th><th>Supplier</th><th>Qty Requested</th><th>Status</th><th>Date</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr class="{% if r.status == 'pending' %}table-warning{% endif %}">
+          <td>{{ r.stockist.company_name }}</td>
+          <td class="fw-semibold">{{ r.variant.product.name }}</td>
+          <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
+          <td class="text-muted">{{ r.variant.product.supplier.company_name }}</td>
+          <td>{{ r.quantity_requested }}</td>
+          <td><span class="badge {% if r.status == 'fulfilled' %}bg-success{% elif r.status == 'rejected' %}bg-danger{% elif r.status == 'approved' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">{{ r.get_status_display }}</span></td>
+          <td class="text-muted">{{ r.requested_at|date:"d M Y" }}</td>
+          <td>
+            {% if r.status == 'pending' %}
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="req_id" value="{{ r.pk }}">
+              <button name="action" value="fulfill" type="submit" class="btn btn-sm btn-success me-1">Fulfill</button>
+              <button name="action" value="reject" type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
+            </form>
+            {% else %}
+              <span class="text-muted small">{{ r.get_status_display }}</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-4">No restock requests yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,157 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}My Stock — Distributor{% endblock %}
+{% block page_title %}📦 My Stock — {{ wholesaler.company_name }}{% endblock %}
+{% block content %}
+
+{% comment %}Stage 7: Distributor stock — increase only via stockist delivery,
+manual change can only reduce. Mobile-first: tables scroll in their own box.{% endcomment %}
+
+<div class="alert alert-light border small mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  Stock increases only when <strong>{% if my_stockist %}{{ my_stockist.company_name }}{% else %}your stockist{% endif %}</strong>
+  delivers a restock request. You can reduce manually any time (offline sales, own use)
+  — but never increase manually.
+  {% if not my_stockist %}<br><span class="text-danger fw-semibold">No stockist assigned yet — ask the admin to set one before requesting stock.</span>{% endif %}
+</div>
+
+
+{% comment %}Stage 7g: auto-restock — files the restock REQUEST automatically
+when stock dips; stock still only rises when it is delivered.{% endcomment %}
+<form method="post" class="card border-0 shadow-sm p-3 mb-3">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="auto_restock_settings">
+  <div class="d-flex flex-wrap align-items-end gap-3">
+    <div class="form-check form-switch mb-1">
+      <input class="form-check-input" type="checkbox" name="enabled" value="1"
+             id="autoRestockToggle" {% if wholesaler.auto_restock_enabled %}checked{% endif %}>
+      <label class="form-check-label fw-semibold" for="autoRestockToggle">
+        <i class="bi bi-arrow-repeat me-1"></i>Auto-restock when stock is low
+      </label>
+    </div>
+    <div>
+      <label class="form-label small mb-0">Low-stock level (≤ units)</label>
+      <input type="number" name="threshold" min="0" value="{{ wholesaler.auto_restock_threshold }}"
+             class="form-control form-control-sm" style="width:7rem">
+    </div>
+    <div>
+      <label class="form-label small mb-0">Order this many units</label>
+      <input type="number" name="quantity" min="1" value="{{ wholesaler.auto_restock_quantity }}"
+             class="form-control form-control-sm" style="width:7rem">
+    </div>
+    <div>
+      <label class="form-label small mb-0">Skip items above ₹ (0 = no limit)</label>
+      <input type="number" name="max_price" min="0" step="0.01" value="{{ wholesaler.auto_restock_max_price }}"
+             class="form-control form-control-sm" style="width:8rem"
+             title="High-value items above this supplier price are never auto-ordered">
+    </div>
+    <button class="btn btn-sm btn-success">Save</button>
+    <div class="small text-muted w-100 mb-0">When any stock row falls to the level, a request to your stockist is filed automatically (one open request per item).</div>
+  </div>
+</form>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">Current Stock</div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr><th>Product</th><th>Pack</th><th>Qty</th><th>Updated</th><th>Auto</th><th class="text-end">Reduce (offline sale / own use)</th></tr>
+      </thead>
+      <tbody>
+        {% for s in stock_items %}
+        <tr>
+          <td class="fw-semibold">{{ s.variant.product.name }}</td>
+          <td><span class="badge bg-secondary">{{ s.variant.label }}</span></td>
+          <td class="fw-bold {% if s.quantity == 0 %}text-danger{% elif s.quantity <= 5 %}text-warning{% else %}text-success{% endif %}">{{ s.quantity }}</td>
+          <td class="text-muted">{{ s.updated_at|date:"d M, H:i" }}</td>
+          <td>
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="toggle_auto">
+              <input type="hidden" name="stock_id" value="{{ s.pk }}">
+              {% if s.auto_restock_exempt %}
+                <button class="btn btn-sm btn-outline-secondary" title="Auto-restock OFF for this item — click to include">✗</button>
+              {% else %}
+                <button class="btn btn-sm btn-outline-success" title="Auto-restock ON for this item — click to exclude">✓</button>
+              {% endif %}
+            </form>
+          </td>
+          <td class="text-end">
+            <form method="post" class="d-inline-flex gap-1 justify-content-end">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="reduce">
+              <input type="hidden" name="stock_id" value="{{ s.pk }}">
+              <input type="number" name="units" min="1" max="{{ s.quantity }}" class="form-control form-control-sm" style="width:5.5rem" placeholder="units">
+              <button class="btn btn-sm btn-outline-danger" {% if s.quantity == 0 %}disabled{% endif %}>− Reduce</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No stock yet — request some from your stockist below.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">Request Stock from {% if my_stockist %}{{ my_stockist.company_name }}{% else %}Stockist{% endif %}</div>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="restock">
+    <div class="table-responsive" style="max-height: 24rem; overflow-y: auto;">
+      <table class="table align-middle mb-0 small">
+        <thead class="table-light">
+          <tr><th>Product</th><th>Pack</th><th>Supplier ₹</th><th style="width:7rem">Order qty</th></tr>
+        </thead>
+        <tbody>
+          {% for v in orderable %}
+          <tr>
+            <td>{{ v.product.name }}</td>
+            <td><span class="badge bg-secondary">{{ v.label }}</span></td>
+            <td>₹{{ v.selling_price }}</td>
+            <td><input type="number" name="qty_{{ v.pk }}" min="0" class="form-control form-control-sm" placeholder="0"></td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="4" class="text-center text-muted py-4">Nothing orderable yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="p-3">
+      <button class="btn btn-success" {% if not my_stockist %}disabled{% endif %}>
+        <i class="bi bi-send me-1"></i>Send Restock Request
+      </button>
+    </div>
+  </form>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header bg-white fw-semibold">Recent Requests</div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr><th>#</th><th>Product</th><th>Pack</th><th>Qty</th><th>Stockist</th><th>Status</th><th>Requested</th></tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr>
+          <td class="text-muted">#{{ r.pk }}</td>
+          <td>{{ r.variant.product.name }}</td>
+          <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
+          <td>{{ r.quantity_requested }}</td>
+          <td class="text-muted">{{ r.stockist.company_name }}</td>
+          <td>
+            {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
+            {% elif r.status == 'delivered' %}<span class="badge bg-success">Delivered</span>
+            {% else %}<span class="badge bg-danger">Rejected</span>{% endif %}
+          </td>
+          <td class="text-muted">{{ r.requested_at|date:"d M, H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No requests yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

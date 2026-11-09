@@ -1,0 +1,134 @@
+<style>
+  :root {
+    --theme-color: {{ theme_color|default:ui_default_theme_color }};
+    --ui-font-family: {{ ui_font_family|default:'Inter, sans-serif' }};
+    --green: var(--theme-color);
+  }
+
+  .navbar { background: var(--theme-color) !important; }
+  .btn-success, .btn-green { background: var(--theme-color) !important; border-color: var(--theme-color) !important; }
+  .btn-success:hover, .btn-green:hover { filter: brightness(0.9); }
+  .btn-outline-success { color: var(--theme-color) !important; border-color: var(--theme-color) !important; }
+  .btn-outline-success:hover { background: var(--theme-color) !important; color: #fff !important; }
+  .text-success { color: var(--theme-color) !important; }
+  .badge-cart { background: var(--theme-color); }
+  a.text-success:hover { filter: brightness(0.85); }
+  footer { background: var(--theme-color); color: rgba(255,255,255,.8); }
+
+  [data-bs-theme='dark'] body { background: #1a1a2e !important; }
+  [data-bs-theme='dark'] .main-content { background: #1a1a2e !important; }
+  [data-bs-theme='dark'] .card,
+  [data-bs-theme='dark'] .card-header,
+  [data-bs-theme='dark'] .card-footer,
+  [data-bs-theme='dark'] .bg-white,
+  [data-bs-theme='dark'] .bg-light,
+  [data-bs-theme='dark'] .topbar { background-color: #16213e !important; color: #e0e0e0 !important; }
+
+  [data-bs-theme='dark'] thead,
+  [data-bs-theme='dark'] thead tr,
+  [data-bs-theme='dark'] thead th,
+  [data-bs-theme='dark'] .table-light,
+  [data-bs-theme='dark'] .table-light > * {
+    background-color: #0f3460 !important;
+    color: #e0e0e0 !important;
+    --bs-table-bg: #0f3460 !important;
+    --bs-table-color: #e0e0e0 !important;
+  }
+
+  [data-bs-theme='dark'] .table { --bs-table-bg: #16213e; color: #e0e0e0; }
+  [data-bs-theme='dark'] .table > :not(caption) > * > * { background-color: #16213e; color: #e0e0e0; }
+  [data-bs-theme='dark'] .table td,
+  [data-bs-theme='dark'] .table th { border-color: #2a3a5a !important; }
+  [data-bs-theme='dark'] .text-muted { color: #9aa0b0 !important; }
+  [data-bs-theme='dark'] .border,
+  [data-bs-theme='dark'] .border-bottom { border-color: #2a3a5a !important; }
+
+  [data-bs-theme='dark'] .form-control,
+  [data-bs-theme='dark'] .form-select,
+  [data-bs-theme='dark'] .input-group-text {
+    background-color: #0f3460 !important;
+    color: #e0e0e0 !important;
+    border-color: #2a3a5a !important;
+  }
+
+  [data-bs-theme='dark'] select option { background-color: #0f3460; color: #e0e0e0; }
+  [data-bs-theme='dark'] .list-group-item { background-color: #16213e !important; color: #e0e0e0 !important; border-color: #2a3a5a !important; }
+  [data-bs-theme='dark'] .modal-content { background-color: #16213e !important; }
+  [data-bs-theme='dark'] .dropdown-menu { background-color: #16213e !important; border-color: #2a3a5a !important; }
+  [data-bs-theme='dark'] .dropdown-item { color: #e0e0e0 !important; }
+  [data-bs-theme='dark'] .dropdown-item:hover { background-color: #0f3460 !important; }
+  [data-bs-theme='dark'] .btn-outline-secondary { color: #9aa0b0; border-color: #2a3a5a; }
+  [data-bs-theme='dark'] .stat-card { border-left-color: #4caf50; }
+  [data-bs-theme='dark'] .alert { border-color: #2a3a5a; }
+
+  /* ── Offcanvas (cart basket) dark mode ─────────────────────────────────── */
+  [data-bs-theme='dark'] .offcanvas,
+  [data-bs-theme='dark'] .offcanvas-header,
+  [data-bs-theme='dark'] .offcanvas-body {
+    background-color: #16213e !important;
+    color: #e0e0e0 !important;
+  }
+  [data-bs-theme='dark'] .offcanvas .border-bottom,
+  [data-bs-theme='dark'] .offcanvas .border-top { border-color: #2a3a5a !important; }
+  [data-bs-theme='dark'] .offcanvas .btn-close { filter: invert(1) grayscale(100%) brightness(2); }
+
+  /* ── Navbar dark mode ───────────────────────────────────────────────────── */
+  [data-bs-theme='dark'] nav.navbar,
+  [data-bs-theme='dark'] #mainNavbar {
+    background-color: #16213e !important;
+  }
+  [data-bs-theme='dark'] #mainNavbar .nav-link,
+  [data-bs-theme='dark'] #mainNavbar .navbar-brand {
+    color: #e0e0e0 !important;
+  }
+
+  /* ── Spinner / input-group-text dark mode ───────────────────────────── */
+  [data-bs-theme='dark'] .input-group-text,
+  [data-bs-theme='dark'] .input-group-text.bg-white {
+    background-color: #0f3460 !important;
+    color: #e0e0e0 !important;
+  }
+
+  /* ── Home / storefront contrast fixes (dark) ──────────────────────────── */
+  /* Shop by Category cards — readable light label text */
+  [data-bs-theme='dark'] .category-card,
+  [data-bs-theme='dark'] .category-card.card {
+    background-color: #16213e !important;
+    border-color: #2a3a5a !important;
+  }
+  [data-bs-theme='dark'] .category-card .text-dark,
+  [data-bs-theme='dark'] .category-card .fw-semibold,
+  [data-bs-theme='dark'] .category-card .small,
+  [data-bs-theme='dark'] .category-card a {
+    color: #E2E8F0 !important;
+  }
+
+  /* Top utility banner — seamless dark, matches navbar */
+  [data-bs-theme='dark'] .store-utility-strip {
+    background: #16213e !important;
+    border-color: #2a3a5a !important;
+    color: #F8FAFC !important;
+  }
+  [data-bs-theme='dark'] .store-utility-strip span { color: #F8FAFC !important; }
+  [data-bs-theme='dark'] .store-utility-strip i { color: #7de3aa !important; }
+
+  /* Hero buttons (Search + Shop All) — soften stark white, gentle hover */
+  [data-bs-theme='dark'] .home-hero .btn-light,
+  [data-bs-theme='dark'] .home-hero .btn-shop-all {
+    background-color: #E2E8F0 !important;
+    border-color: #E2E8F0 !important;
+    color: #0f172a !important;
+  }
+  [data-bs-theme='dark'] .home-hero .btn-light:hover,
+  [data-bs-theme='dark'] .home-hero .btn-light:focus,
+  [data-bs-theme='dark'] .home-hero .btn-shop-all:hover,
+  [data-bs-theme='dark'] .home-hero .btn-shop-all:focus {
+    background-color: #F1F5F9 !important;
+    border-color: #F1F5F9 !important;
+    color: #0f172a !important;
+  }
+
+  /* Section headings pop on dark */
+  [data-bs-theme='dark'] .product-grid-section h5,
+  [data-bs-theme='dark'] .container > h5 { color: #F1F5F9 !important; }
+</style>

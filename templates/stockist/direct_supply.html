@@ -1,0 +1,83 @@
+{% extends 'stockist/base_stockist.html' %}
+{% block title %}Direct Supply{% endblock %}
+{% block page_title %}🚚 Direct Supply Control{% endblock %}
+{% block active_nav %}direct_supply{% endblock %}
+{% block content %}
+
+{% comment %}Stage 7: the stockist has FULL CONTROL over what bypasses them.
+DIRECT = supplier delivers straight to shops; the stockist neither processes,
+stocks, prices nor earns on that product.{% endcomment %}
+
+<div class="alert alert-light border small mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  <strong>You decide what passes through you.</strong>
+  Products set to <span class="badge bg-info text-dark">DIRECT</span> are delivered by the
+  supplier straight to the shops — no processing, no charges, and no commission for you or
+  the Distributor. Products <span class="badge bg-secondary">IN CHAIN</span> come through your
+  warehouse and need your processing charges before shops can see them.
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">Through my warehouse</div>
+      <div class="fs-4 fw-bold text-success">{{ chain_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">Direct (bypass me)</div>
+      <div class="fs-4 fw-bold text-info">{{ direct_count }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr><th>Product</th><th>Category</th><th>Supplier</th><th>Status</th><th>Mode</th><th class="text-end"></th></tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr>
+          <td class="fw-semibold">{{ p.name }}</td>
+          <td class="text-muted">{{ p.category.name|default:"—" }}</td>
+          <td class="text-muted">{{ p.supplier.company_name }}</td>
+          <td>
+            {% if p.status == 'approved' %}<span class="badge bg-success-subtle text-success">Approved</span>
+            {% else %}<span class="badge bg-warning-subtle text-warning">Pending</span>{% endif %}
+          </td>
+          <td>
+            {% if p.direct_supply %}<span class="badge bg-info text-dark">DIRECT — supplier → shops</span>
+            {% elif p.charges_confirmed %}<span class="badge bg-secondary">IN CHAIN — charges set</span>
+            {% else %}<span class="badge bg-secondary">IN CHAIN — awaiting charges</span>{% endif %}
+          </td>
+          <td class="text-end">
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="product_id" value="{{ p.pk }}">
+              {% if p.direct_supply %}
+              <button class="btn btn-sm btn-outline-secondary"
+                      data-confirm="Bring &quot;{{ p.name }}&quot; back through your warehouse? Shops will not see it until you confirm processing charges."
+                      data-confirm-type="warning" data-confirm-title="Back into the chain?">
+                <i class="bi bi-box-seam me-1"></i>Take into chain
+              </button>
+              {% else %}
+              <button class="btn btn-sm btn-outline-info"
+                      data-confirm="Make &quot;{{ p.name }}&quot; DIRECT? The supplier will deliver it straight to shops — no processing charges and no commission for you or the Distributor."
+                      data-confirm-type="warning" data-confirm-title="Set as direct supply?">
+                <i class="bi bi-truck me-1"></i>Set direct
+              </button>
+              {% endif %}
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No products yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

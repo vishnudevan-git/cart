@@ -1,0 +1,45 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% block title %}Procurement Receivables — {{ supplier.company_name }}{% endblock %}
+{% block page_title %}Procurement Receivables{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='procurement' %}{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm p-3">
+      <div class="small text-muted">Total Receivable</div>
+      <div class="fs-4 fw-bold text-danger">₹{{ total_receivable }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header "><strong>Stockist Accounts</strong></div>
+  <div class="table-responsive">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Stockist</th>
+          <th class="text-end">Invoiced</th>
+          <th class="text-end">Paid</th>
+          <th class="text-end">Balance Due</th>
+          <th class="text-end">Their Credit</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for acc in accounts %}
+        <tr>
+          <td>{{ acc.stockist.company_name }}</td>
+          <td class="text-end">₹{{ acc.total_invoiced }}</td>
+          <td class="text-end text-success">₹{{ acc.total_paid }}</td>
+          <td class="text-end {% if acc.balance_due > 0 %}text-danger fw-semibold{% endif %}">₹{{ acc.balance_due }}</td>
+          <td class="text-end text-primary">₹{{ acc.excess_credit }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-3">No procurement accounts found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

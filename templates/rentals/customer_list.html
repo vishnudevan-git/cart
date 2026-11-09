@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% block title %}Rentals{% endblock %}
+{% block content %}
+<div class="container py-3" style="max-width:900px">
+  {% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+  {% if no_shop %}
+    <div class="alert alert-info">You are not linked to a shop yet, so there are no rentals to show.</div>
+  {% else %}
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+    <h4 class="fw-bold mb-0">🛠️ Rentals</h4>
+    <div class="d-flex gap-2 align-items-center">
+      <span class="badge bg-success-subtle text-success">Wallet ₹{{ balance }}</span>
+      <a href="{% url 'rentals:customer_publish' %}" class="btn btn-sm btn-outline-success">List my item</a>
+      <a href="{% url 'rentals:customer_bookings' %}" class="btn btn-sm btn-outline-primary">My rentals</a>
+      <a href="{% url 'rentals:customer_owned_bookings' %}" class="btn btn-sm btn-outline-secondary">My items’ bookings</a>
+    </div>
+  </div>
+  <div class="row g-3">
+    {% for i in items %}
+    <div class="col-6 col-md-4">
+      <a href="{% url 'rentals:customer_item' i.pk %}" class="text-decoration-none text-dark">
+        <div class="card border-0 shadow-sm h-100">
+          {% if i.image %}<img src="{{ i.image.url }}" class="card-img-top" style="height:130px;object-fit:cover" alt="{{ i.name }}">
+          {% else %}<div class="d-flex align-items-center justify-content-center" style="height:130px;background:#f1f3f1;font-size:2rem">🛠️</div>{% endif %}
+          <div class="card-body p-2">
+            <div class="fw-semibold small">{{ i.name }}</div>
+            <div class="text-success fw-bold">₹{{ i.rent_per_day }}<span class="text-muted fw-normal small">/day</span></div>
+            <div class="text-muted" style="font-size:.72rem">{{ i.get_category_display }} · {{ i.units }} unit(s)</div>
+          </div>
+        </div>
+      </a>
+    </div>
+    {% empty %}<div class="col-12"><p class="text-muted text-center py-5">No rental items in your shop yet.</p></div>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(docker --version)",
+      "Bash(python3 -m venv venv)",
+      "Bash(./venv/bin/pip install *)",
+      "Bash(pip3 --version)",
+      "Bash(pip3 install *)",
+      "Bash(python3 -c \"import django; print\\(django.get_version\\(\\)\\)\")",
+      "Bash(python3 -c \"import django; print\\('Django', django.get_version\\(\\)\\)\")",
+      "Bash(python3 manage.py check)",
+      "Bash(python3 manage.py makemigrations accounts)",
+      "Bash(python3 manage.py migrate)",
+      "Bash(python3 manage.py runserver 127.0.0.1:8000)",
+      "Bash(echo \"started pid $!\")",
+      "Read(//tmp/**)",
+      "Bash(kill 58833)",
+      "Bash(disown)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8000/admin/login/)",
+      "Bash(pkill -f \"manage.py runserver\")",
+      "Bash(DJANGO_SUPERUSER_USERNAME=admin DJANGO_SUPERUSER_EMAIL=admin@vyapardock.local DJANGO_SUPERUSER_PASSWORD=VyaparDock@2026 python3 manage.py createsuperuser --noinput)",
+      "Bash(mkdir -p /home/vishnu/Documents/Projects/Cart/.vscode 2>/dev/null; cat /home/vishnu/Documents/Projects/Cart/.claude/launch.json 2>/dev/null; echo \"---exists check above, empty means none---\")",
+      "Bash(curl -s -X POST http://127.0.0.1:8000/api/accounts/register/ -H 'Content-Type: application/json' -d '{\"username\":\"testsupplier\",\"email\":\"testsupplier@example.com\",\"password\":\"TestPass123!\"}')",
+      "Bash(curl -s http://127.0.0.1:8000/api/accounts/me/ -H \"Authorization: Token 829a3c4d0094c4ad7f3b397558f40f813cac6120\")",
+      "Bash(python3 manage.py shell -c ' *)",
+      "Bash(python3 manage.py makemigrations catalog admin_panel)"
+    ]
+  }
+}

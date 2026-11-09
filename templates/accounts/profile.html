@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<div class="container mt-4 mb-5">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 mb-4">
+      {% include 'accounts/partials/account_sidebar.html' with active='profile' %}
+    </div>
+    
+    <!-- Content -->
+    <div class="col-md-9">
+      <h4 class="mb-4 fw-bold">Personal Details</h4>
+      
+      <div class="card border-0 border-top border-success shadow-sm pt-2">
+        <div class="card-body">
+          <form method="post" action="{% url 'accounts:profile' %}">
+            {% csrf_token %}
+            
+            <div class="row align-items-center mb-3">
+              <div class="col-sm-3 text-muted fw-bold">First Name:</div>
+              <div class="col-sm-9">
+                <input type="text" class="form-control" name="first_name" value="{{ user.first_name }}" required>
+              </div>
+            </div>
+            <hr class="border-light opacity-50">
+            
+            <div class="row align-items-center mb-3">
+              <div class="col-sm-3 text-muted fw-bold">Last Name:</div>
+              <div class="col-sm-9">
+                <input type="text" class="form-control" name="last_name" value="{{ user.last_name }}">
+              </div>
+            </div>
+            <hr class="border-light opacity-50">
+            
+            <div class="row align-items-center mb-3">
+              <div class="col-sm-3 text-muted fw-bold">Mobile Number:</div>
+              <div class="col-sm-9">
+                <input type="tel" class="form-control" name="phone" value="{{ user.phone }}" required>
+              </div>
+            </div>
+            <hr class="border-light opacity-50">
+            
+            <div class="row align-items-center mb-4">
+              <div class="col-sm-3 text-muted fw-bold">Email:</div>
+              <div class="col-sm-9">
+                <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
+              </div>
+            </div>
+            
+            <button type="submit" class="btn btn-success fw-bold px-4">Save Changes</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

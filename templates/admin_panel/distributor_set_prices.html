@@ -1,0 +1,69 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Set Prices — {{ dist.company_name }}{% endblock %}
+{% block page_title %}Admin Prices for {{ dist.company_name }}{% endblock %}
+{% block active_nav %}distributor_list{% endblock %}
+{% block content %}
+<p class="text-muted small mb-3">
+  Set the price you charge <strong>{{ dist.company_name }}</strong> for each variant.
+  This is the admin's price (supplier price + admin margin). The distributor then adds their own margin on top.
+</p>
+<form method="post">
+  {% csrf_token %}
+  {% for pd in products_data %}
+  {% with p=pd.product %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+      {% if p.image %}<img src="{{ p.image.url }}" style="height:28px;width:28px;object-fit:cover;border-radius:4px">{% endif %}
+      {{ p.name }} <span class="text-muted small fw-normal">· {{ p.supplier.company_name }}</span>
+    </div>
+    <div class="table-wrap">
+      <table class="table align-middle mb-0 small">
+        <thead class="table-light">
+          <tr><th>Variant</th><th>Supplier Price</th><th>Admin Price (charge marketplace)</th><th>Admin Margin</th></tr>
+        </thead>
+        <tbody>
+          {% for vd in pd.variants %}
+          {% with v=vd.variant dvp=vd.dvp %}
+          <tr>
+            <td><span class="badge bg-secondary">{{ v.label }}</span></td>
+            <td class="text-muted">₹{{ v.selling_price }}</td>
+            <td style="width:160px">
+              <input type="number" name="base_price_{{ v.pk }}" step="0.01" min="{{ v.selling_price }}"
+                     value="{{ dvp.base_price|default:v.selling_price }}"
+                     class="form-control form-control-sm admin-price-input"
+                     data-supplier="{{ v.selling_price }}" data-vid="{{ v.pk }}">
+            </td>
+            <td class="text-success fw-semibold" id="adminmargin-{{ v.pk }}">
+              {% if dvp %}₹{{ dvp.admin_margin }}{% else %}₹0{% endif %}
+            </td>
+          </tr>
+          {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endwith %}
+  {% endfor %}
+  <div class="d-flex gap-2 mt-2">
+    <button type="submit" class="btn btn-success px-4">Save All Prices</button>
+    <a href="{% url 'admin_panel:distributor_list' %}" class="btn btn-outline-secondary">Back</a>
+  </div>
+</form>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.querySelectorAll('.admin-price-input').forEach(input => {
+  input.addEventListener('input', function() {
+    const supplier = parseFloat(this.dataset.supplier) || 0;
+    const admin = parseFloat(this.value) || 0;
+    const el = document.getElementById('adminmargin-' + this.dataset.vid);
+    if (el) {
+      const margin = admin - supplier;
+      el.textContent = '₹' + margin.toFixed(2);
+      el.className = 'fw-semibold ' + (margin >= 0 ? 'text-success' : 'text-danger');
+    }
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,610 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% load humanize qty_tags %}
+{% block title %}Shipment Requests{% endblock %}
+{% block page_title %}Shipment Requests{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='orders' %}{% endblock %}
+{% block content %}
+
+<style>
+  /* Same column positions in every order card (no zig-zag). */
+  .ship-table { table-layout: fixed; width: 100%; }
+  .ship-table th, .ship-table td { overflow-wrap: anywhere; vertical-align: middle; }
+
+  /* Printing prints ONLY the "What to pack" list. */
+  @media print {
+    .sidebar, .topbar, .sidebar-overlay, .env-ribbon, .no-print, .print-hide { display: none !important; }
+    .main-content { margin-left: 0 !important; padding: 0 !important; }
+    #packSummary { display: block !important; height: auto !important; visibility: visible !important; }
+    .card { box-shadow: none !important; border: 0 !important; }
+  }
+</style>
+
+<!-- Shown only on paper -->
+<div class="d-none d-print-block mb-2">
+  <h5 class="mb-0">Packing list - {{ supplier.company_name }}</h5>
+  <div class="small text-muted">{% now "d M Y, H:i" %} · {{ tab|title }} tab</div>
+</div>
+
+<p class="text-muted small mb-2 print-hide">
+  Each order line is a separate request. Pack it and mark it <strong>ready</strong>, then hand it over (collect) or dispatch it (self-dispatch). If you can't, report a delay or mark it unavailable.
+</p>
+
+<!-- Packing summary: what to prepare, aggregated by product + size -->
+{% if packing_summary %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 no-print"
+       role="button" data-bs-toggle="collapse" data-bs-target="#packSummary">
+    <span class="fw-semibold"><i class="bi bi-box-seam me-1"></i>What to pack ({{ tab }})</span>
+    <i class="bi bi-chevron-down text-muted" id="packChevron"
+       style="transition: transform .2s ease;"></i>
+  </div>
+  <div class="collapse" id="packSummary">
+    <div class="table-wrap">
+      <table class="table table-sm mb-0 align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Product</th><th>Pack size</th>
+            <th class="text-end pe-3">Qty to pack</th>
+            <th class="text-end pe-3">In stock</th>
+            <th class="text-end pe-3">Value (₹)</th>
+            <th class="text-end pe-3">Orders</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in packing_summary %}
+          <tr {% if row.short %}class="table-danger"{% endif %}>
+            <td class="fw-semibold">{{ row.product }}</td>
+            <td>{{ row.size }}</td>
+            <td class="text-end pe-3"><span class="badge bg-success fs-6">{{ row.total_qty }}</span></td>
+            <td class="text-end pe-3">
+              {% if row.stock is None %}<span class="text-muted">—</span>
+              {% elif row.short %}
+                <span class="text-danger fw-semibold" title="Short by {{ row.short_by }}">
+                  {{ row.stock }} <i class="bi bi-exclamation-triangle-fill"></i>
+                </span>
+              {% else %}{{ row.stock }}{% endif %}
+            </td>
+            <td class="text-end pe-3">₹{{ row.value|inr }}</td>
+            <td class="text-end pe-3 text-muted">{{ row.order_count }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light fw-semibold">
+          <tr>
+            <td colspan="2">Total</td>
+            <td class="text-end pe-3">{{ pack_total_qty }}</td>
+            <td class="text-end pe-3 text-muted">—</td>
+            <td class="text-end pe-3 text-success">₹{{ pack_total_value|inr }}</td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 px-3 py-2 no-print">
+      <div class="form-text m-0" style="font-size:11px">
+        Awaiting lines in the current tab and filters. Red rows: stock can't cover the quantity.
+      </div>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="window.print()">
+          <i class="bi bi-printer me-1"></i>Print
+        </button>
+        <a class="btn btn-sm btn-outline-secondary"
+           href="?tab={{ tab }}{{ filter_qs }}&export=csv">
+          <i class="bi bi-download me-1"></i>CSV
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  // Remember the "What to pack" panel open/closed state across page reloads
+  // (tab clicks reload the page). Default: collapsed.
+  (function () {
+    var el = document.getElementById('packSummary');
+    if (!el) return;
+    var chevron = document.getElementById('packChevron');
+    var KEY = 'supplierPackSummaryOpen';
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
+    function setChevron(open) {
+      if (chevron) chevron.style.transform = open ? 'rotate(0deg)' : 'rotate(-90deg)';
+    }
+    var startOpen = (saved === '1');
+    if (startOpen) el.classList.add('show');
+    setChevron(startOpen);
+    el.addEventListener('shown.bs.collapse', function () {
+      setChevron(true);
+      try { localStorage.setItem(KEY, '1'); } catch (e) {}
+    });
+    el.addEventListener('hidden.bs.collapse', function () {
+      setChevron(false);
+      try { localStorage.setItem(KEY, '0'); } catch (e) {}
+    });
+  })();
+</script>
+{% endif %}
+
+<!-- Global shipment mode — slim one-line summary, expandable -->
+<div class="d-flex align-items-center flex-wrap gap-2 mb-3 small print-hide">
+  <span class="text-muted">Shipment:</span>
+  {% if supplier.use_global_shipment_mode %}
+    <span class="badge {% if supplier.default_shipment_mode == 'send' %}bg-primary{% else %}bg-secondary{% endif %}">
+      Global · {{ supplier.get_default_shipment_mode_display }}
+    </span>
+  {% else %}
+    <span class="badge bg-light text-dark border">Per-product</span>
+  {% endif %}
+  <a class="link-primary" style="cursor:pointer" data-bs-toggle="collapse" href="#globalMode">Change</a>
+</div>
+<div class="collapse mb-3 print-hide" id="globalMode">
+  <div class="card border-0 shadow-sm">
+    <div class="card-body py-2">
+      <form method="post" class="row g-2 align-items-end">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="set_global_mode">
+        <div class="col-auto">
+          <div class="form-check form-switch mb-0 mt-3">
+            <input class="form-check-input" type="checkbox" name="use_global" value="1"
+                   id="useGlobal" {% if supplier.use_global_shipment_mode %}checked{% endif %}>
+            <label class="form-check-label small fw-semibold" for="useGlobal">Use one global mode</label>
+          </div>
+        </div>
+        <div class="col-12 col-md-5">
+          <select name="default_shipment_mode" class="form-select form-select-sm">
+            {% for val, lbl in global_mode_choices %}
+            <option value="{{ val }}" {% if supplier.default_shipment_mode == val %}selected{% endif %}>{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-sm btn-primary">Save</button>
+        </div>
+        <div class="col-12">
+          <div class="form-text" style="font-size:11px">
+            Self-dispatch = you send it; the <strong>receiver bears the pickup cost</strong>. Allow collect = target picks up.
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Filters (selects and dates apply on change; Order # applies on Enter) -->
+<form method="get" class="card border-0 shadow-sm mb-3 print-hide" id="filterForm">
+  <div class="card-header bg-white d-flex align-items-center justify-content-between py-2"
+       role="button" data-bs-toggle="collapse" data-bs-target="#filterBody">
+    <span class="fw-semibold">
+      <i class="bi bi-funnel me-1"></i>Filters
+      {% if active_filter_count %}
+        <span class="badge bg-primary ms-1" title="Filters in use">{{ active_filter_count }} active</span>
+      {% endif %}
+    </span>
+    <span class="d-flex align-items-center gap-3">
+      {% if active_filter_count %}
+        <a href="?tab={{ tab }}" class="small" onclick="event.stopPropagation()">Clear filters</a>
+      {% endif %}
+      <i class="bi bi-chevron-down text-muted" id="filterChevron" style="transition: transform .2s ease;"></i>
+    </span>
+  </div>
+  <div class="collapse" id="filterBody">
+  <div class="card-body py-2">
+    <input type="hidden" name="tab" value="{{ tab }}">
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-3">
+        <label class="form-label small mb-1">Product</label>
+        <select name="product" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">All products</option>
+          {% for p in filter_products %}
+          <option value="{{ p.id }}" {% if f_product == p.id|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">From</label>
+        <input type="date" name="from" value="{{ f_from }}" class="form-control form-control-sm"
+               onchange="this.form.submit()">
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label small mb-1">To</label>
+        <input type="date" name="to" value="{{ f_to }}" class="form-control form-control-sm"
+               onchange="this.form.submit()">
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label small mb-1">Dispatch to</label>
+        <select name="target" class="form-select form-select-sm" onchange="this.form.submit()">
+          <option value="">Any target</option>
+          {% for val, lbl in target_choices %}
+          <option value="{{ val }}" {% if f_target == val %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Order #</label>
+        <input type="search" name="q" value="{{ f_q }}" placeholder="e.g. 52"
+               class="form-control form-control-sm" inputmode="numeric" autocomplete="off">
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label small mb-1">Sort</label>
+        <select name="sort" class="form-select form-select-sm" onchange="this.form.submit()">
+          {% for val, lbl in sort_choices %}
+          <option value="{{ val }}" {% if f_sort == val %}selected{% endif %}>{{ lbl }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-outline-primary flex-fill">Search</button>
+        <a href="?tab={{ tab }}" class="btn btn-sm btn-outline-secondary flex-fill">Clear</a>
+      </div>
+    </div>
+  </div>
+  </div>
+</form>
+<script>
+  // Hide / unhide the Filters panel and remember the choice across reloads
+  // (changing a filter reloads the page). Default: collapsed.
+  (function () {
+    var el = document.getElementById('filterBody');
+    if (!el) return;
+    var chevron = document.getElementById('filterChevron');
+    var KEY = 'supplierFiltersOpen';
+    var saved = null;
+    try { saved = localStorage.getItem(KEY); } catch (e) {}
+    function setChevron(open) {
+      if (chevron) chevron.style.transform = open ? 'rotate(0deg)' : 'rotate(-90deg)';
+    }
+    var startOpen = (saved === '1');
+    if (startOpen) el.classList.add('show');
+    setChevron(startOpen);
+    el.addEventListener('shown.bs.collapse', function () {
+      setChevron(true);
+      try { localStorage.setItem(KEY, '1'); } catch (e) {}
+    });
+    el.addEventListener('hidden.bs.collapse', function () {
+      setChevron(false);
+      try { localStorage.setItem(KEY, '0'); } catch (e) {}
+    });
+  })();
+</script>
+
+<!-- Status tabs (keep current filters when switching) -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 print-hide">
+  <ul class="nav nav-pills gap-2">
+    <li class="nav-item">
+      <a class="nav-link {% if tab == 'action' %}active{% endif %}" href="?tab=action{{ filter_qs }}">
+        Needs action
+        {% if count_action %}<span class="badge bg-warning text-dark ms-1">{{ count_action }}</span>{% endif %}
+      </a>
+    </li>
+    {% if count_delayed or tab == 'delayed' %}
+    <li class="nav-item">
+      <a class="nav-link {% if tab == 'delayed' %}active{% endif %}" href="?tab=delayed{{ filter_qs }}">
+        <i class="bi bi-clock-history me-1"></i>Delayed <span class="badge bg-warning text-dark ms-1">{{ count_delayed }}</span>
+      </a>
+    </li>
+    {% endif %}
+    {% if count_unavailable or tab == 'unavailable' %}
+    <li class="nav-item">
+      <a class="nav-link {% if tab == 'unavailable' %}active{% endif %}" href="?tab=unavailable{{ filter_qs }}">
+        Unavailable <span class="badge bg-danger ms-1">{{ count_unavailable }}</span>
+      </a>
+    </li>
+    {% endif %}
+    <li class="nav-item">
+      <a class="nav-link {% if tab == 'completed' %}active{% endif %}" href="?tab=completed{{ filter_qs }}">
+        Completed <span class="badge bg-light text-dark ms-1">{{ count_completed }}</span>
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if tab == 'all' %}active{% endif %}" href="?tab=all{{ filter_qs }}">
+        All <span class="badge bg-light text-dark ms-1">{{ count_all }}</span>
+      </a>
+    </li>
+  </ul>
+  {% if selectable_count %}
+  <label class="small d-inline-flex align-items-center gap-2 mb-0" style="cursor:pointer">
+    <input type="checkbox" class="form-check-input mt-0" id="selAll">
+    Select all {{ selectable_count }} awaiting line{{ selectable_count|pluralize }} on this page
+  </label>
+  {% endif %}
+</div>
+
+<div class="print-hide">
+{% for grp in order_groups %}
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex flex-wrap align-items-center justify-content-between gap-2">
+      <div>
+        <span class="fw-semibold">Order #{{ grp.order.id }}</span>
+        <span class="text-muted small ms-2">{{ grp.order.created_at|date:"d M Y, H:i" }}</span>
+        {% if grp.waiting_days >= 1 %}
+          <span class="badge ms-2 {% if grp.overdue %}bg-danger{% else %}bg-warning text-dark{% endif %}"
+                title="Something on this order has been awaiting you for {{ grp.waiting_days }} day{{ grp.waiting_days|pluralize }}">
+            <i class="bi bi-clock-history me-1"></i>Waiting {{ grp.waiting_days }}d
+          </span>
+        {% endif %}
+      </div>
+      <div class="small text-muted d-flex align-items-center gap-2 flex-wrap">
+        {% if grp.targets %}
+          <span class="d-inline-flex align-items-center gap-1 flex-wrap">Deliver to:
+            {% for t in grp.targets %}<span class="badge bg-info text-dark ms-1">{{ t }}</span>{% endfor %}
+          </span>
+        {% endif %}
+        <span class="badge bg-light text-dark border" title="Status of the customer's order, not of your shipment">
+          Order: {{ grp.order.get_status_display }}
+        </span>
+        {% for bg in grp.bulk_groups %}
+          <button type="button" class="btn btn-sm btn-outline-primary"
+                  data-bs-toggle="collapse" data-bs-target="#bulk{{ grp.order.id }}-{{ bg.target }}">
+            <i class="bi bi-box-seam me-1"></i>Dispatch {{ bg.count }} to {{ bg.label }} together
+          </button>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Bulk dispatch: one docket per destination (one consignment = one docket) -->
+    {% for bg in grp.bulk_groups %}
+    <div class="collapse" id="bulk{{ grp.order.id }}-{{ bg.target }}">
+      <div class="p-3 border-bottom bg-light">
+        <div class="small fw-semibold mb-2">
+          <i class="bi bi-info-circle me-1"></i>One docket for the {{ bg.count }} send lines going to {{ bg.label }} on Order #{{ grp.order.id }}
+        </div>
+        <form method="post"
+              data-confirm="Dispatch {{ bg.count }} lines of Order #{{ grp.order.id }} to {{ bg.label }} under this one docket? You can revert each line afterwards if needed."
+              data-confirm-title="Dispatch together?" data-confirm-type="success">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="bulk_dispatch">
+          <input type="hidden" name="order_id" value="{{ grp.order.id }}">
+          <input type="hidden" name="target" value="{{ bg.target }}">
+          <div class="row g-2">
+            <div class="col-12 col-md-4">
+              <label class="form-label small mb-1">Dispatched to (contact / address)</label>
+              <input type="text" name="dispatched_to_name" class="form-control form-control-sm"
+                     value="{{ bg.dest }}" placeholder="Where it's going">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label small mb-1">Carrier / vehicle</label>
+              <input type="text" name="carrier" class="form-control form-control-sm" placeholder="Courier / transport">
+            </div>
+            <div class="col-6 col-md-3">
+              <label class="form-label small mb-1">Docket / LR / tracking</label>
+              <input type="text" name="tracking_reference" class="form-control form-control-sm" placeholder="One docket no.">
+            </div>
+            <div class="col-12 col-md-2 d-flex align-items-end">
+              <button type="submit" class="btn btn-sm btn-primary w-100">
+                <i class="bi bi-send me-1"></i>Dispatch all
+              </button>
+            </div>
+          </div>
+          <div class="mt-2">
+            <input type="text" name="transhipment_note" class="form-control form-control-sm" placeholder="Note (optional) — applies to all">
+          </div>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+
+    <div class="table-wrap d-none d-md-block">
+      <table class="table align-middle mb-0 ship-table">
+        <colgroup>
+          <col style="width:3%">   {# select #}
+          <col style="width:17%">  {# Product #}
+          <col style="width:7%">   {# Variant #}
+          <col style="width:5%">   {# Qty #}
+          <col style="width:10%">  {# Amount #}
+          <col style="width:10%">  {# Ship to #}
+          <col style="width:7%">   {# Mode #}
+          <col style="width:19%">  {# Shipment status #}
+          <col style="width:22%">  {# Action #}
+        </colgroup>
+        <thead class="table-light">
+          <tr>
+            <th>
+              {% if grp.selectable %}
+              <input type="checkbox" class="form-check-input sel-order" data-order="{{ grp.order.id }}"
+                     title="Select every awaiting line of this order">
+              {% endif %}
+            </th>
+            <th>Product</th><th>Variant</th><th>Qty</th><th>Amount</th>
+            <th>Ship to</th><th>Mode</th><th>Shipment status</th><th class="text-end">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item, ship in grp.lines %}
+          <tr>
+            <td>
+              {% if ship.status == 'awaiting' or ship.status == 'delayed' %}
+              <input type="checkbox" class="form-check-input sel-line" name="item_ids"
+                     value="{{ item.pk }}" form="bulkReadyForm" data-order="{{ grp.order.id }}">
+              {% endif %}
+            </td>
+            <td class="fw-semibold">{{ item.product.name }}</td>
+            <td>{{ item.variant_label|default:item.variant.label }}</td>
+            <td>{{ item.quantity }}</td>
+            <td>₹{{ item.subtotal|inr }}</td>
+            <td><span class="badge bg-info text-dark">{{ ship.get_target_display }}</span></td>
+            <td>
+              {% if ship.mode == 'send' %}
+                <span class="badge bg-primary">Send</span>
+              {% else %}
+                <span class="badge bg-secondary">Collect</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if ship.status == 'awaiting' %}
+                <span class="badge bg-warning text-dark">Awaiting you</span>
+              {% elif ship.status == 'delayed' %}
+                <span class="badge bg-warning text-dark"><i class="bi bi-clock-history me-1"></i>Delayed</span>
+              {% elif ship.status == 'confirmed' %}
+                <span class="badge bg-success">{% if ship.mode == 'send' %}Ready to dispatch{% else %}Ready for pickup{% endif %}</span>
+              {% elif ship.status == 'dispatched' %}
+                <span class="badge bg-primary">Dispatched</span>
+              {% elif ship.status == 'received' %}
+                <span class="badge bg-dark">Received</span>
+              {% elif ship.status == 'unavailable' %}
+                <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i>Unavailable</span>
+              {% else %}
+                <span class="badge bg-light text-dark border">{{ ship.get_status_display }}</span>
+              {% endif %}
+              {% if ship.public_reason %}
+                <div class="small text-muted mt-1" {% if ship.issue_note %}title="Your note: {{ ship.issue_note }}"{% endif %}>
+                  {{ ship.public_reason }}{% if ship.status == 'delayed' and ship.expected_ready_on %} · expected {{ ship.expected_ready_on|date:"d M" }}{% endif %}
+                </div>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              {% include 'suppliers/partials/shipment_action.html' with item=item ship=ship sfx='-d' %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Mobile -->
+    <div class="d-md-none p-2">
+      {% for item, ship in grp.lines %}
+      <div class="border rounded p-2 mb-2">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <span class="fw-semibold small">
+            {% if ship.status == 'awaiting' or ship.status == 'delayed' %}
+            <input type="checkbox" class="form-check-input sel-line me-1" name="item_ids"
+                   value="{{ item.pk }}" form="bulkReadyForm" data-order="{{ grp.order.id }}">
+            {% endif %}
+            {{ item.product.name }}
+          </span>
+          <span class="small text-muted">× {{ item.quantity }}</span>
+        </div>
+        <div class="small text-muted mb-1">
+          {{ item.variant_label|default:item.variant.label }} · ₹{{ item.subtotal|inr }}
+        </div>
+        <div class="d-flex flex-wrap gap-1 mb-2">
+          <span class="badge bg-info text-dark">To: {{ ship.get_target_display }}</span>
+          <span class="badge {% if ship.mode == 'send' %}bg-primary{% else %}bg-secondary{% endif %}">{{ ship.get_mode_display }}</span>
+          <span class="badge
+            {% if ship.status == 'awaiting' or ship.status == 'delayed' %}bg-warning text-dark
+            {% elif ship.status == 'confirmed' %}bg-success
+            {% elif ship.status == 'dispatched' %}bg-primary
+            {% elif ship.status == 'unavailable' %}bg-danger
+            {% else %}bg-dark{% endif %}">{{ ship.get_status_display }}</span>
+          {% if ship.public_reason %}
+            <span class="small text-muted align-self-center">
+              {{ ship.public_reason }}{% if ship.status == 'delayed' and ship.expected_ready_on %} · expected {{ ship.expected_ready_on|date:"d M" }}{% endif %}
+            </span>
+          {% endif %}
+        </div>
+        {% include 'suppliers/partials/shipment_action.html' with item=item ship=ship sfx='-m' %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+{% empty %}
+  <div class="card border-0 shadow-sm">
+    <div class="card-body text-center text-muted py-5">
+      {% if tab == 'action' %}Nothing needs your action right now. 🎉
+      {% elif tab == 'delayed' %}No delayed lines.
+      {% elif tab == 'unavailable' %}No unavailable lines.
+      {% elif tab == 'completed' %}No completed shipments yet.
+      {% else %}No shipment requests yet.{% endif %}
+    </div>
+  </div>
+{% endfor %}
+
+{% if paginator.num_pages > 1 %}
+<nav class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+  <span class="small text-muted">
+    Page {{ page_obj.number }} of {{ paginator.num_pages }} · {{ paginator.count }} order{{ paginator.count|pluralize }}
+  </span>
+  <ul class="pagination pagination-sm mb-0">
+    {% if page_obj.has_previous %}
+      <li class="page-item"><a class="page-link" href="?tab={{ tab }}{{ filter_qs }}&page={{ page_obj.previous_page_number }}">‹ Prev</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">‹ Prev</span></li>
+    {% endif %}
+    <li class="page-item active"><span class="page-link">{{ page_obj.number }}</span></li>
+    {% if page_obj.has_next %}
+      <li class="page-item"><a class="page-link" href="?tab={{ tab }}{{ filter_qs }}&page={{ page_obj.next_page_number }}">Next ›</a></li>
+    {% else %}
+      <li class="page-item disabled"><span class="page-link">Next ›</span></li>
+    {% endif %}
+  </ul>
+</nav>
+{% endif %}
+</div>
+
+<!-- Bulk ready: checkboxes above point at this form via form="bulkReadyForm" -->
+<form id="bulkReadyForm" method="post" class="d-none"
+      data-confirm-title="Mark selected lines ready?" data-confirm-type="success">
+  {% csrf_token %}
+  <input type="hidden" name="action" value="bulk_ready">
+</form>
+
+<div id="prepBar" class="d-none no-print print-hide" style="position:sticky;bottom:12px;z-index:1030">
+  <div class="card shadow border-success mx-auto" style="max-width:560px">
+    <div class="card-body py-2 d-flex align-items-center justify-content-between gap-2">
+      <span class="small"><strong id="prepCount">0</strong> line(s) selected</span>
+      <span class="d-flex gap-2">
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="prepClear">Clear</button>
+        <button type="submit" form="bulkReadyForm" class="btn btn-sm btn-success">
+          <i class="bi bi-box-seam me-1"></i>Mark selected ready
+        </button>
+      </span>
+    </div>
+  </div>
+</div>
+
+<script>
+  // Bulk-prepare selection. The page renders each line twice (desktop table +
+  // mobile list), so selection is tracked by item id, not by checkbox.
+  (function () {
+    var bar = document.getElementById('prepBar');
+    var count = document.getElementById('prepCount');
+    var form = document.getElementById('bulkReadyForm');
+    if (!bar || !form) return;
+
+    function setValue(id, checked) {
+      document.querySelectorAll('input.sel-line[value="' + id + '"]').forEach(function (b) { b.checked = checked; });
+    }
+    function selectedIds() {
+      var s = {};
+      document.querySelectorAll('input.sel-line:checked').forEach(function (b) { s[b.value] = 1; });
+      return Object.keys(s);
+    }
+    function refresh() {
+      var n = selectedIds().length;
+      count.textContent = n;
+      bar.classList.toggle('d-none', n === 0);
+      form.dataset.confirm = 'Mark ' + n + ' selected line' + (n === 1 ? '' : 's') +
+        ' as packed and ready? You can undo any line afterwards.';
+      // keep order-level and select-all boxes in sync
+      document.querySelectorAll('input.sel-order').forEach(function (ob) {
+        var lines = document.querySelectorAll('input.sel-line[data-order="' + ob.dataset.order + '"]');
+        var all = lines.length > 0 && Array.prototype.every.call(lines, function (b) { return b.checked; });
+        ob.checked = all;
+      });
+      var sa = document.getElementById('selAll');
+      if (sa) {
+        var every = document.querySelectorAll('input.sel-line');
+        sa.checked = every.length > 0 && Array.prototype.every.call(every, function (b) { return b.checked; });
+      }
+    }
+
+    document.addEventListener('change', function (e) {
+      var t = e.target;
+      if (t.classList.contains('sel-line')) {
+        setValue(t.value, t.checked);
+      } else if (t.classList.contains('sel-order')) {
+        document.querySelectorAll('input.sel-line[data-order="' + t.dataset.order + '"]')
+          .forEach(function (b) { setValue(b.value, t.checked); });
+      } else if (t.id === 'selAll') {
+        document.querySelectorAll('input.sel-line').forEach(function (b) { setValue(b.value, t.checked); });
+      } else { return; }
+      refresh();
+    });
+    document.getElementById('prepClear').addEventListener('click', function () {
+      document.querySelectorAll('input.sel-line').forEach(function (b) { b.checked = false; });
+      refresh();
+    });
+    refresh();
+  })();
+</script>
+
+{% endblock %}

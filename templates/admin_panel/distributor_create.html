@@ -1,0 +1,61 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Create Marketplace{% endblock %}
+{% block page_title %}Create Marketplace{% endblock %}
+{% block active_nav %}distributor_list{% endblock %}
+{% block content %}
+<div class="card border-0 shadow-sm p-4" style="max-width:580px">
+  <form method="post">
+    {% csrf_token %}
+    <div class="row g-3">
+      <div class="col-12 col-sm-6">
+        <label class="form-label fw-semibold small">Username *</label>
+        <input type="text" name="username" class="form-control" required value="{{ post.username|default:'' }}">
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label fw-semibold small">Password *</label>
+        <input type="password" name="password" class="form-control" required>
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label fw-semibold small">Full Name</label>
+        <input type="text" name="first_name" class="form-control" value="{{ post.first_name|default:'' }}">
+      </div>
+      <div class="col-12 col-sm-6">
+        <label class="form-label fw-semibold small">Phone</label>
+        <input type="text" name="phone" class="form-control" value="{{ post.phone|default:'' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold small">Email</label>
+        <input type="email" name="email" class="form-control" value="{{ post.email|default:'' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold small">Company Name *</label>
+        <input type="text" name="company_name" class="form-control" required value="{{ post.company_name|default:'' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold small">Service Area</label>
+        <input type="text" name="area" class="form-control" placeholder="e.g. Anna Nagar, Chennai" value="{{ post.area|default:'' }}">
+      </div>
+      <div class="col-12 col-sm-4">
+        <label class="form-label fw-semibold small">Default Margin %</label>
+        <input type="number" name="default_margin_percent" class="form-control" step="0.5" min="0" value="{{ post.default_margin_percent|default:'0' }}">
+      </div>
+      <div class="col-12 col-sm-4">
+        <label class="form-label fw-semibold small">Delivery Charge ₹</label>
+        <input type="number" name="delivery_charge" class="form-control" step="0.01" min="0" value="{{ post.delivery_charge|default:'0' }}">
+      </div>
+      <div class="col-12 col-sm-4">
+        <label class="form-label fw-semibold small">Free Delivery Above ₹</label>
+        <input type="number" name="free_delivery_above" class="form-control" step="0.01" min="0" value="{{ post.free_delivery_above|default:'0' }}">
+      </div>
+    </div>
+    <div class="mt-4 d-flex gap-2">
+      <button type="submit" class="btn btn-success px-4">Create Marketplace</button>
+      <a href="{% url 'admin_panel:distributor_list' %}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/username_validation.js"></script>
+{% endblock %}

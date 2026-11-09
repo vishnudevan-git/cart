@@ -1,0 +1,28 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Wallets{% endblock %}
+{% block page_title %}💰 Customer Wallets{% endblock %}
+{% block active_nav %}rentals{% endblock %}
+{% block content %}
+{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+<div class="alert alert-light border small mb-3"><i class="bi bi-info-circle me-1"></i>
+The wallet is real money for rentals — separate from reward points. Take cash from the customer, then load it here.</div>
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap"><table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>Customer</th><th>Wallet balance</th><th style="width:16rem">Load cash</th></tr></thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td class="fw-semibold">{{ r.customer.get_full_name|default:r.customer.username }}<div class="small text-muted">{{ r.customer.username }}</div></td>
+        <td class="fw-bold text-success">₹{{ r.balance }}</td>
+        <td>
+          <form method="post" class="d-flex gap-1">{% csrf_token %}
+            <input type="hidden" name="customer_id" value="{{ r.customer.pk }}">
+            <input name="amount" type="number" step="0.01" min="1" class="form-control form-control-sm" placeholder="₹" style="width:7rem">
+            <button class="btn btn-sm btn-success">Load</button>
+          </form>
+        </td>
+      </tr>
+      {% empty %}<tr><td colspan="3" class="text-center text-muted py-4">No customers yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

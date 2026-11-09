@@ -1,0 +1,432 @@
+{% extends 'stockist/base_stockist.html' %}
+{% block title %}Processing Charges{% endblock %}
+{% block page_title %}⚙️ Processing Charges{% endblock %}
+{% block active_nav %}processing_charges{% endblock %}
+{% block content %}
+
+<div class="alert alert-info small py-2 mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  Set charges per stage for products or suppliers. Priority: <strong>Product &gt; Supplier &gt; Global</strong>.
+  Once charges are set, click <strong>Confirm & Release</strong> to make the product visible to distributors.
+  <a href="{% url 'stockist:charges_overview' %}" class="alert-link ms-2">
+    <i class="bi bi-table me-1"></i>View all products overview →
+  </a>
+</div>
+
+<!-- Pending release -->
+{% if pending_release %}
+<div class="card border-warning border-0 shadow-sm mb-4">
+  <div class="card-header bg-warning bg-opacity-10 fw-semibold text-warning-emphasis">
+    <i class="bi bi-hourglass-split me-1"></i>
+    {{ pending_release|length }} product(s) approved — waiting for charges before release to distributors
+  </div>
+  <div class="table-wrap">
+    <table class="table table-sm align-middle mb-0 small">
+      <thead class="table-light">
+        <tr><th>Product</th><th>Supplier</th><th>Category</th><th>Approved</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for p in pending_release %}
+        <tr>
+          <td class="fw-semibold">{{ p.name }}</td>
+          <td class="text-muted">{{ p.supplier.company_name }}</td>
+          <td class="text-muted">{{ p.category.name|default:"—" }}</td>
+          <td class="text-muted">{{ p.created_at|date:"d M Y" }}</td>
+          <td>
+            <a href="{% url 'stockist:processing_charges' %}?product={{ p.pk }}"
+               class="btn btn-sm btn-outline-primary">
+              Set charges &amp; release
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+
+  <!-- LEFT: Stage Management -->
+  <div class="col-12 col-md-4">
+    <div class="card border-0 shadow-sm p-3 h-100">
+      <h6 class="fw-semibold mb-3">📋 Manage Stages</h6>
+      <p class="small text-muted mb-3">Create, edit, or delete charge stages. Set where each stage appears.</p>
+
+      <!-- Add stage form -->
+      <form method="post" class="mb-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_stage">
+        <div class="mb-2">
+          <input type="text" name="stage_name" class="form-control form-control-sm" placeholder="Stage name (e.g. Cold Storage)" required>
+        </div>
+        <div class="mb-2">
+          <select name="stage_display" class="form-select form-select-sm">
+            {% for val, label in stage_display_choices %}
+            <option value="{{ val }}">{{ label }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <button type="submit" class="btn btn-success btn-sm w-100">
+          <i class="bi bi-plus-lg me-1"></i>Add Stage
+        </button>
+      </form>
+
+      <!-- Existing stages list -->
+      <div class="list-group list-group-flush">
+        {% for stage in stages %}
+        <div class="list-group-item px-0 py-2">
+          <div class="d-flex justify-content-between align-items-start">
+            <div>
+              <span class="fw-semibold small">{{ stage.name }}</span>
+              <div class="text-muted" style="font-size:.7rem">
+                {{ stage.get_display_in_display }}
+                {% if not stage.is_active %}<span class="badge bg-secondary ms-1">Inactive</span>{% endif %}
+              </div>
+            </div>
+            <div class="d-flex gap-1">
+              <button class="btn btn-sm btn-outline-secondary py-0 px-1"
+                      onclick="openEditStage({{ stage.pk }}, '{{ stage.name|escapejs }}', '{{ stage.display_in }}', {{ stage.is_active|yesno:'true,false' }})"
+                      title="Edit">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_stage">
+                <input type="hidden" name="stage_id" value="{{ stage.pk }}">
+                <button class="btn btn-sm btn-outline-danger py-0 px-1"
+                        onclick="return confirm('Delete stage \'{{ stage.name|escapejs }}\'? All charges using this stage will also be deleted.')"
+                        title="Delete">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+        {% empty %}
+        <p class="text-muted small">No stages yet.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Charge Grid -->
+  <div class="col-12 col-md-8">
+    <div class="card border-0 shadow-sm p-3">
+      <h6 class="fw-semibold mb-3">💰 Set Charges</h6>
+
+      <!-- Scope + Supplier + Product selectors -->
+      <div class="row g-2 mb-3 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label small fw-semibold mb-1">Scope</label>
+          <select id="scopePicker" class="form-select form-select-sm" onchange="onScopeChange()">
+            <option value="product">Product-wise</option>
+            <option value="supplier">Supplier-wise</option>
+            <option value="global">Global</option>
+          </select>
+        </div>
+        <div class="col-md-3" id="supplierPickerWrap">
+          <label class="form-label small fw-semibold mb-1">Supplier</label>
+          <select id="supplierPicker" class="form-select form-select-sm" onchange="onSupplierChange()">
+            <option value="">— Select —</option>
+            {% for s in suppliers %}
+            <option value="{{ s.pk }}">{{ s.company_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-4" id="productPickerWrap">
+          <label class="form-label small fw-semibold mb-1">Product</label>
+          <select id="productPicker" class="form-select form-select-sm" onchange="loadChargeGrid()">
+            <option value="">— Select product —</option>
+            {% for p in products %}
+            <option value="{{ p.pk }}" data-supplier="{{ p.supplier.pk }}" data-confirmed="{{ p.charges_confirmed|yesno:'1,0' }}">
+              {{ p.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-auto" id="statusBadge"></div>
+      </div>
+
+      <!-- Charge grid -->
+      <div id="chargeGrid" style="display:none">
+        <form method="post" id="chargeForm">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="save_charges">
+          <input type="hidden" name="scope" id="hiddenScope" value="product">
+          <input type="hidden" name="product_id" id="hiddenProductId" value="">
+          <input type="hidden" name="supplier_id" id="hiddenSupplierId" value="">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle small mb-2">
+              <thead class="table-light">
+                <tr>
+                  <th style="width:160px">Stage</th>
+                  <th style="width:130px">Charge Type</th>
+                  <th style="width:100px">Value</th>
+                  <th>Note</th>
+                  <th style="width:80px" title="Remove saved charge for this stage">Clear</th>
+                </tr>
+              </thead>
+              <tbody id="chargeGridBody"></tbody>
+            </table>
+          </div>
+          <div class="d-flex gap-2 align-items-center">
+            <button type="submit" class="btn btn-success btn-sm px-4">
+              <i class="bi bi-save me-1"></i>Save Charges
+            </button>
+            <button type="button" class="btn btn-outline-success btn-sm" id="confirmBtn" style="display:none" onclick="confirmProduct()">
+              <i class="bi bi-check-circle me-1"></i>Confirm & Release
+            </button>
+          </div>
+        </form>
+      </div>
+      <div id="chargeGridHint" class="text-muted small py-3">
+        Select a scope and product/supplier above to set charges.
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Stage Modal -->
+<div class="modal fade" id="editStageModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-sm">
+    <div class="modal-content">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="edit_stage">
+        <input type="hidden" name="stage_id" id="editStageId">
+        <div class="modal-header border-0 pb-0">
+          <h6 class="modal-title fw-bold">Edit Stage</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Stage Name</label>
+            <input type="text" name="stage_name" id="editStageName" class="form-control form-control-sm" required>
+          </div>
+          <div class="mb-2">
+            <label class="form-label small fw-semibold">Display In</label>
+            <select name="stage_display" id="editStageDisplay" class="form-select form-select-sm">
+              {% for val, label in stage_display_choices %}
+              <option value="{{ val }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-check">
+            <input type="checkbox" name="stage_active" id="editStageActive" class="form-check-input" value="1">
+            <label class="form-check-label small" for="editStageActive">Active</label>
+          </div>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-success">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Stage data from server
+const STAGES = [
+  {% for s in stages %}
+  { id: {{ s.pk }}, name: '{{ s.name|escapejs }}', display_in: '{{ s.display_in }}', active: {{ s.is_active|yesno:'true,false' }} }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+];
+
+const CHARGE_TYPES = [
+  {% for val, label in charge_type_choices %}
+  { val: '{{ val }}', label: '{{ label }}' }{% if not forloop.last %},{% endif %}
+  {% endfor %}
+];
+
+// Existing charges from server: key = "scope_id_stage_id"
+const CHARGE_MAP = {{ charge_map_json|safe }};
+
+function getCsrf() {
+  const m = document.cookie.match(/csrftoken=([^;]+)/);
+  return m ? m[1] : '';
+}
+
+function onScopeChange() {
+  const scope = document.getElementById('scopePicker').value;
+  const supplierWrap = document.getElementById('supplierPickerWrap');
+  const productWrap = document.getElementById('productPickerWrap');
+  document.getElementById('chargeGrid').style.display = 'none';
+  document.getElementById('chargeGridHint').style.display = '';
+  document.getElementById('statusBadge').innerHTML = '';
+
+  if (scope === 'global') {
+    supplierWrap.style.display = 'none';
+    productWrap.style.display = 'none';
+    loadChargeGrid();
+  } else if (scope === 'supplier') {
+    supplierWrap.style.display = '';
+    productWrap.style.display = 'none';
+    document.getElementById('supplierPicker').value = '';
+  } else {
+    supplierWrap.style.display = '';
+    productWrap.style.display = '';
+    document.getElementById('supplierPicker').value = '';
+    document.getElementById('productPicker').value = '';
+    filterProductsBySupplier('');
+  }
+}
+
+function onSupplierChange() {
+  const scope = document.getElementById('scopePicker').value;
+  const supplierId = document.getElementById('supplierPicker').value;
+  if (scope === 'supplier') {
+    loadChargeGrid();
+  } else {
+    filterProductsBySupplier(supplierId);
+  }
+}
+
+function filterProductsBySupplier(supplierId) {
+  const picker = document.getElementById('productPicker');
+  picker.value = '';
+  document.getElementById('chargeGrid').style.display = 'none';
+  document.getElementById('chargeGridHint').style.display = '';
+  Array.from(picker.options).forEach(opt => {
+    if (!opt.value) return;
+    opt.hidden = supplierId ? opt.dataset.supplier !== supplierId : false;
+  });
+}
+
+function loadChargeGrid() {
+  const scope = document.getElementById('scopePicker').value;
+  const supplierId = document.getElementById('supplierPicker').value;
+  const productId = document.getElementById('productPicker').value;
+
+  // Determine scope key for charge lookup
+  let scopeKey = '';
+  if (scope === 'global') scopeKey = 'global';
+  else if (scope === 'supplier' && supplierId) scopeKey = `s_${supplierId}`;
+  else if (scope === 'product' && productId) scopeKey = `p_${productId}`;
+  else return;
+
+  // Filter stages by display_in
+  const visibleStages = STAGES.filter(s => {
+    if (!s.active) return false;
+    if (scope === 'product') return s.display_in === 'product' || s.display_in === 'both';
+    if (scope === 'supplier') return s.display_in === 'supplier' || s.display_in === 'both';
+    return true; // global shows all
+  });
+
+  if (visibleStages.length === 0) {
+    document.getElementById('chargeGridHint').innerHTML = '<span class="text-warning">No stages configured for this scope. Add stages in the left panel.</span>';
+    document.getElementById('chargeGridHint').style.display = '';
+    document.getElementById('chargeGrid').style.display = 'none';
+    return;
+  }
+
+  // Set hidden fields
+  document.getElementById('hiddenScope').value = scope;
+  document.getElementById('hiddenProductId').value = productId || '';
+  document.getElementById('hiddenSupplierId').value = supplierId || '';
+
+  // Build grid rows
+  const body = document.getElementById('chargeGridBody');
+  body.innerHTML = visibleStages.map(stage => {
+    const key = `${scopeKey}_${stage.id}`;
+    const existing = CHARGE_MAP[key] || {};
+    const val = existing.value || '';
+    const note = existing.note || '';
+    const chargeId = existing.id || '';
+    const typeOptions = CHARGE_TYPES.map(t =>
+      `<option value="${t.val}" ${t.val === (existing.type || 'fixed') ? 'selected' : ''}>${t.label}</option>`
+    ).join('');
+    const savedBadge = chargeId ? `<span class="badge bg-success ms-1" style="font-size:.6rem">Saved</span>` : '';
+    const delBtn = chargeId
+      ? `<form method="post" class="d-inline" title="Remove this saved charge (falls back to supplier/global level)"><input type="hidden" name="csrfmiddlewaretoken" value="${getCsrf()}"><input type="hidden" name="action" value="delete_charge"><input type="hidden" name="charge_id" value="${chargeId}"><button class="btn btn-sm btn-outline-danger py-0 px-2" onclick="return confirm('Remove this charge? It will fall back to supplier or global level if set.')"><i class="bi bi-x-lg"></i> Remove</button></form>`
+      : `<span class="text-muted small">Not saved</span>`;
+    return `
+      <tr class="${chargeId ? 'table-success' : ''}">
+        <td>
+          <span class="badge bg-secondary">${stage.name}</span>${savedBadge}
+          ${chargeId ? `<input type="hidden" name="cid_${stage.id}" value="${chargeId}">` : ''}
+        </td>
+        <td><select name="type_${stage.id}" class="form-select form-select-sm">${typeOptions}</select></td>
+        <td><input type="number" name="val_${stage.id}" class="form-control form-control-sm" step="0.01" min="0" value="${val}" placeholder="blank = skip"></td>
+        <td><input type="text" name="note_${stage.id}" class="form-control form-control-sm" value="${note}" placeholder="optional"></td>
+        <td>${delBtn}</td>
+      </tr>`;
+  }).join('');
+
+  // Status badge for product
+  const statusEl = document.getElementById('statusBadge');
+  const confirmBtn = document.getElementById('confirmBtn');
+  if (scope === 'product' && productId) {
+    const opt = document.querySelector(`#productPicker option[value="${productId}"]`);
+    const confirmed = opt && opt.dataset.confirmed === '1';
+    statusEl.innerHTML = confirmed
+      ? '<span class="badge bg-success">✓ Released</span>'
+      : '<span class="badge bg-warning text-dark">⏳ Pending Release</span>';
+    confirmBtn.style.display = confirmed ? 'none' : '';
+    confirmBtn.dataset.productId = productId;
+  } else {
+    statusEl.innerHTML = '';
+    confirmBtn.style.display = 'none';
+  }
+
+  document.getElementById('chargeGrid').style.display = '';
+  document.getElementById('chargeGridHint').style.display = 'none';
+}
+
+function confirmProduct() {
+  const pid = document.getElementById('confirmBtn').dataset.productId;
+  if (!pid) return;
+  const form = document.createElement('form');
+  form.method = 'post';
+  form.innerHTML = `<input type="hidden" name="csrfmiddlewaretoken" value="${getCsrf()}"><input type="hidden" name="action" value="confirm"><input type="hidden" name="product_id" value="${pid}">`;
+  document.body.appendChild(form);
+  form.submit();
+}
+
+function openEditStage(id, name, displayIn, isActive) {
+  document.getElementById('editStageId').value = id;
+  document.getElementById('editStageName').value = name;
+  document.getElementById('editStageDisplay').value = displayIn;
+  document.getElementById('editStageActive').checked = isActive;
+  new bootstrap.Modal(document.getElementById('editStageModal')).show();
+}
+
+// Init
+onScopeChange();
+
+// Auto-select product from URL query param (e.g. ?product=123)
+(function() {
+  const params = new URLSearchParams(window.location.search);
+  const productId = params.get('product');
+  if (productId) {
+    // Find the supplier for this product and pre-select it
+    const productOpt = document.querySelector(`#productPicker option[value="${productId}"]`);
+    if (productOpt) {
+      const supplierId = productOpt.dataset.supplier;
+      // Set supplier picker
+      const supplierPicker = document.getElementById('supplierPicker');
+      if (supplierPicker && supplierId) {
+        supplierPicker.value = supplierId;
+        filterProductsBySupplier(supplierId);
+      }
+      // Set product picker
+      const productPicker = document.getElementById('productPicker');
+      if (productPicker) {
+        productPicker.value = productId;
+        loadChargeGrid();
+        // Scroll to the charge grid
+        setTimeout(() => {
+          const grid = document.getElementById('chargeGrid');
+          if (grid) grid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
+  }
+})();
+</script>
+{% endblock %}

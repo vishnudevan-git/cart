@@ -1,0 +1,92 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Create User{% endblock %}
+{% block page_title %}Create User{% endblock %}
+{% block active_nav %}user_list{% endblock %}
+{% block content %}
+<form method="post">
+  {% csrf_token %}
+  <div class="row g-3">
+    <!-- Account fields -->
+    <div class="col-12 col-md-8 mx-auto">
+      <div class="card border-0 shadow-sm p-3">
+        <h6 class="fw-semibold mb-3">Account Details</h6>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label small fw-semibold">Username <span class="text-danger">*</span></label>
+            <input type="text" name="username" class="form-control" required>
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-semibold">Password <span class="text-danger">*</span></label>
+            <input type="password" name="password" class="form-control" required>
+          </div>
+        </div>
+        <div class="row g-2 mb-3">
+          <div class="col-6">
+            <label class="form-label small fw-semibold">First Name</label>
+            <input type="text" name="first_name" class="form-control">
+          </div>
+          <div class="col-6">
+            <label class="form-label small fw-semibold">Last Name</label>
+            <input type="text" name="last_name" class="form-control">
+          </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Email</label>
+          <input type="email" name="email" class="form-control">
+        </div>
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Phone</label>
+          <input type="text" name="phone" class="form-control">
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Role <span class="text-danger">*</span></label>
+
+          {# Single-role policy: one account = one role. #}
+          <div class="border rounded p-3 mb-2">
+            {% for value, label in role_choices %}
+            <div class="form-check">
+              <input class="form-check-input" type="radio" name="role" value="{{ value }}"
+                     id="role_{{ value }}" required {% if value == 'customer' %}checked{% endif %}>
+              <label class="form-check-label" for="role_{{ value }}">{{ label }}</label>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="form-text">
+            Each account holds exactly one role. If the same person needs a second role
+            (e.g. a marketplace that also wants to supply products to other shops), create a separate account.
+            <br>Creating a <strong>Stockist</strong>? Use
+            <a href="{% url 'admin_panel:stockist_create' %}">Create Stockist</a> instead —
+            it also sets up the company profile.
+          </div>
+        </div>
+        
+        <div class="form-check form-switch mb-3">
+          <input class="form-check-input" type="checkbox" name="is_active" value="1" id="isActive" checked>
+          <label class="form-check-label" for="isActive">Account Active</label>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label small fw-semibold">Linked Marketplace (Optional) <span class="text-muted">(Only applies to the Customer role)</span></label>
+          <select name="distributor_id" class="form-select">
+            <option value="">— None —</option>
+            {% for d in distributors %}
+            <option value="{{ d.pk }}">{{ d.company_name }} ({{ d.area }})</option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Assign a marketplace so this customer can browse and order products.</div>
+        </div>
+      </div>
+
+      <div class="mt-3 d-flex gap-2">
+        <button type="submit" class="btn btn-success px-4">Create User</button>
+        <a href="{% url 'admin_panel:user_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      </div>
+    </div>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/username_validation.js"></script>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% block title %}My Storefront — {{ supplier.company_name }}{% endblock %}
+{% block page_title %}My Storefront{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='storefront' %}{% endblock %}
+{% block content %}
+<p class="text-muted small mb-3">This is how your approved products appear to customers.</p>
+
+{% if not products %}
+<div class="text-center py-5 text-muted">
+  <i class="bi bi-box-seam fs-1 d-block mb-2"></i>
+  No approved products yet. Add products and wait for admin approval.
+</div>
+{% else %}
+<div class="row g-3">
+  {% for p in products %}
+  <div class="col-6 col-md-4 col-lg-3">
+    <div class="card border-0 shadow-sm h-100">
+      {% if p.image %}
+        <img src="{{ p.image.url }}" class="card-img-top" style="height:160px;object-fit:cover" alt="{{ p.name }}">
+      {% else %}
+        <div class="bg-light d-flex align-items-center justify-content-center" style="height:160px;font-size:3rem">🌿</div>
+      {% endif %}
+      <div class="card-body p-2">
+        <div class="fw-semibold small">{{ p.name }}</div>
+        <div class="text-muted" style="font-size:0.75rem">{{ p.category.name }}</div>
+        {% with v=p.default_variant %}
+        {% if v %}
+          <div class="text-success fw-bold mt-1">₹{{ v.selling_price }}
+            {% if p.show_mrp and v.mrp and v.mrp > v.selling_price %}
+              <span class="text-muted text-decoration-line-through ms-1" style="font-size:0.75rem">₹{{ v.mrp }}</span>
+            {% endif %}
+          </div>
+          <div class="text-muted" style="font-size:0.72rem">{{ v.label }} · {{ v.stock }} in stock</div>
+        {% endif %}
+        {% endwith %}
+        {% if p.variants.count > 1 %}
+          <div class="mt-1">
+            {% for v in p.variants.all %}
+              <span class="badge bg-light text-dark border" style="font-size:0.65rem">{{ v.label }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+      </div>
+      <div class="card-footer  border-0 p-2">
+        <a href="{% url 'suppliers:product_edit' p.pk %}" class="btn btn-outline-success btn-sm w-100">
+          <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

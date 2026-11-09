@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>How Lakrish Mart Works — Project Explainer</title>
+  <style>
+    :root { --bg:#f7f9fc; --card:#fff; --ink:#1f2937; --muted:#6b7280; --accent:#2e7d32; --accent-2:#0b7285; --gold:#b45309; --line:#e5e7eb; --chip:#f1f5f9; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:"Segoe UI",Tahoma,Verdana,sans-serif; color:var(--ink); background:radial-gradient(circle at top right,#dcfce7 0%,var(--bg) 35%); line-height:1.5; }
+    header { background:linear-gradient(135deg,#0f172a 0%,#14532d 60%,#2e7d32 100%); color:#fff; padding:30px 18px; }
+    header .wrap { width:min(1120px,95vw); margin:0 auto; }
+    header h1 { margin:0 0 8px; font-size:1.8rem; } header p { margin:4px 0; opacity:.92; }
+    header .tags { margin-top:14px; display:flex; flex-wrap:wrap; gap:8px; }
+    header .tag { background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.25); padding:4px 10px; border-radius:999px; font-size:.8rem; font-weight:600; }
+    nav.toc { width:min(1120px,95vw); margin:16px auto 0; display:flex; flex-wrap:wrap; gap:8px; }
+    nav.toc a { text-decoration:none; color:#14532d; background:#fff; border:1px solid var(--line); padding:6px 10px; border-radius:8px; font-size:.82rem; font-weight:600; }
+    nav.toc a:hover { border-color:var(--accent); }
+    .container { width:min(1120px,95vw); margin:20px auto 60px; display:grid; gap:16px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px; box-shadow:0 8px 22px rgba(2,6,23,.05); }
+    .card h2 { margin:0 0 4px; font-size:1.25rem; } .card h3 { margin:16px 0 6px; font-size:1rem; color:#14532d; }
+    .card .lead { margin:0 0 12px; color:var(--muted); }
+    p { margin:8px 0; } ul,ol { margin:6px 0; padding-left:20px; } li { margin:5px 0; }
+    code,.mono { background:#f1f5f9; border:1px solid #e2e8f0; border-radius:6px; padding:1px 6px; font-family:Consolas,"Courier New",monospace; font-size:.85em; }
+    .grid { display:grid; gap:12px; } .grid.cols-2 { grid-template-columns:1fr; } .grid.cols-3 { grid-template-columns:1fr; }
+    @media (min-width:860px){ .grid.cols-2{grid-template-columns:1fr 1fr;} .grid.cols-3{grid-template-columns:repeat(3,1fr);} }
+    .role { border:1px solid var(--line); border-radius:12px; padding:14px; background:#fafcff; }
+    .role h4 { margin:0 0 4px; font-size:1rem; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .role .pill { font-size:.68rem; text-transform:uppercase; letter-spacing:.04em; background:var(--chip); color:var(--muted); border-radius:6px; padding:2px 6px; font-weight:700; }
+    .role .who { color:var(--muted); font-size:.88rem; }
+    table { width:100%; border-collapse:collapse; margin-top:8px; font-size:.9rem; }
+    th,td { padding:8px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; } th { background:#f8fafc; }
+    .flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; margin:10px 0; }
+    .flow .step { flex:1 1 120px; border:1px solid var(--line); border-radius:10px; padding:10px; background:#fff; text-align:center; }
+    .flow .step .t { font-weight:700; font-size:.9rem; } .flow .step .s { color:var(--muted); font-size:.78rem; }
+    .flow .arrow { align-self:center; color:var(--accent); font-weight:800; }
+    .chain { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:8px 0; }
+    .chain .node { border-radius:999px; padding:6px 12px; font-size:.84rem; font-weight:700; border:1px solid var(--line); background:#fff; }
+    .node.sup{background:#fff7ed;border-color:#fed7aa;} .node.sto{background:#eff6ff;border-color:#bfdbfe;}
+    .node.who{background:#f5f3ff;border-color:#ddd6fe;} .node.mkt{background:#dcfce7;border-color:#86efac;}
+    .node.cus{background:#fce7f3;border-color:#fbcfe8;} .chain .sep{color:var(--muted);font-weight:800;}
+    .pricebar { display:flex; flex-wrap:wrap; margin:12px 0; border-radius:10px; overflow:hidden; }
+    .pricebar div { padding:12px; color:#fff; flex:1 1 120px; text-align:center; }
+    .pricebar .p1{background:#f59e0b;} .pricebar .p2{background:#3b82f6;} .pricebar .p3{background:#8b5cf6;} .pricebar .p4{background:#16a34a;}
+    .pricebar .lbl{font-size:.72rem;opacity:.95;} .pricebar .val{font-size:1.25rem;font-weight:800;}
+    .steps-grid { display:grid; gap:12px; }
+    .stepitem { position:relative; padding-left:40px; }
+    .stepitem::before { content:attr(data-n); position:absolute; left:0; top:0; width:28px; height:28px; border-radius:50%; background:var(--accent); color:#fff; font-weight:800; display:grid; place-items:center; font-size:.85rem; }
+    .callout { border-left:4px solid var(--accent); background:#f0fdf4; padding:10px 14px; border-radius:8px; margin:10px 0; }
+    .callout.warn { border-color:var(--gold); background:#fffbeb; } .callout.info { border-color:var(--accent-2); background:#f0f9ff; }
+    .badge { display:inline-block; font-size:.72rem; font-weight:700; padding:2px 8px; border-radius:999px; }
+    .badge.g{background:#dcfce7;color:#166534;} .badge.b{background:#dbeafe;color:#1e40af;} .badge.p{background:#ede9fe;color:#5b21b6;} .badge.o{background:#ffedd5;color:#9a3412;}
+    .muted { color:var(--muted); } .small { font-size:.85rem; }
+    details { border:1px solid var(--line); border-radius:10px; background:#fafcff; padding:8px 12px; margin-top:8px; }
+    summary { cursor:pointer; font-weight:700; color:#1e3a8a; }
+    footer { text-align:center; color:var(--muted); font-size:.82rem; padding:10px 0 30px; }
+    .urlmap td:first-child { white-space:nowrap; } a { color:#14532d; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>🛒 How Lakrish Mart Works</h1>
+      <p>A plain-English explainer of the whole Django project — the roles, the supply chain, the money, and what every app does.</p>
+      <p class="small" style="opacity:.85">Internal codename <b>VyaparDock</b> · public brand <b>“Shop / LaKrish Mart”</b> · folder name <b>Cart</b>.</p>
+      <div class="tags">
+        <span class="tag">Django 4.2</span><span class="tag">13 apps</span>
+        <span class="tag">Distributor-centric</span><span class="tag">Multi-tier pricing</span>
+        <span class="tag">Single-role logins</span><span class="tag">Soft-delete only</span>
+      </div>
+    </div>
+  </header>
+  <nav class="toc">
+    <a href="#glance">At a glance</a><a href="#principle">Core principle</a><a href="#roles">Roles</a>
+    <a href="#supply">Supply chain &amp; pricing</a><a href="#apps">The 13 apps</a><a href="#data">Data model</a>
+    <a href="#order">Order lifecycle</a><a href="#money">Money &amp; settlements</a>
+    <a href="#rules">Cross-cutting rules</a><a href="#run">How to run</a>
+  </nav>
+  <div class="container">
+    <section class="card" id="glance">
+      <h2>1 · At a glance</h2>
+      <p class="lead">Lakrish Mart is a <b>distributor-based B2B2C e-commerce platform</b>. It is not one big shared marketplace — it is many independent storefronts, each curated by a distributor from suppliers they choose to work with.</p>
+      <div class="grid cols-2">
+        <div>
+          <h3>What it does</h3>
+          <ul>
+            <li><b>Suppliers</b> list products (with pack / variant sizes) and set a supplier price.</li>
+            <li>An optional <b>Stockist</b> adds processing charges and does physical picking &amp; stocking.</li>
+            <li>A wholesale <b>Distributor</b> supplies many <b>Marketplace</b> storefronts and earns a margin.</li>
+            <li>Each <b>Marketplace</b> sets its own selling price and serves its own customers.</li>
+            <li><b>Customers</b> browse, cart, order — and can also <b>rent</b> equipment from a real-money wallet.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Tech stack</h3>
+          <ul>
+            <li><b>Django 4.2</b> server-rendered templates + <b>Django REST Framework</b>.</li>
+            <li>Custom user model <code>accounts.User</code>.</li>
+            <li><b>SQLite</b> for dev (<code>db.sqlite3</code> / <code>db_demo.sqlite3</code>); <b>PostgreSQL</b> in prod.</li>
+            <li><b>django-axes</b> login rate-limiting, <b>WhiteNoise</b> static files, <b>Gunicorn</b> server.</li>
+            <li><b>Pillow</b> images, <b>openpyxl</b> Excel export/import, <b>python-dotenv</b> config.</li>
+            <li>A <b>mobile delivery API</b> (<code>/delivery/api/…</code>, token auth) for driver apps.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="callout info">
+        <b>Settings module:</b> <code>lakrish_mart</code> &nbsp;·&nbsp; <b>URL root:</b> <code>lakrish_mart/urls.py</code> mounts each app under its own prefix (see <a href="#apps">§5</a>). 13 apps are registered in <code>INSTALLED_APPS</code>.
+      </div>
+    </section>
+
+    <section class="card" id="principle">
+      <h2>2 · The core principle: everything is distributor-based</h2>
+      <p class="lead">Recorded in <code>DOMAIN_MODEL.md</code> and baked into the code and managers.</p>
+      <div class="grid cols-2">
+        <div>
+          <ul>
+            <li><b>Every storefront belongs to a distributor.</b> A distributor picks which <i>suppliers</i> to connect to and which <i>products</i> to list.</li>
+            <li>A product is only ever shown <b>inside a specific distributor's context</b> — never in a generic listing.</li>
+            <li>A shopper enters a distributor's context by <b>logging in</b> or following that distributor's <b>invite / store link</b>.</li>
+          </ul>
+        </div>
+        <div>
+          <div class="callout warn">
+            <b>Consequence for the public home page:</b> without a distributor context there are no products to show — so the logged-out home page does <b>not</b> show a product grid or a search bar. It just leads with <b>Login / Sign up</b>. Product browsing happens after login or inside a distributor store.
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+
+    <section class="card" id="roles">
+      <h2>3 · Roles — one account, exactly one role</h2>
+      <p class="lead">Multi-role has been removed. An account can hold <b>exactly one role</b> at a time (changed by admin / transactions management, never stacked). <b>Admin is not a customer</b> — it has no shopping surfaces.</p>
+      <p class="small muted">⚠️ Naming trap: internal <i>code</i> words differ from <i>UI labels</i> because of a mid-build rename. Both are shown below.</p>
+      <div class="grid cols-3">
+        <div class="role">
+          <h4>🅰️ Admin <span class="pill">code: admin</span></h4>
+          <div class="who">The platform owner / “docking station”. The sole admin. Grants roles, approves products, sets commission, oversees everything.</div>
+        </div>
+        <div class="role">
+          <h4>🏭 Supplier <span class="pill">code: supplier</span></h4>
+          <div class="who">Makes/owns goods. Lists products with multiple packs, sets supplier price, manages stock, sees restock requests &amp; payouts. <b>Granted by admin.</b></div>
+        </div>
+        <div class="role">
+          <h4>📦 Stockist <span class="pill">code: stockist</span></h4>
+          <div class="who">Optional processing / pick-pack layer. Defines <i>processing-charge stages</i>, holds inventory, picks from suppliers, fulfils restock &amp; procurement billing. <b>Granted by admin.</b></div>
+        </div>
+        <div class="role">
+          <h4>🚛 Distributor <span class="pill">code: wholesaler</span></h4>
+          <div class="who">The wholesale tier. Buys from one Stockist, supplies many Marketplace shops, earns a margin (per weight or per unit). Can create/reset its own shops. <b>Granted by admin.</b></div>
+        </div>
+        <div class="role">
+          <h4>🏪 Marketplace <span class="pill">code: distributor</span></h4>
+          <div class="who">The storefront (older UI label “Enterprise”). Owns a customer base; lists shared-catalog products <i>and</i> its own private products; sets selling prices; delivers; runs rewards &amp; rentals. <b>Granted by admin or created by a Distributor.</b></div>
+        </div>
+        <div class="role">
+          <h4>🛍️ Customer <span class="pill">code: customer</span></h4>
+          <div class="who"><b>Self-registers</b> (optionally with a distributor invite code). Browses, carts, orders, earns reward points, rents from a wallet. The only role with shopping surfaces.</div>
+        </div>
+      </div>
+      <div class="callout">
+
+    <section class="card" id="supply">
+      <h2>4 · The supply chain &amp; how pricing is built up</h2>
+      <p class="lead">Goods flow <b>down</b> the chain; money (margins) is added at each step. The final number a customer pays is the sum of everyone's markup, floored at cost.</p>
+
+      <h3>The five links</h3>
+      <div class="chain">
+        <span class="node sup">🏭 Supplier</span><span class="sep">→</span>
+        <span class="node sto">📦 Stockist</span><span class="sep">→</span>
+        <span class="node who">🚛 Distributor</span><span class="sep">→</span>
+        <span class="node mkt">🏪 Marketplace</span><span class="sep">→</span>
+        <span class="node cus">🛍️ Customer</span>
+      </div>
+
+      <h3>How the price grows (worked example from the price-flow test)</h3>
+      <p class="small muted">Supplier ₹200 → +Stockist charges → +Distributor margin → Marketplace sells. (₹/kg Distributor margin; Marketplace clamps between its cost floor and MRP.)</p>
+      <div class="pricebar money">
+        <div class="p1"><div class="lbl">Supplier price</div><div class="val">₹200</div></div>
+        <div class="p2"><div class="lbl">+ Stockist charges<br>(₹15 fixed + 10%)</div><div class="val">₹235</div></div>
+        <div class="p3"><div class="lbl">+ Distributor margin<br>(₹8 / kg)</div><div class="val">₹243</div></div>
+        <div class="p4"><div class="lbl">= Marketplace cost (floor)</div><div class="val">₹243</div></div>
+      </div>
+      <p>The <b>Marketplace</b> then adds <b>its own margin</b> and sells — e.g. it chooses <b>₹250</b> (margin ₹7). The customer's price is clamped: never below the <b>cost floor</b>, and never above the product's <b>MRP</b> if one is set.</p>
+
+      <h3>The rules that shape each step</h3>
+      <table>
+        <tr><th>Layer</th><th>Who controls it</th><th>How</th></tr>
+        <tr>
+          <td><b>Stockist charges</b></td>
+          <td>Stockist</td>
+          <td>Named <i>stages</i> (Shipping, Packing, Cold Storage…) with fixed ₹, % of price, or ₹/kg. Priority per stage: <b>product &gt; supplier &gt; global</b>.</td>
+        </tr>
+        <tr>
+          <td><b>Distributor margin</b></td>
+          <td>Wholesaler (Distributor)</td>
+          <td>Charged by <b>weight (₹/kg)</b> or <b>quantity (₹/unit)</b> — never a flat %. Applied on top of the stockist cost.</td>
+        </tr>
+        <tr>
+          <td><b>Marketplace margin</b></td>
+          <td>Marketplace shop</td>
+          <td>Per-product or a global %/₹-per-unit “Global Pricing”. Clamped to <code>min(sell, MRP)</code> then <code>max(sell, cost floor)</code>.</td>
+        </tr>
+      </table>
+
+      <div class="callout warn">
+        <b>Global Pricing gate:</b> a Marketplace's pricing screens are <b>locked</b> until it configures Global Pricing at least once — this guarantees a sane default margin exists before products go live.
+      </div>
+
+      <h3>Special cases</h3>
+      <ul>
+        <li><b>Direct-supply products</b> (e.g. eggs) skip the stockist <i>and</i> the wholesale Distributor: supplier → Marketplace. Neither earns a commission; cost = supplier price.</li>
+        <li><b>Marketplace own-products</b> have no supply chain behind them — the price the shop types <b>is</b> the customer price.</li>
+        <li><b>Loose stock</b>: a Distributor can hold bulk grams that any pack size draws from (e.g. 5000 g → 10×500 g).</li>
+      </ul>
+      <p class="small muted">Core function: <code>stockist.models.get_stockist_price(product, variant, stockist, enterprise=None)</code> returns the cost plus a full breakdown of every charge/margin.</p>
+    </section>
+
+        <b>Login routing</b> (each role lands on its own dashboard):
+        <span class="mono">admin → /admin-panel/</span> ·
+        <span class="mono">supplier → /supplier/</span> ·
+        <span class="mono">stockist → /stockist/</span> ·
+        <span class="mono">wholesaler → /wholesale/</span> ·
+        <span class="mono">distributor → /distributor/</span> ·
+        <span class="mono">customer → /</span> (home)
+      </div>
+      <p class="small muted"><b>Self-registration vs. granted:</b> only <b>Customer</b> self-registers. Supplier / Stockist / Distributor / Marketplace are created by the admin (or, for shops, by their parent Distributor). See <code>accounts.User.ROLE_CHOICES</code>.</p>
+    </section>
+
+
+    <section class="card" id="apps">
+      <h2>5 · The 13 apps — what each one does</h2>
+      <p class="lead">Each app is mounted under its own URL prefix in <code>lakrish_mart/urls.py</code>. They are designed to be self-contained modules (the codebase is “API-first internally” so pieces could later split into services).</p>
+      <table class="urlmap">
+        <tr><th>App</th><th>URL prefix</th><th>Responsibility (key screens)</th></tr>
+        <tr><td><b>accounts</b></td><td><code>/accounts/</code></td><td>Identity &amp; roles. Login/logout, customer register, profile, addresses, rewards, change/forgot password, preferences &amp; dark mode, role context processor. Custom <code>User</code> model.</td></tr>
+        <tr><td><b>products</b></td><td><code>/</code> (root)</td><td>Public &amp; customer surfaces: home, distributor storefront (<code>/store/&lt;invite_code&gt;/</code>), product list &amp; detail, search autocomplete, reviews, wishlist, join-by-invite. <code>Category</code>, <code>Product</code>, <code>ProductVariant</code>.</td></tr>
+        <tr><td><b>suppliers</b></td><td><code>/supplier/</code></td><td>Supplier console: dashboard, add/edit products &amp; packs, stock, bulk upload, price history, payout history, payments center, storefront, restock requests, procurement.</td></tr>
+        <tr><td><b>stockist</b></td><td><code>/stockist/</code></td><td>Processing layer: inventory, processing-charge stages &amp; overview, restock requests, orders, distributor restock, direct-supply, procurement billing (invoices/payments).</td></tr>
+        <tr><td><b>distributors</b></td><td><code>/distributor/</code> + <code>/wholesale/</code></td><td>Marketplace shop: catalogue &amp; pricing, orders, customers, earnings, settings, delivery zones/slots, rewards, my-stock, restock, own-products (<code>/my-products/</code>). Wholesale Distributor dashboard lives under <code>/wholesale/</code>.</td></tr>
+        <tr><td><b>cart</b></td><td><code>/cart/</code></td><td>Customer cart: add/update/remove, live floor-price calculation, offcanvas + JSON APIs for the mobile-style UI.</td></tr>
+        <tr><td><b>orders</b></td><td><code>/orders/</code></td><td>Checkout, “my orders”, order detail, reorder, edit. Owns the <code>Order</code> status state machine.</td></tr>
+        <tr><td><b>payments</b></td><td><code>/payments/</code></td><td>Commission rules (overall/supplier/product), settlement centre, and automatic <code>RoleSettlement</code> money-split after delivery.</td></tr>
+        <tr><td><b>admin_panel</b></td><td><code>/admin-panel/</code></td><td>The admin console: users, suppliers, stockists, distributors, wholesale distributors, product approval, stock, orders (read-only), categories, commission, reports, support tickets, price validator, impersonation.</td></tr>
+        <tr><td><b>delivery</b></td><td><code>/delivery/</code></td><td>Delivery management (mark out-for-delivery / delivered) <b>plus a mobile-driver API</b> (<code>/delivery/api/login|orders|…</code>, token auth).</td></tr>
+        <tr><td><b>support</b></td><td><code>/support/</code></td><td>Support tickets: submit, “my tickets”, detail; admin responds from the admin panel.</td></tr>
+        <tr><td><b>transactions</b></td><td><code>/transactions/</code></td><td>Audit trail &amp; lifecycle dashboards for products, roles, and orders (activate/deactivate/suspend/restore, role add/remove, order confirm/cancel).</td></tr>
+        <tr><td><b>rentals</b></td><td><code>/rentals/</code></td><td>The RENT feature: rentable equipment inside a shop, a real-money <b>Wallet</b>, bookings, block-days, owner approvals — all behind one master switch.</td></tr>
+      </table>
+    </section>
+
+
+    <section class="card" id="data">
+      <h2>6 · The data model — the tables that matter</h2>
+      <p class="lead">Everything hangs off a few core tables. Two design tricks do a lot of the isolation work: <b>custom managers</b> and a <b>no-hard-delete</b> policy.</p>
+
+      <h3>People</h3>
+      <table>
+        <tr><th>Model</th><th>What it is</th></tr>
+        <tr><td><code>accounts.User</code></td><td>The custom auth user. One <code>role</code> field. Soft-delete (<code>is_deleted</code>). Default manager <code>objects</code> hides deleted; <code>all_objects</code> sees them.</td></tr>
+        <tr><td><code>suppliers.Supplier</code></td><td>A supplier's company profile (1-to-1 with User). Also holds one hidden <b>house account</b> per Marketplace for its own products.</td></tr>
+        <tr><td><code>stockist.Stockist</code></td><td>Stockist profile + auto-restock settings.</td></tr>
+        <tr><td><code>distributors.Wholesaler</code></td><td>The wholesale “Distributor” tier. One Wholesaler → many Marketplace shops. Has a margin mode/value and its one <code>stockist</code>.</td></tr>
+        <tr><td><code>distributors.Distributor</code></td><td>The Marketplace shop (code name is confusingly “Distributor”). Holds pricing, delivery charge, <code>invite_code</code>, theme, rewards, auto-restock, and a FK to its <code>wholesaler</code>.</td></tr>
+        <tr><td><code>accounts.CustomerAddress</code></td><td>Customer delivery addresses (Home/Work/Other).</td></tr>
+      </table>
+
+      <h3>Catalogue</h3>
+      <table>
+        <tr><th>Model</th><th>What it is</th></tr>
+        <tr><td><code>products.Category</code></td><td>Admin-managed categories with a 2-char SKU code.</td></tr>
+        <tr><td><code>products.Product</code></td><td>A product. <code>owner_enterprise</code> FK makes it a <b>shop-private own-product</b> (null = shared catalogue). Default manager hides owned products from the whole shared chain.</td></tr>
+        <tr><td><code>products.ProductVariant</code></td><td>A <b>pack/size</b> (e.g. Turmeric 100 g) with weight, MRP / suggested price, supplier price, and per-distributor prices.</td></tr>
+        <tr><td><code>distributors.DistributorVariantPrice</code></td><td>The Marketplace's own selling price for a pack (with a stale flag when the supplier price changes).</td></tr>
+      </table>
+
+      <h3>Stock</h3>
+      <table>
+        <tr><th>Model</th><th>What it is</th></tr>
+        <tr><td><code>stockist.StockistInventory</code></td><td>Units the stockist holds per pack (+ per-item auto-restock opt-out).</td></tr>
+        <tr><td><code>distributors.DistributorStock</code> + <code>…Batch</code></td><td>Marketplace stock held in costed <b>batches</b>; consumed <b>FIFO</b> (oldest first) at checkout.</td></tr>
+        <tr><td><code>distributors.DistributorLooseStock</code></td><td>Bulk grams any pack size can draw from.</td></tr>
+        <tr><td><code>…RestockRequest</code> (3 tiers)</td><td>Stockist / Distributor / Marketplace restock requests that move stock <b>only on delivery</b>.</td></tr>
+      </table>
+
+      <h3>Commerce</h3>
+      <table>
+        <tr><th>Model</th><th>What it is</th></tr>
+        <tr><td><code>orders.Order</code> + <code>OrderItem</code></td><td>The order. Each item stores the customer price, base (stockist) price, and frozen supplier price so margins stay auditable.</td></tr>
+        <tr><td><code>payments.CommissionRule</code></td><td>Commission: overall / supplier / product (priority in that order).</td></tr>
+        <tr><td><code>payments.RoleSettlement</code></td><td>Auto-created money owed per hop (shop→stockist, stockist→supplier) after delivery.</td></tr>
+        <tr><td><code>rentals.Wallet</code> + <code>…Transaction</code></td><td>A real-money balance per (customer, shop), loaded with cash and spent on rent. <b>Separate from reward points.</b></td></tr>
+        <tr><td><code>distributors.RewardPoints</code> / <code>…Config</code></td><td>The existing loyalty-points system (1 pt = ₹1), earned after orders and adjusted manually.</td></tr>
+      </table>
+    </section>
+
+
+    <section class="card" id="order">
+      <h2>7 · The order lifecycle</h2>
+      <p class="lead">An order moves through a strict <b>state machine</b> (<code>Order.VALID_TRANSITIONS</code>) — you can't jump states; any state can always go to <b>cancelled</b>.</p>
+
+      <h3>Two fulfilment paths (chosen at checkout)</h3>
+      <div class="grid cols-2">
+        <div>
+          <div class="callout info"><span class="badge b">From Supplier</span> — item not in local stock.</div>
+          <div class="flow">
+            <div class="step"><div class="t">Pending</div><div class="s">placed</div></div>
+            <span class="arrow">→</span>
+            <div class="step"><div class="t">Confirmed</div><div class="s">accepted</div></div>
+            <span class="arrow">→</span>
+            <div class="step"><div class="t">Stockist picked</div><div class="s">from supplier</div></div>
+          </div>
+          <div class="flow">
+            <div class="step"><div class="t">At Distributor</div><div class="s">arrived</div></div>
+            <span class="arrow">→</span>
+            <div class="step"><div class="t">Out for delivery</div></div>
+            <span class="arrow">→</span>
+            <div class="step"><div class="t">Delivered</div></div>
+          </div>
+        </div>
+        <div>
+          <div class="callout"><span class="badge g">From Distributor Stock</span> — express, already local.</div>
+          <div class="flow">
+            <div class="step"><div class="t">Pending</div></div>
+            <span class="arrow">→</span>
+            <div class="step"><div class="t">At Distributor</div><div class="s">instant</div></div>
+            <span class="arrow">→</span>
+            <div class="step"><div class="t">Out for delivery</div></div>
+            <span class="arrow">→</span>
+            <div class="step"><div class="t">Delivered</div></div>
+          </div>
+          <p class="small muted">Skipped states because stock is on hand — the code jumps straight to <code>at_distributor</code>.</p>
+        </div>
+      </div>
+
+      <h3>What happens at checkout</h3>
+      <div class="steps-grid">
+        <div class="stepitem" data-n="1"><b>Price is locked.</b> Each item's price is <code>max(distributor_price, cost_floor)</code> so the shop never sells below its true cost.</div>
+        <div class="stepitem" data-n="2"><b>Stock is decided.</b> If everything is in local (distributor) stock it becomes an <i>express</i> order; if only some is, and the shop allows it, it ships partially and back-orders the rest.</div>
+        <div class="stepitem" data-n="3"><b>FIFO consumption.</b> Available items draw from the shop's costed batches (oldest first).</div>
+        <div class="stepitem" data-n="4"><b>Rewards &amp; wallet.</b> Reward points may be redeemed; on delivery, points are credited and <b>auto-restock</b> is checked.</div>
+      </div>
+      <p class="small muted"><b>Partial shipment:</b> each <code>OrderItem</code> has its own <code>fulfillment_status</code> (pending / shipped / backordered / delivered / cancelled), and the order can be flagged <code>is_partial_shipment</code>.</p>
+    </section>
+
+    <section class="card" id="money">
+      <h2>8 · Money: commissions &amp; automatic settlements</h2>
+      <p class="lead">When an order is delivered, the platform works out exactly who is owed what and writes <code>RoleSettlement</code> rows. The math is derived from the frozen prices stored on each order line.</p>
+
+      <h3>Where the money comes from</h3>
+      <table>
+        <tr><th>Margin</th><th>Formula (per line)</th><th>Earner</th></tr>
+        <tr><td>Supplier price</td><td>frozen <code>supplier_price</code> × qty</td><td>Supplier</td></tr>
+        <tr><td>Stockist charge</td><td><code>base_price − supplier_price</code> × qty</td><td>Stockist</td></tr>
+        <tr><td>Distributor margin</td><td>included in the base/floor cost</td><td>Wholesale Distributor</td></tr>
+        <tr><td>Marketplace margin</td><td><code>customer_price − base_price</code> × qty</td><td>Marketplace shop</td></tr>
+      </table>
+
+      <h3>Commission rules</h3>
+      <ul>
+        <li>Rules are evaluated most-specific-first: <b>product → supplier → overall</b>.</li>
+        <li>Can be a <b>%</b> (overall/supplier/product) or a <b>fixed ₹</b> (by price or by weight).</li>
+        <li><b>Direct-supply</b> and <b>shop own-products</b> earn <b>zero</b> commission (no stockist / distributor in the chain).</li>
+      </ul>
+
+      <h3>Two kinds of balances — do not confuse them</h3>
+      <div class="grid cols-2">
+        <div class="role"><h4>🎁 Reward points <span class="pill">loyalty</span></h4><div class="who">Earned after orders + manual adjustments. 1 pt = ₹1. Used as a discount. Lives in the <code>distributors</code> app.</div></div>
+        <div class="role"><h4>💳 Wallet <span class="pill">real money</span></h4><div class="who">Loaded with <b>cash</b> and spent on <b>rent</b>. A money ledger with credits/debits. Lives in the <code>rentals</code> app. The two never mix.</div></div>
+      </div>
+    </section>
+
+
+    <section class="card" id="rules">
+      <h2>9 · Cross-cutting rules that show up everywhere</h2>
+      <div class="grid cols-2">
+        <div>
+          <h3>No hard deletes</h3>
+          <p>“Delete” is always a <b>soft delete</b> — records stay with <code>is_deleted</code> / <code>deleted_at</code> and are admin-restorable. Default managers hide deleted rows.</p>
+          <h3>Single-role logins</h3>
+          <p>One account = one role. No role switcher. Admin is not a customer and never sees shopping surfaces.</p>
+          <h3>Role-gated views</h3>
+          <p>Decorators like <code>@role_required(...)</code> and <code>customer_only</code> guard every page; an audit crawl confirmed 0 authorization bypasses across ~140 gated URLs.</p>
+        </div>
+        <div>
+          <h3>Isolation by managers</h3>
+          <p>Shop own-products are hidden from suppliers, stockists, other shops, the storefront, and admin via <code>Product.objects</code> filtering — with <code>all_objects</code> as the deliberate escape hatch.</p>
+          <h3>Auto-restock (safe by design)</h3>
+          <p>When stock hits a threshold the system files a <b>restock request</b> — it never adds stock directly. A per-item opt-out and a price cap prevent auto-ordering expensive items.</p>
+          <h3>Rentals master switch</h3>
+          <p>The entire rent feature is gated by one admin flag, <code>SiteSettings.rentals_enabled</code>. Off → every rent page redirects home.</p>
+        </div>
+      </div>
+      <div class="callout info small">
+        Also standard: CSRF on every form, <b>django-axes</b> locks a login after 5 failed attempts for 15 minutes, and production turns on HSTS / secure cookies / SSL redirect.
+      </div>
+    </section>
+
+    <section class="card" id="run">
+      <h2>10 · How to run it locally</h2>
+      <p class="lead">The project ships with an isolated virtual env (managed by <code>uv</code>) and an SQLite dev database.</p>
+      <table>
+        <tr><th>Step</th><th>Command</th></tr>
+        <tr><td>Create env</td><td><code>uv venv --python 3.11 --seed venv</code></td></tr>
+        <tr><td>Install deps</td><td><code>venv/Scripts/python.exe -m pip install -r requirements.txt</code></td></tr>
+        <tr><td>Create DB</td><td><code>… python manage.py migrate</code></td></tr>
+        <tr><td>Run server</td><td><code>… python manage.py runserver 127.0.0.1:8000</code></td></tr>
+      </table>
+      <p class="small muted">Config comes from a <code>.env</code> file (copy <code>.env.example</code>): <code>SECRET_KEY</code>, <code>DEBUG</code>, <code>ALLOWED_HOSTS</code>, optional <code>DATABASE_URL</code> (PostgreSQL). A <b>demo mode</b> uses a separate <code>db_demo.sqlite3</code> and blocks real transaction writes.</p>
+      <div class="callout warn small"><b>Docs that back this up:</b> <code>PROJECT_NOTES.md</code> (decisions &amp; build log), <code>DOMAIN_MODEL.md</code> (the distributor rule), and the live <code>/runbook/</code> page generated from the code.</div>
+    </section>
+
+    <footer>Generated as a project explainer · one self-contained HTML file · no external assets.</footer>
+  </div>
+</body>
+</html>
+

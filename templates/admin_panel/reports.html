@@ -1,0 +1,418 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Reports{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block active_nav %}reports{% endblock %}
+{% block content %}
+
+<!-- Date Range Filter & Export Options -->
+<div class="card border-0 shadow-sm mb-3 p-3">
+  <div class="row align-items-end">
+    <div class="col-md-8">
+      <form method="get" class="d-flex gap-2 flex-wrap align-items-end">
+        <div>
+          <label class="small fw-semibold mb-1">From Date</label>
+          <input type="date" name="date_from" class="form-control form-control-sm" value="{{ date_from }}">
+        </div>
+        <div>
+          <label class="small fw-semibold mb-1">To Date</label>
+          <input type="date" name="date_to" class="form-control form-control-sm" value="{{ date_to }}">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-funnel me-1"></i>Filter</button>
+        {% if date_from or date_to %}
+        <a href="{% url 'admin_panel:reports' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+        {% endif %}
+      </form>
+    </div>
+    <div class="col-md-4 text-md-end mt-2 mt-md-0">
+      <div class="dropdown d-inline-block">
+        <button class="btn btn-success btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+          <i class="bi bi-download me-1"></i>Export Reports
+        </button>
+        <ul class="dropdown-menu">
+          <li><h6 class="dropdown-header">Excel Format (.xlsx)</h6></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=summary&fmt=xlsx{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Sales Summary
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=ledger&fmt=xlsx{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Role Ledger Report
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=products&fmt=xlsx">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Top Products
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=customers&fmt=xlsx">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Top Customers
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=distributors&fmt=xlsx{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Marketplace Sales
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=inventory&fmt=xlsx">
+            <i class="bi bi-file-earmark-spreadsheet me-2"></i>Inventory Report
+          </a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><h6 class="dropdown-header">CSV Format (.csv)</h6></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=summary&fmt=csv{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+            <i class="bi bi-filetype-csv me-2"></i>Sales Summary
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=ledger&fmt=csv{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+            <i class="bi bi-filetype-csv me-2"></i>Role Ledger Report
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=products&fmt=csv">
+            <i class="bi bi-filetype-csv me-2"></i>Top Products
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=customers&fmt=csv">
+            <i class="bi bi-filetype-csv me-2"></i>Top Customers
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=distributors&fmt=csv{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">
+            <i class="bi bi-filetype-csv me-2"></i>Marketplace Sales
+          </a></li>
+          <li><a class="dropdown-item" href="{% url 'admin_panel:export_reports' %}?type=inventory&fmt=csv">
+            <i class="bi bi-filetype-csv me-2"></i>Inventory Report
+          </a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Key Metrics -->
+<div class="row mb-3">
+  <div class="col-md-3 col-6 mb-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-muted small mb-1">Total Orders</div>
+            <div class="h4 mb-0 fw-bold">{{ total_orders }}</div>
+          </div>
+          <div class="bg-primary bg-opacity-10 p-2 rounded">
+            <i class="bi bi-receipt text-primary fs-4"></i>
+          </div>
+        </div>
+        {% if pending_orders > 0 %}
+        <div class="mt-2 small text-warning">
+          <i class="bi bi-clock me-1"></i>{{ pending_orders }} pending
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6 mb-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-muted small mb-1">Total Revenue</div>
+            <div class="h4 mb-0 fw-bold">₹{{ total_revenue|floatformat:2 }}</div>
+          </div>
+          <div class="bg-success bg-opacity-10 p-2 rounded">
+            <i class="bi bi-currency-rupee text-success fs-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 small text-muted">
+          Avg: ₹{{ avg_order_value|floatformat:2 }}
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6 mb-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-muted small mb-1">Total Customers</div>
+            <div class="h4 mb-0 fw-bold">{{ total_customers }}</div>
+          </div>
+          <div class="bg-info bg-opacity-10 p-2 rounded">
+            <i class="bi bi-people text-info fs-4"></i>
+          </div>
+        </div>
+        <div class="mt-2 small text-muted">
+          {{ customers_with_orders }} with orders
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-3 col-6 mb-3">
+    <div class="card border-0 shadow-sm h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="text-muted small mb-1">Products</div>
+            <div class="h4 mb-0 fw-bold">{{ total_products }}</div>
+          </div>
+          <div class="bg-warning bg-opacity-10 p-2 rounded">
+            <i class="bi bi-box-seam text-warning fs-4"></i>
+          </div>
+        </div>
+        {% if low_stock_count > 0 or out_of_stock_count > 0 %}
+        <div class="mt-2 small">
+          {% if out_of_stock_count > 0 %}<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>{{ out_of_stock_count }} out</span>{% endif %}
+          {% if low_stock_count > 0 %}<span class="text-warning ms-2"><i class="bi bi-exclamation-triangle me-1"></i>{{ low_stock_count }} low</span>{% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Revenue Chart -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-graph-up me-2"></i>Revenue Trend (Last 30 Days)
+  </div>
+  <div class="card-body">
+    <canvas id="revenueChart" height="80"></canvas>
+  </div>
+</div>
+
+<!-- Two Column Layout -->
+<div class="row">
+  <!-- Left Column -->
+  <div class="col-lg-6">
+    <!-- Role Ledger Summary -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-cash-stack me-2"></i>Role Ledger Summary</span>
+        <a href="{% url 'admin_panel:export_reports' %}?type=ledger&fmt=xlsx{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-sm btn-outline-success" title="Export to Excel">
+          <i class="bi bi-download"></i>
+        </a>
+      </div>
+      <div class="table-wrap">
+        <table class="table mb-0">
+          <thead class="table-light">
+            <tr><th>Role</th><th>Party</th><th>Entry</th><th>Status</th><th class="text-end">Total</th></tr>
+          </thead>
+          <tbody>
+            {% for row in role_ledger_summary %}
+            <tr>
+              <td>{{ row.party_role|title }}</td>
+              <td>{{ row.distributor__company_name|default:row.stockist__company_name|default:'Customer' }}</td>
+              <td>{{ row.entry_type|title }}</td>
+              <td>{{ row.status|title }}</td>
+              <td class="text-end fw-semibold">₹{{ row.total|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sales by Status -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header fw-semibold">
+        <i class="bi bi-pie-chart me-2"></i>Sales by Status
+      </div>
+      <div class="table-wrap">
+        <table class="table mb-0">
+          <thead class="table-light">
+            <tr><th>Status</th><th class="text-end">Orders</th><th class="text-end">Total</th></tr>
+          </thead>
+          <tbody>
+            {% for row in sales_by_status %}
+            <tr>
+              <td>
+                <span class="badge {% if row.status == 'delivered' %}bg-success{% elif row.status == 'pending' %}bg-warning text-dark{% elif row.status == 'cancelled' %}bg-danger{% else %}bg-secondary{% endif %}">
+                  {{ row.status|title }}
+                </span>
+              </td>
+              <td class="text-end">{{ row.count }}</td>
+              <td class="text-end fw-semibold">₹{{ row.total|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Top Customers -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-star me-2"></i>Top Customers</span>
+        <a href="{% url 'admin_panel:export_reports' %}?type=customers&fmt=xlsx" class="btn btn-sm btn-outline-success" title="Export to Excel">
+          <i class="bi bi-download"></i>
+        </a>
+      </div>
+      <div class="table-wrap">
+        <table class="table mb-0">
+          <thead class="table-light">
+            <tr><th>Customer</th><th class="text-end">Orders</th><th class="text-end">Total Spent</th></tr>
+          </thead>
+          <tbody>
+            {% for c in top_customers %}
+            <tr>
+              <td>
+                <div class="fw-semibold small">{{ c.get_full_name|default:c.username }}</div>
+                <div class="text-muted small">{{ c.email }}</div>
+              </td>
+              <td class="text-end">{{ c.order_count }}</td>
+              <td class="text-end fw-semibold">₹{{ c.total_spent|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right Column -->
+  <div class="col-lg-6">
+    <!-- Top Products -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-trophy me-2"></i>Top Products</span>
+        <a href="{% url 'admin_panel:export_reports' %}?type=products&fmt=xlsx" class="btn btn-sm btn-outline-success" title="Export to Excel">
+          <i class="bi bi-download"></i>
+        </a>
+      </div>
+      <div class="table-wrap">
+        <table class="table mb-0">
+          <thead class="table-light">
+            <tr><th>Product</th><th class="text-end">Orders</th></tr>
+          </thead>
+          <tbody>
+            {% for p in top_products %}
+            <tr>
+              <td>
+                <div class="fw-semibold small">{{ p.name }}</div>
+                <div class="text-muted small">{{ p.supplier.company_name }}</div>
+              </td>
+              <td class="text-end">
+                <span class="badge bg-primary">{{ p.order_count }}</span>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="2" class="text-center text-muted py-3">No data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Sales by Marketplace -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold"><i class="bi bi-truck me-2"></i>Sales by Marketplace</span>
+        <a href="{% url 'admin_panel:export_reports' %}?type=distributors&fmt=xlsx{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" class="btn btn-sm btn-outline-success" title="Export to Excel">
+          <i class="bi bi-download"></i>
+        </a>
+      </div>
+      <div class="table-wrap">
+        <table class="table mb-0">
+          <thead class="table-light">
+            <tr><th>Marketplace</th><th class="text-end">Orders</th><th class="text-end">Total</th></tr>
+          </thead>
+          <tbody>
+            {% for row in sales_by_distributor %}
+            <tr>
+              <td>{{ row.distributor__company_name|default:"Not Assigned" }}</td>
+              <td class="text-end">{{ row.count }}</td>
+              <td class="text-end fw-semibold">₹{{ row.total|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center text-muted py-3">No data yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const ctx = document.getElementById('revenueChart');
+  if (ctx) {
+    const labels = {{ chart_labels|safe }};
+    const revenueData = {{ chart_revenue|safe }};
+    const ordersData = {{ chart_orders|safe }};
+    
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Revenue (₹)',
+          data: revenueData,
+          borderColor: 'rgb(75, 192, 192)',
+          backgroundColor: 'rgba(75, 192, 192, 0.1)',
+          tension: 0.3,
+          yAxisID: 'y'
+        }, {
+          label: 'Orders',
+          data: ordersData,
+          borderColor: 'rgb(255, 99, 132)',
+          backgroundColor: 'rgba(255, 99, 132, 0.1)',
+          tension: 0.3,
+          yAxisID: 'y1'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top'
+          },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                let label = context.dataset.label || '';
+                if (label) {
+                  label += ': ';
+                }
+                if (context.parsed.y !== null) {
+                  if (context.datasetIndex === 0) {
+                    label += '₹' + context.parsed.y.toFixed(2);
+                  } else {
+                    label += context.parsed.y;
+                  }
+                }
+                return label;
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            title: {
+              display: true,
+              text: 'Revenue (₹)'
+            }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            title: {
+              display: true,
+              text: 'Orders'
+            },
+            grid: {
+              drawOnChartArea: false,
+            }
+          }
+        }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

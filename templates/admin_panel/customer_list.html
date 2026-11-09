@@ -1,0 +1,253 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Customer Management{% endblock %}
+{% block page_title %}{% if show_deleted %}Deleted Customers{% else %}Customer Management{% endif %}{% endblock %}
+{% block active_nav %}customer_list{% endblock %}
+{% block content %}
+
+<!-- Tab bar -->
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  <a href="{% url 'admin_panel:customer_list' %}" class="btn btn-sm {% if not show_deleted and not unlinked and not suspended_dist %}btn-success{% else %}btn-outline-secondary{% endif %}">
+    <i class="bi bi-people me-1"></i>Active Customers
+  </a>
+  <a href="{% url 'admin_panel:customer_list' %}?unlinked=1" class="btn btn-sm {% if unlinked %}btn-warning{% else %}btn-outline-warning{% endif %}">
+    <i class="bi bi-person-x me-1"></i>No Marketplace
+    {% if unlinked_count %}<span class="badge bg-warning text-dark ms-1">{{ unlinked_count }}</span>{% endif %}
+  </a>
+  <a href="{% url 'admin_panel:customer_list' %}?suspended_dist=1" class="btn btn-sm {% if suspended_dist %}btn-danger{% else %}btn-outline-danger{% endif %}">
+    <i class="bi bi-pause-circle me-1"></i>Suspended Marketplace
+    {% if suspended_dist_count %}<span class="badge bg-danger ms-1">{{ suspended_dist_count }}</span>{% endif %}
+  </a>
+  <a href="{% url 'admin_panel:customer_list' %}?deleted=1" class="btn btn-sm {% if show_deleted %}btn-danger{% else %}btn-outline-danger{% endif %}">
+    <i class="bi bi-trash me-1"></i>Deleted Customers
+    {% if deleted_count %}<span class="badge bg-danger ms-1">{{ deleted_count }}</span>{% endif %}
+  </a>
+</div>
+
+<!-- Filter bar -->
+{% if not show_deleted %}
+<div class="card border-0 shadow-sm p-3 mb-3">
+  <form method="get" id="filterForm" class="d-flex flex-wrap gap-2 align-items-center">
+    {% if unlinked %}<input type="hidden" name="unlinked" value="1">{% endif %}
+    {% if suspended_dist %}<input type="hidden" name="suspended_dist" value="1">{% endif %}
+    <input type="text" name="q" class="form-control form-control-sm" style="max-width:220px"
+           placeholder="Search username / name / email" value="{{ search }}">
+    <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-search me-1"></i>Search</button>
+
+    <!-- Chain filters: Stockist → Distributor → Marketplace -->
+    <select name="stockist" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()" title="Filter by Stockist">
+      <option value="">All Stockists</option>
+      {% for s in stockists_f %}<option value="{{ s.pk }}" {% if f_stockist == s.pk|stringformat:'s' %}selected{% endif %}>{{ s.company_name }}</option>{% endfor %}
+    </select>
+    <select name="distributor" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()" title="Filter by Distributor">
+      <option value="">All Distributors</option>
+      {% for w in wholesalers_f %}<option value="{{ w.pk }}" {% if f_distributor == w.pk|stringformat:'s' %}selected{% endif %}>{{ w.company_name }}</option>{% endfor %}
+    </select>
+    <select name="marketplace" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()" title="Filter by Marketplace">
+      <option value="">All Marketplaces</option>
+      {% for m in marketplaces_f %}<option value="{{ m.pk }}" {% if f_marketplace == m.pk|stringformat:'s' %}selected{% endif %}>{{ m.company_name }}</option>{% endfor %}
+    </select>
+
+    {% if search or f_marketplace or f_distributor or f_stockist %}
+    <a href="{% url 'admin_panel:customer_list' %}{% if unlinked %}?unlinked=1{% elif suspended_dist %}?suspended_dist=1{% endif %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-x me-1"></i>Clear</a>
+    {% endif %}
+    <span class="text-muted small ms-auto">{{ customers|length }} customer{{ customers|length|pluralize }}</span>
+    {% include 'partials/column_toggle.html' with table_id="customerTable" count=customers|length %}
+  </form>
+</div>
+{% endif %}
+
+<!-- Desktop table -->
+<div class="card border-0 shadow-sm d-none d-md-block">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0" id="customerTable">
+      <thead class="table-light">
+        <tr>
+          <th data-col="username">{% include 'partials/sort_header.html' with field="username" label="Username" current_sort=sort %}</th>
+          <th data-col="name">{% include 'partials/sort_header.html' with field="name" label="Name" current_sort=sort %}</th>
+          <th data-col="distributor">Marketplace</th>
+          <th data-col="phone">Phone</th>
+          <th data-col="status">Status</th>
+          {% if show_deleted %}<th data-col="deleted_at">Deleted At</th><th data-col="deleted_by">Deleted By</th>{% else %}<th data-col="joined">{% include 'partials/sort_header.html' with field="date_joined" label="Joined" current_sort=sort %}</th>{% endif %}
+          <th data-col="actions">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for customer in customers %}
+        <tr class="{% if not customer.is_active %}table-secondary{% endif %}">
+          <td data-col="username" class="fw-semibold">{{ customer.username }}</td>
+          <td data-col="name">{{ customer.get_full_name|default:"—" }}</td>
+          <td data-col="distributor" class="small">
+            {% if customer.distributor %}
+              <i class="bi bi-truck text-muted me-1"></i>{{ customer.distributor.company_name }}
+              {% if customer.distributor.status == 'suspended' %}
+                <span class="badge bg-danger ms-1" title="Marketplace is suspended — customer cannot shop">Suspended</span>
+              {% endif %}
+            {% else %}
+              <form method="post" class="d-inline-block" style="min-width: 180px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="assign_distributor">
+                <input type="hidden" name="user_id" value="{{ customer.pk }}">
+                <select name="distributor_id" class="form-select form-select-sm" 
+                        onchange="this.form.submit()" 
+                        title="Assign distributor to {{ customer.username }}">
+                  <option value="" class="text-warning">⚠ Not Assigned</option>
+                  {% for d in distributors %}
+                    <option value="{{ d.pk }}">{{ d.company_name }}</option>
+                  {% endfor %}
+                </select>
+              </form>
+            {% endif %}
+          </td>
+          <td data-col="phone" class="small">{{ customer.phone|default:"—" }}</td>
+          <td data-col="status">
+            {% if customer.distributor and customer.distributor.status == 'suspended' %}
+              <span class="badge bg-warning text-dark" title="Marketplace suspended — customer cannot shop">
+                <i class="bi bi-pause-circle me-1"></i>Can't Shop
+              </span>
+            {% else %}
+              <span class="badge {% if customer.is_active %}bg-success{% else %}bg-secondary{% endif %}">
+                {% if customer.is_active %}Active{% else %}Inactive{% endif %}
+              </span>
+            {% endif %}
+          </td>
+          {% if show_deleted %}
+          <td data-col="deleted_at" class="small text-muted">{{ customer.deleted_at|date:"d M Y, H:i"|default:"—" }}</td>
+          <td data-col="deleted_by" class="small text-muted">{{ customer.deleted_by|default:"—" }}</td>
+          {% else %}
+          <td data-col="joined" class="small">{{ customer.date_joined|date:"d M Y" }}</td>
+          {% endif %}
+          <td data-col="actions">
+            {% if show_deleted %}
+              <div class="d-flex gap-1">
+                <form method="post" action="{% url 'admin_panel:user_restore' customer.pk %}" class="d-inline">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-success">Restore</button>
+                </form>
+                <form method="post" action="{% url 'admin_panel:user_purge' customer.pk %}" class="d-inline"
+                      data-confirm="Permanently archive {{ customer.username }}? This cannot be undone."
+                      data-confirm-title="Delete permanently?" data-confirm-type="danger" data-confirm-icon="🗑️">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger">Delete permanently</button>
+                </form>
+              </div>
+            {% else %}
+              <div class="d-flex gap-1 flex-wrap align-items-center">
+                <a href="{% url 'admin_panel:user_detail' customer.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+
+                {% if unlinked %}
+                <!-- Assign Marketplace inline — only on No Marketplace tab -->
+                <form method="post" class="d-flex gap-1 align-items-center"
+                      data-user-name="{{ customer.get_full_name|default:customer.username }}">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="assign_distributor">
+                  <input type="hidden" name="user_id" value="{{ customer.pk }}">
+                  <select name="distributor_id" class="form-select form-select-sm" style="max-width:150px"
+                          data-assign-confirm="true" title="Assign distributor">
+                    <option value="">— Assign —</option>
+                    {% for d in distributors %}
+                      <option value="{{ d.pk }}" {% if customer.distributor_id == d.pk %}selected{% endif %}>{{ d.company_name }}</option>
+                    {% endfor %}
+                  </select>
+                </form>
+                {% endif %}
+
+                <!-- Delete inline -->
+                <form method="post"
+                      data-confirm="This will soft-delete {{ customer.username }}. They can be restored from Deleted Customers."
+                      data-confirm-title="Delete Customer?"
+                      data-confirm-type="danger">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="user_id" value="{{ customer.pk }}">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete customer">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="{% if show_deleted %}8{% else %}7{% endif %}" class="text-center text-muted py-4">
+          {% if show_deleted %}No deleted customers.{% else %}No customers found.{% endif %}
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Mobile cards -->
+<div class="d-md-none">
+  {% for customer in customers %}
+  <div class="card border-0 shadow-sm mb-2 p-3 {% if not customer.is_active %}opacity-75{% endif %}">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div>
+        <div class="fw-semibold">{{ customer.username }}</div>
+        <div class="text-muted small">{{ customer.get_full_name|default:"—" }}</div>
+        {% if customer.distributor %}
+          <div class="text-muted small"><i class="bi bi-truck me-1"></i>{{ customer.distributor.company_name }}</div>
+        {% else %}
+          <form method="post" class="mt-1">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign_distributor">
+            <input type="hidden" name="user_id" value="{{ customer.pk }}">
+            <select name="distributor_id" class="form-select form-select-sm" 
+                    onchange="this.form.submit()" 
+                    title="Assign distributor">
+              <option value="" class="text-warning">⚠ Not Assigned</option>
+              {% for d in distributors %}
+                <option value="{{ d.pk }}">{{ d.company_name }}</option>
+              {% endfor %}
+            </select>
+          </form>
+        {% endif %}
+        {% if show_deleted %}
+          <div class="text-danger small">Deleted: {{ customer.deleted_at|date:"d M Y"|default:"—" }} by {{ customer.deleted_by|default:"—" }}</div>
+        {% endif %}
+      </div>
+      <div class="d-flex flex-column align-items-end gap-1">
+        {% if show_deleted %}
+          <form method="post" action="{% url 'admin_panel:user_restore' customer.pk %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-success py-0 px-2">Restore</button>
+          </form>
+          <form method="post" action="{% url 'admin_panel:user_purge' customer.pk %}" class="d-inline"
+                data-confirm="Permanently archive {{ customer.username }}? This cannot be undone."
+                data-confirm-title="Delete permanently?" data-confirm-type="danger" data-confirm-icon="🗑️">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2">Delete permanently</button>
+          </form>
+        {% else %}
+          <a href="{% url 'admin_panel:user_detail' customer.pk %}" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+          {% if unlinked %}
+          <form method="post" class="w-100" data-user-name="{{ customer.get_full_name|default:customer.username }}">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="assign_distributor">
+            <input type="hidden" name="user_id" value="{{ customer.pk }}">
+            <select name="distributor_id" class="form-select form-select-sm" data-assign-confirm="true">
+              <option value="">— Assign Marketplace —</option>
+              {% for d in distributors %}
+                <option value="{{ d.pk }}" {% if customer.distributor_id == d.pk %}selected{% endif %}>{{ d.company_name }}</option>
+              {% endfor %}
+            </select>
+          </form>
+          {% endif %}
+          <form method="post"
+                data-confirm="This will soft-delete {{ customer.username }}. They can be restored from Deleted Customers."
+                data-confirm-title="Delete Customer?"
+                data-confirm-type="danger">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="user_id" value="{{ customer.pk }}">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">{% if show_deleted %}No deleted customers.{% else %}No customers found.{% endif %}</p>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,137 @@
+/* ============================================================
+   Modern Shop — mobile-first grocery-app UI layer
+   Loaded after premium-ui.css; scoped to customer storefront.
+   Design language: Blinkit/Zepto/BigBasket — clean tiles,
+   ADD buttons, sticky search, app-like bottom nav.
+   ============================================================ */
+:root {
+  --ms-green: #1f8f3a;
+  --ms-green-dark: #14672a;
+  --ms-ink: #1b2a20;
+  --ms-muted: #6b7b70;
+  --ms-line: #e7ece7;
+  --ms-surface: #ffffff;
+  --ms-bg: #f5f7f5;
+  --ms-radius: 16px;
+  --ms-shadow: 0 4px 16px rgba(20, 40, 25, .07);
+  --ms-discount: #e23744;
+}
+
+/* ---- page ground ---- */
+body.ms-shop { background: var(--ms-bg); padding-bottom: 76px; }
+
+/* ---- store hero (compact, app-like) ---- */
+.ms-shop .storefront-hero {
+  /* Respect the distributor's theme color when set; fall back to brand green. */
+  background: linear-gradient(135deg, var(--theme-color, var(--ms-green)) 0%, var(--ms-green-dark) 100%) !important;
+  padding: 1.4rem 1rem 1.1rem !important;
+  border-radius: 0 0 22px 22px;
+}
+.ms-shop .storefront-hero h1 { font-size: 1.5rem; margin-bottom: .15rem; }
+.ms-shop .store-utility-strip { background: #eef4ee; color: var(--ms-green-dark); font-size: .78rem; }
+
+/* ---- sticky search ---- */
+.ms-shop .sticky-shop-toolbar {
+  position: sticky; top: 0; z-index: 1015;
+  background: var(--ms-bg);
+  padding: .6rem 0 .5rem;
+  margin: 0 0 .25rem !important;
+}
+.ms-shop .sticky-shop-toolbar .form-control {
+  border-radius: 12px; border: 1px solid var(--ms-line);
+  background: #fff; height: 44px; font-size: .95rem;
+}
+.ms-shop .sticky-shop-toolbar .btn { border-radius: 12px; }
+.ms-shop .form-select { border-radius: 12px; border-color: var(--ms-line); }
+
+/* ---- category chips: horizontal scroll ---- */
+.ms-shop .ms-cat-scroll {
+  display: flex; gap: .5rem; overflow-x: auto; padding: .15rem .1rem .55rem;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+}
+.ms-shop .ms-cat-scroll::-webkit-scrollbar { display: none; }
+.ms-shop .ms-cat-chip {
+  flex: 0 0 auto; white-space: nowrap;
+  padding: .42rem .9rem; border-radius: 999px;
+  font-size: .84rem; font-weight: 600; text-decoration: none;
+  background: #fff; color: var(--ms-ink); border: 1px solid var(--ms-line);
+  transition: all .2s ease;
+}
+.ms-shop .ms-cat-chip.active { background: var(--ms-green); color: #fff; border-color: var(--ms-green); }
+
+/* ---- product grid + tiles ---- */
+.ms-shop .product-grid { --bs-gutter-x: .7rem; --bs-gutter-y: .7rem; }
+.ms-shop .product-card {
+  background: var(--ms-surface) !important;
+  border: 1px solid var(--ms-line) !important;
+  border-radius: var(--ms-radius) !important;
+  box-shadow: var(--ms-shadow) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  display: flex; flex-direction: column;
+}
+.ms-shop .product-card .product-card-image,
+.ms-shop .product-card .card-img-top { height: 128px !important; border-radius: 12px 12px 0 0; }
+.ms-shop .product-card .card-body { padding: .55rem .6rem .6rem !important; display: flex; flex-direction: column; gap: .15rem; }
+.ms-shop .ms-name {
+  font-size: .82rem; font-weight: 600; color: var(--ms-ink); line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 2.05em;
+}
+.ms-shop .ms-weight { font-size: .72rem; color: var(--ms-muted); }
+.ms-shop .ms-price-row { display: flex; align-items: baseline; gap: .35rem; margin-top: .1rem; }
+.ms-shop .ms-price { font-size: .98rem; font-weight: 800; color: var(--ms-ink); }
+.ms-shop .ms-mrp { font-size: .72rem; color: var(--ms-muted); text-decoration: line-through; }
+.ms-shop .ms-off { font-size: .68rem; font-weight: 700; color: var(--ms-green-dark); }
+
+/* discount / popular badge */
+.ms-shop .product-card-offer-badge {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  background: var(--ms-discount); color: #fff;
+  font-size: .62rem; font-weight: 700; letter-spacing: .02em;
+  padding: .16rem .45rem; border-radius: 7px;
+}
+.ms-shop .product-card-offer-badge-alt { background: #f59e0b; }
+
+/* ADD button (grocery-app signature) */
+.ms-shop .ms-add {
+  margin-top: .45rem; display: block; text-align: center;
+  padding: .42rem; border-radius: 10px;
+  border: 1.5px solid var(--ms-green); background: #eafaef;
+  color: var(--ms-green-dark); font-weight: 800; font-size: .82rem;
+  text-decoration: none; letter-spacing: .04em; transition: all .18s ease;
+}
+.ms-shop .ms-add:hover { background: var(--ms-green); color: #fff; }
+
+/* rating chip */
+.ms-shop .ms-rating {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: .66rem; font-weight: 700; color: #1a7f37;
+}
+
+/* ---- app-like bottom navigation ---- */
+.ms-bottom-nav {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 1050;
+  display: flex; justify-content: space-around; align-items: center;
+  background: #fff; border-top: 1px solid var(--ms-line);
+  height: 62px; padding-bottom: env(safe-area-inset-bottom, 0);
+  box-shadow: 0 -4px 18px rgba(20, 40, 25, .06);
+}
+.ms-bottom-nav a {
+  flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  color: var(--ms-muted); text-decoration: none; font-size: .64rem; font-weight: 600;
+}
+.ms-bottom-nav a i { font-size: 1.15rem; }
+.ms-bottom-nav a.active { color: var(--ms-green); }
+.ms-bottom-nav .ms-cart-count {
+  position: absolute; transform: translate(10px, -8px);
+  background: var(--ms-discount); color: #fff; font-size: .58rem; font-weight: 700;
+  min-width: 15px; height: 15px; line-height: 15px; text-align: center; border-radius: 999px; padding: 0 3px;
+}
+
+/* hide bottom nav on wider screens (desktop uses top nav) */
+@media (min-width: 992px) {
+  .ms-bottom-nav { display: none; }
+  body.ms-shop { padding-bottom: 0; }
+  .ms-shop .product-card .product-card-image,
+  .ms-shop .product-card .card-img-top { height: 175px !important; }
+}

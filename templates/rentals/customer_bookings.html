@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% block title %}My rentals{% endblock %}
+{% block content %}
+<div class="container py-3" style="max-width:800px">
+  {% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="fw-bold mb-0">My rentals</h4>
+    <span class="badge bg-success-subtle text-success">Wallet ₹{{ balance }}</span>
+    <a href="{% url 'rentals:customer_owned_bookings' %}" class="btn btn-sm btn-outline-secondary">Bookings on my items</a>
+  </div>
+  <div class="card border-0 shadow-sm"><div class="table-wrap"><table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>Item</th><th>Dates</th><th>₹</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for b in bookings %}
+      <tr>
+        <td class="fw-semibold">{{ b.item.name }}</td>
+        <td class="small">{{ b.start_day|date:"d M" }} → {{ b.end_day|date:"d M" }}</td>
+        <td>₹{{ b.amount }}</td>
+        <td><span class="badge bg-secondary">{{ b.get_status_display }}</span></td>
+        <td class="text-end">
+          {% if b.status == 'requested' or b.status == 'confirmed' %}
+          <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="booking_id" value="{{ b.pk }}">
+            <button name="action" value="cancel" class="btn btn-sm btn-outline-danger">Cancel</button></form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}<tr><td colspan="5" class="text-center text-muted py-4">No rentals yet.</td></tr>{% endfor %}
+    </tbody></table></div></div>
+</div>
+{% endblock %}

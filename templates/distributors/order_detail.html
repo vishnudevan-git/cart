@@ -1,0 +1,252 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Order #{{ order.id }}{% endblock %}
+{% block page_title %}Order #{{ order.id }}{% endblock %}
+{% block active_nav %}orders{% endblock %}
+{% block content %}
+<div class="row g-3">
+  <div class="col-12 col-md-8">
+    {% if supplier_issues %}
+    <div class="alert alert-warning border-warning mb-3">
+      <div class="fw-semibold mb-1"><i class="bi bi-exclamation-triangle me-1"></i>The supplier has flagged {{ supplier_issues|length }} item{{ supplier_issues|length|pluralize }} on this order</div>
+      <ul class="mb-1 small">
+        {% for it, s in supplier_issues %}
+        <li class="mb-2">
+          <strong>{{ it.product.name }}</strong> ({{ it.variant_label }} × {{ it.quantity }}):
+          {% if s.status == 'unavailable' %}<span class="text-danger fw-semibold">cannot be supplied</span>{% else %}delayed{% endif %}
+          · {{ s.public_reason }}{% if s.status == 'delayed' and s.expected_ready_on %} · expected {{ s.expected_ready_on|date:"d M" }}{% endif %}
+          {% if s.status == 'unavailable' and s.issue_at %}
+            <span class="text-muted">· flagged {{ s.issue_at|timesince }} ago</span>
+          {% endif %}
+          {% if s.status == 'unavailable' and s.resume_requested_at %}
+          <div class="mt-1 p-2 rounded bg-white border border-info">
+            <div class="fw-semibold"><i class="bi bi-question-circle me-1"></i>The supplier can supply this again. Does the customer still want it?</div>
+            <div class="d-flex gap-2 mt-1">
+              <form method="post" class="d-inline"
+                    data-confirm="Resume &quot;{{ it.product.name }}&quot;? It goes back to the supplier to pack and send."
+                    data-confirm-title="Customer still wants it?" data-confirm-type="success">
+                {% csrf_token %}
+                <input type="hidden" name="ship_action" value="resume_supply">
+                <input type="hidden" name="item_id" value="{{ it.pk }}">
+                <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check2 me-1"></i>Yes, resume</button>
+              </form>
+              <form method="post" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="ship_action" value="decline_supply">
+                <input type="hidden" name="item_id" value="{{ it.pk }}">
+                <button type="submit" class="btn btn-sm btn-outline-secondary">No, keep unavailable</button>
+              </form>
+            </div>
+          </div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ul>
+      <div class="small text-muted">Nothing has been cancelled or refunded automatically. Decide whether to wait, or cancel the order below.</div>
+    </div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header fw-semibold d-flex justify-content-between align-items-center">
+        <span>
+          Items
+          {% if order.is_partial_shipment %}
+            <span class="badge bg-warning text-dark ms-2">Partial Shipment</span>
+          {% endif %}
+        </span>
+        <span class="text-success fw-bold">My Margin: ₹{{ dist_margin|floatformat:2 }}</span>
+      </div>
+      <div class="table-wrap">
+        <table class="table align-middle mb-0 small">
+          <thead class="table-light">
+            <tr>
+              <th>Product</th><th>Variant</th><th>Qty</th>
+              <th>Customer Price</th><th>Admin Price</th><th>My Margin</th>
+              {% if show_supplier_stage %}<th>Supplier</th>{% endif %}
+              <th>Fulfillment</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in order.items.all %}
+            <tr>
+              <td>{{ item.product.name|default:"—" }}</td>
+              <td><span class="badge bg-secondary">{{ item.variant_label }}</span></td>
+              <td>{{ item.quantity }}</td>
+              <td>₹{{ item.price }}</td>
+              <td class="text-muted">₹{{ item.base_price }}</td>
+              <td class="text-success fw-semibold">₹{{ item.distributor_margin }}</td>
+              {% if show_supplier_stage %}
+              <td>
+                {% if item.supplier_shipment %}
+                  {% include 'partials/supplier_stage.html' with ship=item.supplier_shipment audience='receiver' %}
+                {% else %}—{% endif %}
+              </td>
+              {% endif %}
+              <td>
+                {% if item.fulfillment_status == 'shipped' %}
+                  <span class="badge bg-success">Shipped</span>
+                {% elif item.fulfillment_status == 'backordered' %}
+                  <span class="badge bg-warning text-dark">Back-ordered</span>
+                {% elif item.fulfillment_status == 'delivered' %}
+                  <span class="badge bg-primary">Delivered</span>
+                {% elif item.fulfillment_status == 'cancelled' %}
+                  <span class="badge bg-danger">Cancelled</span>
+                {% else %}
+                  <span class="badge bg-secondary">Pending</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="card-footer small">
+        <div class="d-flex justify-content-between"><span>Subtotal</span><span>₹{{ order.subtotal }}</span></div>
+        <div class="d-flex justify-content-between"><span>Delivery</span><span>₹{{ order.delivery_charge }}</span></div>
+        <div class="d-flex justify-content-between fw-bold"><span>Total</span><span>₹{{ order.total_amount }}</span></div>
+        <div class="d-flex justify-content-between text-success fw-bold mt-1 border-top pt-1">
+          <span>My Total Margin</span><span>₹{{ dist_margin|floatformat:2 }}</span>
+        </div>
+      </div>
+    </div>
+
+    {% if order.is_partial_shipment and backordered_items %}
+    <div class="card border-0 shadow-sm border-warning border mb-3 p-3">
+      <h6 class="fw-semibold mb-1">📦 Fulfill Back-ordered Items</h6>
+      <p class="text-muted small mb-2">
+        Select the items that are now available and ready to ship to the customer.
+      </p>
+      <form method="post" action="{% url 'distributors:fulfill_backorder' order.pk %}">
+        {% csrf_token %}
+        <div class="list-group mb-3">
+          {% for item in backordered_items %}
+          <label class="list-group-item list-group-item-action d-flex align-items-center gap-2">
+            <input type="checkbox" name="item_ids" value="{{ item.pk }}" class="form-check-input mt-0">
+            <span>
+              <strong>{{ item.product.name|default:"—" }}</strong>
+              <span class="badge bg-secondary ms-1">{{ item.variant_label }}</span>
+              × {{ item.quantity }}
+            </span>
+          </label>
+          {% endfor %}
+        </div>
+        <button type="submit" class="btn btn-warning btn-sm">
+          <i class="bi bi-box-seam me-1"></i> Mark Selected as Shipped
+        </button>
+      </form>
+    </div>
+    {% endif %}
+
+    {% if order.status == 'delivered' and reward_enabled %}
+    <div class="card border-0 shadow-sm border-success border p-3">
+      <h6 class="fw-semibold mb-1">🎁 Give Reward Points to Customer</h6>
+      <p class="text-muted small mb-2">
+        1 point = ₹1. Your margin on this order is <strong class="text-success">₹{{ dist_margin|floatformat:0 }}</strong>.
+        You can give up to that amount as reward points.
+        {% if existing_reward %}
+          <span class="badge bg-success ms-1">Already gave ₹{{ existing_reward }} pts</span>
+        {% endif %}
+      </p>
+      {% if not existing_reward %}
+      <form method="post" action="{% url 'distributors:allocate_reward' order.pk %}">
+        {% csrf_token %}
+        <div class="d-flex gap-2 align-items-center">
+          <div class="input-group" style="max-width:200px">
+            <span class="input-group-text">₹</span>
+            <input type="number" name="points" class="form-control" min="1"
+                   max="{{ dist_margin|floatformat:0 }}" placeholder="e.g. 10"
+                   required>
+          </div>
+          <input type="text" name="note" class="form-control" placeholder="Note (optional)" style="max-width:200px">
+          <button type="submit" class="btn btn-success">Give Points</button>
+        </div>
+        <div class="form-text">Customer will get this as ₹ discount on next order.</div>
+      </form>
+      {% else %}
+      <div class="alert alert-success py-2 small mb-0">
+        <i class="bi bi-check-circle me-1"></i>You already gave ₹{{ existing_reward }} reward points for this order.
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-12 col-md-4">
+    <div class="card border-0 shadow-sm p-3 mb-3">
+      <h6 class="fw-semibold mb-2">Customer</h6>
+      <div class="small">
+        <p class="mb-1"><strong>Name:</strong> {{ order.customer.get_full_name|default:order.customer.username }}</p>
+        <p class="mb-1"><strong>Phone:</strong> {{ order.phone }}</p>
+        <p class="mb-0"><strong>Address:</strong> {{ order.address }}</p>
+      </div>
+    </div>
+
+    {% if reward_enabled %}
+    <div class="card border-0 shadow-sm p-3 mb-3">
+      <h6 class="fw-semibold mb-1">Customer Reward Balance</h6>
+      <div class="fs-4 fw-bold text-success">₹{{ customer_reward_balance }}</div>
+      <div class="text-muted small">Available to use at checkout</div>
+    </div>
+    {% endif %}
+
+    <div class="card border-0 shadow-sm p-3">
+      <h6 class="fw-semibold mb-2">Update Status</h6>
+      <p class="text-muted small">Current: <span class="badge bg-warning text-dark">{{ order.get_status_display }}</span></p>
+
+      {% if order.status == 'pending' %}
+        <div class="alert alert-warning small mb-2">New order — confirm to proceed.</div>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="status" value="confirmed">
+          <button type="submit" class="btn btn-warning btn-sm w-100">
+            <i class="bi bi-check-circle me-1"></i> Confirm Order
+          </button>
+        </form>
+
+      {% elif order.status == 'confirmed' and order.fulfillment_source == 'supplier' %}
+        <div class="alert alert-info small mb-2">Waiting for stockist to pick from supplier.</div>
+        <form method="post" class="mt-2">
+          {% csrf_token %}
+          <input type="hidden" name="status" value="cancelled">
+          <button type="submit" class="btn btn-outline-danger btn-sm w-100">Cancel Order</button>
+        </form>
+
+      {% elif order.status == 'at_distributor' %}
+        <div class="alert alert-success small mb-2">Items received. Ready to deliver to customer.</div>
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="status" value="out_for_delivery">
+          <button type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-truck me-1"></i> Mark Out for Delivery
+          </button>
+        </form>
+
+      {% elif order.status == 'out_for_delivery' %}
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="status" value="delivered">
+          <button type="submit" class="btn btn-success btn-sm w-100">
+            <i class="bi bi-check2-circle me-1"></i> Mark as Delivered
+          </button>
+        </form>
+
+      {% elif order.status == 'delivered' %}
+        <div class="alert alert-success small mb-0"><i class="bi bi-check-circle me-1"></i>Order complete.</div>
+
+      {% elif order.status == 'cancelled' %}
+        <div class="alert alert-danger small mb-0">Order cancelled.</div>
+
+      {% else %}
+        <form method="post">
+          {% csrf_token %}
+          <select name="status" class="form-select form-select-sm mb-2">
+            <option value="out_for_delivery">Out for Delivery</option>
+            <option value="delivered">Delivered</option>
+          </select>
+          <button type="submit" class="btn btn-success btn-sm w-100">Update</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<a href="{% url 'distributors:order_list' %}" class="btn btn-outline-secondary mt-2">← Back</a>
+{% endblock %}

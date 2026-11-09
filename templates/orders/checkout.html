@@ -1,0 +1,479 @@
+{% extends 'base.html' %}
+{% block title %}Checkout — LaKrish Mart{% endblock %}
+{% block content %}
+<style>
+  .peer-radio:checked + div.border-address {
+    border-color: #198754 !important;
+    background-color: #f8fff9;
+    border-width: 2px !important;
+  }
+  @media (max-width: 767.98px) {
+    .sticky-mobile-checkout {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      padding: 10px 15px;
+      box-shadow: 0 -4px 10px rgba(0,0,0,0.1);
+      z-index: 1040;
+    }
+    .checkout-container { padding-bottom: 70px; }
+  }
+</style>
+<div class="container mt-3 mb-5 checkout-container">
+  <h4 class="fw-semibold mb-3">Checkout</h4>
+  <div class="row g-3">
+    <!-- Form -->
+    <div class="col-12 col-md-7 order-2 order-md-1">
+      <div class="card border-0 shadow-sm p-3 p-md-4">
+        <h5 class="fw-semibold mb-3">Delivery Details</h5>
+        <form method="post" id="checkoutForm">
+          {% csrf_token %}
+          {% if saved_addresses %}
+            <div class="mb-4">
+              <label class="form-label fw-semibold mb-2">Select Delivery Address</label>
+              <div class="row g-2" id="addressList">
+                {% for addr in saved_addresses %}
+                <div class="col-12">
+                  <label class="w-100" style="cursor: pointer;">
+                    <input type="radio" name="address_id" value="{{ addr.pk }}" class="d-none peer-radio" {% if addr.is_default or forloop.first %}checked{% endif %}>
+                    <div class="card border px-3 py-2 border-address shadow-sm">
+                      <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="fw-bold"><i class="bi bi-geo-alt me-1"></i>{{ addr.label }}</span>
+                        <span class="text-muted small">{{ addr.name }} | {{ addr.phone }}</span>
+                      </div>
+                      <div class="small text-muted">{{ addr.door_number }}, {{ addr.street_details }}, {{ addr.locality }}, {{ addr.city }} - {{ addr.pincode }}</div>
+                    </div>
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
+              <div class="mt-2 text-end">
+                <a href="#" class="small text-success text-decoration-none fw-semibold" data-bs-toggle="modal" data-bs-target="#addAddressModal">+ Add New Address</a>
+              </div>
+            </div>
+          {% else %}
+            <div class="alert alert-warning d-flex align-items-start gap-3 py-3 mb-4">
+              <i class="bi bi-exclamation-triangle-fill fs-4 text-warning mt-1"></i>
+              <div>
+                <div class="fw-semibold mb-1">No delivery address found</div>
+                <div class="small mb-2">You need to add a delivery address before placing an order.</div>
+                <button type="button" class="btn btn-warning btn-sm fw-semibold"
+                        data-bs-toggle="modal" data-bs-target="#addAddressModal">
+                  <i class="bi bi-plus-lg me-1"></i>Add Delivery Address
+                </button>
+              </div>
+            </div>
+          {% endif %}
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Payment Method</label>
+            <div class="d-flex flex-wrap gap-2">
+              <div class="form-check border rounded p-3 flex-fill" style="min-width:130px">
+                <input class="form-check-input" type="radio" name="payment_method" id="cod" value="cod" checked>
+                <label class="form-check-label" for="cod"><i class="bi bi-cash-coin me-1"></i> Cash on Delivery</label>
+              </div>
+            </div>
+            <div class="form-text text-muted small mt-1">Pay with cash when your order is delivered.</div>
+          </div>
+          <button type="button" class="btn btn-success w-100 py-2 fs-5" id="placeOrderBtn"
+                  {% if not saved_addresses %}disabled title="Add a delivery address first"{% endif %}>
+            <i class="bi bi-bag-check me-1"></i> Place Order
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="col-12 col-md-5 order-1 order-md-2">
+      <div class="card border-0 shadow-sm p-3">
+        <h5 class="fw-semibold mb-3">Order Summary</h5>
+        {% for item in cart_items %}
+        <div class="d-flex justify-content-between align-items-center mb-2 small" id="checkout-item-{{ item.variant.pk }}">
+          <div class="d-flex align-items-center gap-2 flex-fill">
+            {% if item.variant.product.image %}
+              <img src="{{ item.variant.product.image.url }}" style="height:36px;width:36px;object-fit:cover;border-radius:4px">
+            {% endif %}
+            <div>
+              <div>{{ item.variant.product.name }}</div>
+              <div class="text-muted" style="font-size:.7rem">{{ item.variant.label }}</div>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-1 ms-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm px-1 py-0"
+                    onclick="checkoutQty({{ item.variant.pk }}, -1)" style="line-height:1.2">−</button>
+            <span class="fw-semibold px-1" id="co-qty-{{ item.variant.pk }}">{{ item.quantity }}</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm px-1 py-0"
+                    onclick="checkoutQty({{ item.variant.pk }}, 1)" style="line-height:1.2">+</button>
+            <button type="button" class="btn btn-outline-danger btn-sm px-1 py-0 ms-1"
+                    onclick="checkoutQty({{ item.variant.pk }}, 0)" style="line-height:1.2" title="Remove">
+              <i class="bi bi-trash" style="font-size:.7rem"></i>
+            </button>
+          </div>
+          <span class="fw-semibold ms-2" id="co-sub-{{ item.variant.pk }}">₹{{ item.display_subtotal }}</span>
+        </div>
+        {% endfor %}
+        <hr>
+        <div class="d-flex justify-content-between small mb-1">
+          <span class="text-muted">Subtotal</span><span>₹{{ subtotal }}</span>
+        </div>
+        <div class="d-flex justify-content-between small mb-2">
+          <span class="text-muted">Delivery{% if delivery_zone_name %} <span class="badge bg-light text-dark border" style="font-size:.65rem">{{ delivery_zone_name }}</span>{% endif %}</span>
+          <span {% if delivery_charge == 0 %}class="text-success"{% endif %}>
+            {% if delivery_charge == 0 %}Free{% else %}₹{{ delivery_charge }}{% endif %}
+          </span>
+        </div>
+        {% if reward_auto %}
+        <div class="d-flex justify-content-between small mb-1 text-success">
+          <span>🎁 Reward discount (auto)</span><span>−₹{{ reward_auto }}</span>
+        </div>
+        {% endif %}
+        {% if wallet_use %}
+        <div class="d-flex justify-content-between small mb-1 text-success" id="walletLine" style="display:none">
+          <span>👛 Paid from wallet</span><span>−₹{{ wallet_use }}</span>
+        </div>
+        {% endif %}
+        <div class="d-flex justify-content-between fw-bold">
+          <span>Total</span><span class="text-success fs-5">₹<span id="grandTotal">{{ after_reward }}</span></span>
+        </div>
+
+        {% if wallet_balance > 0 %}
+        <div class="card border p-2 mt-2">
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" name="use_wallet" value="1" id="useWallet" checked>
+            <label class="form-check-label small" for="useWallet">
+              👛 Pay <strong>₹{{ wallet_use }}</strong> from wallet <span class="text-muted">(balance ₹{{ wallet_balance }})</span>
+            </label>
+          </div>
+        </div>
+        <script>
+          (function () {
+            var cb = document.getElementById('useWallet'),
+                line = document.getElementById('walletLine'),
+                gt = document.getElementById('grandTotal'),
+                afterReward = {{ after_reward }}, walletUse = {{ wallet_use }};
+            function sync() {
+              var use = cb.checked;
+              if (line) line.style.display = use ? 'flex' : 'none';
+              if (gt) gt.textContent = (use ? afterReward - walletUse : afterReward);
+            }
+            cb.addEventListener('change', sync); sync();
+          })();
+        </script>
+        {% endif %}
+        {% if reward_info and not reward_auto and reward_info.balance %}
+        <div class="small text-muted mt-2">🎁 {{ reward_info.balance }} pts — need {{ reward_info.min_to_redeem }} to redeem.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Add Address Modal -->
+<div class="modal fade" id="addAddressModal" tabindex="-1" aria-labelledby="addAddressLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold" id="addAddressLabel"><i class="bi bi-geo-alt-fill me-2 text-success"></i>Add New Address</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="modalAddressForm">
+          {% csrf_token %}
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">LABEL *</label>
+              <select name="label" class="form-select" required>
+                <option value="Home">Home</option>
+                <option value="Work">Work</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">CONTACT NAME *</label>
+              <input type="text" name="name" class="form-control" required value="{{ user.get_full_name|default:user.username }}">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">PHONE *</label>
+              <input type="tel" name="phone" class="form-control" required value="{{ user.phone }}" inputmode="numeric">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small text-muted">DOOR / FLAT NO. *</label>
+              <input type="text" name="door_number" class="form-control" required placeholder="e.g. No:161/2">
+            </div>
+            <div class="col-md-9">
+              <label class="form-label fw-semibold small text-muted">STREET / APARTMENT *</label>
+              <input type="text" name="street_details" class="form-control" required placeholder="e.g. Desingu Nagar">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small text-muted">LOCALITY / LANDMARK *</label>
+              <input type="text" name="locality" class="form-control" required placeholder="e.g. Near Kovil">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small text-muted">CITY *</label>
+              <input type="text" name="city" id="modalCity" class="form-control" required placeholder="e.g. Hosur">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small text-muted">PINCODE *</label>
+              <input type="text" name="pincode" id="modalPincode" class="form-control" required placeholder="635126" inputmode="numeric" maxlength="6" value="{{ user.pincode }}">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small text-muted">POST OFFICE</label>
+              <input type="text" name="post_office" id="modalPostOffice" class="form-control" placeholder="Auto-filled">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small text-muted">DISTRICT</label>
+              <input type="text" name="district" id="modalDistrict" class="form-control" placeholder="Auto-filled">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small text-muted">STATE</label>
+              <input type="text" name="state" id="modalState" class="form-control" placeholder="Auto-filled">
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold small text-danger"><i class="bi bi-geo-alt-fill me-1"></i>GOOGLE MAP LINK (optional)</label>
+              <input type="url" name="google_map_link" class="form-control" placeholder="Paste Google Maps link...">
+            </div>
+          </div>
+        </form>
+        <div id="modalAddrError" class="alert alert-danger mt-3 d-none small"></div>
+      </div>
+      <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" id="saveAddressBtn">
+          <i class="bi bi-check-lg me-1"></i>Save & Select
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Order Confirmation Modal -->
+<div class="modal fade" id="confirmOrderModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <h5 class="modal-title fw-bold"><i class="bi bi-bag-check-fill text-success me-2"></i>Confirm Your Order</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pt-2">
+
+        <!-- Delivery Address -->
+        <div class="mb-3">
+          <div class="small fw-semibold text-muted mb-1"><i class="bi bi-geo-alt me-1"></i>Delivering to</div>
+          <div class="border rounded p-2 small bg-light" id="confirmAddress">—</div>
+        </div>
+
+        <!-- Items -->
+        <div class="mb-3">
+          <div class="small fw-semibold text-muted mb-1"><i class="bi bi-box-seam me-1"></i>Items</div>
+          <div id="confirmItems" class="small"></div>
+        </div>
+
+        <!-- Totals -->
+        <div class="border-top pt-2 small">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">Subtotal</span>
+            <span id="confirmSubtotal"></span>
+          </div>
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-muted">Delivery</span>
+            <span id="confirmDelivery"></span>
+          </div>
+          <div class="d-flex justify-content-between fw-bold fs-6 mt-1">
+            <span>Total</span>
+            <span class="text-success" id="confirmTotal"></span>
+          </div>
+        </div>
+
+        <!-- Payment -->
+        <div class="mt-2 small text-muted">
+          <i class="bi bi-credit-card me-1"></i>Payment: <span id="confirmPayment" class="fw-semibold text-dark"></span>
+        </div>
+      </div>
+      <div class="modal-footer border-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Edit Order</button>
+        <button type="button" class="btn btn-success px-4" id="confirmPlaceBtn">
+          <i class="bi bi-check-lg me-1"></i> Confirm & Place Order
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/pincode_lookup.js?v=3"></script>
+<script>
+// Pincode lookup for modal
+if (typeof initPincodeLookup === 'function') {
+  initPincodeLookup('modalPincode', {
+    postOffice: 'modalPostOffice',
+    district:   'modalDistrict',
+    city:       'modalCity',
+    state:      'modalState',
+  });
+}
+
+// Save address via AJAX, then reload checkout with new address selected
+document.getElementById('saveAddressBtn').addEventListener('click', function() {
+  const form = document.getElementById('modalAddressForm');
+  const errDiv = document.getElementById('modalAddrError');
+  errDiv.classList.add('d-none');
+
+  // Client-side validation
+  const required = form.querySelectorAll('[required]');
+  for (const inp of required) {
+    if (!inp.value.trim()) {
+      inp.focus();
+      errDiv.textContent = 'Please fill in all required fields.';
+      errDiv.classList.remove('d-none');
+      return;
+    }
+  }
+
+  const data = new FormData(form);
+  const btn = this;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+  fetch('{% url "accounts:addresses" %}', {
+    method: 'POST',
+    body: data,
+    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+  })
+  .then(r => {
+    if (r.ok || r.redirected) {
+      // Reload checkout page — new address will appear
+      window.location.href = '{% url "orders:checkout" %}';
+    } else {
+      errDiv.textContent = 'Failed to save address. Please try again.';
+      errDiv.classList.remove('d-none');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save & Select';
+    }
+  })
+  .catch(() => {
+    errDiv.textContent = 'Network error. Please try again.';
+    errDiv.classList.remove('d-none');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>Save & Select';
+  });
+});
+
+// Reward points live calc
+const redeemInput = document.getElementById('redeemPoints');
+if (redeemInput) {
+  const rate = parseInt("{{ reward_info.rate_num|default:'10'|escapejs }}") || 10;
+  redeemInput.addEventListener('input', function() {
+    const pts = parseInt(this.value) || 0;
+    document.getElementById('redeemValue').textContent = Math.floor(pts / rate);
+  });
+}
+
+// Reset on browser back navigation
+window.addEventListener('pageshow', function(e) {
+  if (e.persisted) {
+    // Hide modal if stuck open
+    const modal = bootstrap.Modal.getInstance(document.getElementById('confirmOrderModal'));
+    if (modal) modal.hide();
+    // Reset confirm button
+    const btn = document.getElementById('confirmPlaceBtn');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-lg me-1"></i> Confirm & Place Order';
+    }
+  }
+});
+
+// Place Order confirmation modal
+document.getElementById('placeOrderBtn').addEventListener('click', function() {
+  const form = document.getElementById('checkoutForm');
+
+  // Get selected address label
+  const selectedAddr = document.querySelector('input[name="address_id"]:checked');
+  let addrText = 'No address selected';
+  if (selectedAddr) {
+    const card = selectedAddr.closest('label').querySelector('.card');
+    addrText = card ? card.innerText.trim() : addrText;
+  }
+
+  // Get items from summary
+  let itemsHtml = '';
+  document.querySelectorAll('[id^="checkout-item-"]').forEach(row => {
+    const name = row.querySelector('div > div > div')?.innerText?.trim() || '';
+    const qty = row.querySelector('[id^="co-qty-"]')?.textContent?.trim() || '';
+    const sub = row.querySelector('[id^="co-sub-"]')?.textContent?.trim() || '';
+    itemsHtml += `<div class="d-flex justify-content-between py-1 border-bottom">
+      <span>${name} <span class="text-muted">× ${qty}</span></span>
+      <span class="fw-semibold">${sub}</span>
+    </div>`;
+  });
+
+  // Get totals
+  const subtotalEl = document.querySelector('.d-flex.justify-content-between.small.mb-1 span:last-child');
+  const rows = document.querySelectorAll('.d-flex.justify-content-between.small');
+  let subtotal = '', delivery = '', total = '';
+  rows.forEach(r => {
+    const label = r.querySelector('span:first-child')?.textContent?.trim();
+    const val = r.querySelector('span:last-child')?.textContent?.trim();
+    if (label === 'Subtotal') subtotal = val;
+    if (label?.startsWith('Delivery')) delivery = val;
+  });
+  const totalEl = document.querySelector('.d-flex.justify-content-between.fw-bold span:last-child');
+  total = totalEl ? totalEl.textContent.trim() : '';
+
+  // Payment method
+  const payMethod = document.querySelector('input[name="payment_method"]:checked');
+  const payLabel = payMethod ? payMethod.closest('label')?.textContent?.trim() : '';
+
+  // Populate modal
+  document.getElementById('confirmAddress').textContent = addrText;
+  document.getElementById('confirmItems').innerHTML = itemsHtml || '<span class="text-muted">No items</span>';
+  document.getElementById('confirmSubtotal').textContent = subtotal;
+  document.getElementById('confirmDelivery').textContent = delivery;
+  document.getElementById('confirmTotal').textContent = total;
+  document.getElementById('confirmPayment').textContent = payLabel;
+
+  new bootstrap.Modal(document.getElementById('confirmOrderModal')).show();
+});
+
+// Confirm button submits the actual form
+document.getElementById('confirmPlaceBtn').addEventListener('click', function() {
+  this.disabled = true;
+  this.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Placing...';
+  document.getElementById('checkoutForm').submit();
+});
+
+// Checkout qty controls
+function checkoutQty(variantId, delta) {
+  const csrfToken = document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+  const qtyEl = document.getElementById('co-qty-' + variantId);
+  const current = parseInt(qtyEl ? qtyEl.textContent : 1);
+  const newQty = delta === 0 ? 0 : Math.max(0, current + delta);
+
+  fetch(`/cart/api/set_qty/${variantId}/`, {
+    method: 'POST',
+    headers: {
+      'X-CSRFToken': csrfToken,
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: 'quantity=' + newQty,
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.success) {
+      if (newQty === 0) {
+        // Remove row and reload to recalculate totals
+        window.location.reload();
+      } else {
+        if (qtyEl) qtyEl.textContent = newQty;
+        // Reload to recalculate subtotal/total accurately
+        window.location.reload();
+      }
+    }
+  })
+  .catch(() => alert('Could not update. Please try again.'));
+}
+</script>
+{% endblock %}

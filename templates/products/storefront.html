@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}{{ distributor.company_name }} — Shop Online{% endblock %}
+{% block body_class %}ms-shop{% endblock %}
+
+{% block content %}
+<div class="store-utility-strip mb-0">
+  <div class="container d-flex flex-wrap align-items-center justify-content-center justify-content-md-between gap-2 py-2">
+    <span><i class="bi bi-shop me-1"></i> {{ distributor.company_name }}</span>
+    <span><i class="bi bi-patch-check me-1"></i> Trusted local supply</span>
+    <span><i class="bi bi-truck me-1"></i> Fast doorstep delivery</span>
+  </div>
+</div>
+
+<!-- Store Hero -->
+<div class="py-4 py-md-5 text-white text-center storefront-hero" style="background: var(--theme-color, #2e7d32);">
+  <div class="container px-3">
+    {% if distributor.logo %}
+      <img src="{{ distributor.logo.url }}" style="height:56px;width:auto;object-fit:contain;filter:brightness(0) invert(1)" alt="{{ distributor.company_name }}" class="mb-2">
+    {% endif %}
+    <h1 class="fw-bold mb-1">{{ distributor.company_name }}</h1>
+    {% if distributor.tagline %}
+      <p class="lead mb-2 opacity-75">{{ distributor.tagline }}</p>
+    {% endif %}
+    {% if distributor.area %}
+      <span class="badge bg-light text-dark"><i class="bi bi-geo-alt me-1"></i>{{ distributor.area }}</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="container mt-4 mb-5 pb-4 product-grid-section">
+  <!-- Search + Filters -->
+  <div class="sticky-shop-toolbar row g-2 mb-3 align-items-center">
+    <div class="col-12 col-md-5">
+      <form method="get" class="input-group input-group-sm">
+        <input type="text" name="q" class="form-control" placeholder="Search products..." value="{{ search }}">
+        {% if selected_category %}<input type="hidden" name="category" value="{{ selected_category }}">{% endif %}
+        <button class="btn btn-success" type="submit"><i class="bi bi-search"></i></button>
+      </form>
+    </div>
+    <div class="col-auto">
+      <select onchange="location.href='?sort='+this.value{% if selected_category %}+'&category={{ selected_category }}'{% endif %}{% if search %}+'&q={{ search }}'{% endif %}" class="form-select form-select-sm" style="width:auto">
+        <option value="newest" {% if sort == 'newest' %}selected{% endif %}>Newest</option>
+        <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Price: Low → High</option>
+        <option value="price_desc" {% if sort == 'price_desc' %}selected{% endif %}>Price: High → Low</option>
+        <option value="rating" {% if sort == 'rating' %}selected{% endif %}>Top Rated</option>
+      </select>
+    </div>
+  </div>
+
+  <!-- Categories: horizontal-scroll chips (app-like) -->
+  <div class="ms-cat-scroll">
+    <a href="{% url 'products:distributor_storefront' invite_code %}" class="ms-cat-chip {% if not selected_category %}active{% endif %}">All</a>
+    {% for cat in categories %}
+      <a href="{% url 'products:distributor_storefront' invite_code %}?category={{ cat.slug }}" class="ms-cat-chip {% if selected_category == cat.slug %}active{% endif %}">{{ cat.name }}</a>
+    {% endfor %}
+  </div>
+
+  <!-- Product Grid -->
+  <div class="row g-4 product-grid">
+    {% for product in products %}
+    <div class="col-6 col-sm-4 col-md-3">
+      <div class="card product-card position-relative h-100">
+        {% if product.has_discount %}
+          <span class="product-card-offer-badge">Deal</span>
+        {% elif product.rating and product.rating >= 4.5 %}
+          <span class="product-card-offer-badge product-card-offer-badge-alt">Popular</span>
+        {% endif %}
+        <a href="{% url 'products:product_detail' product.pk %}" class="text-decoration-none">
+          {% if product.image %}
+            <img src="{{ product.image.url }}" class="card-img-top product-card-image" style="object-fit:cover" alt="{{ product.name }}">
+          {% else %}
+            <div class="card-img-top d-flex align-items-center justify-content-center bg-light" style="height:128px">
+              <i class="bi bi-box-seam fs-1 text-muted"></i>
+            </div>
+          {% endif %}
+        </a>
+        <div class="card-body">
+          <a href="{% url 'products:product_detail' product.pk %}" class="text-decoration-none">
+            <div class="ms-name">{{ product.name }}</div>
+          </a>
+          {% if product.default_var %}
+            <div class="ms-weight">{{ product.display_label }}</div>
+            <div class="ms-price-row">
+              <span class="ms-price">₹{{ product.display_price|floatformat:0 }}</span>
+              {% if product.has_discount %}
+                <span class="ms-mrp">₹{{ product.display_mrp|floatformat:0 }}</span>
+              {% endif %}
+            </div>
+          {% endif %}
+          {% if product.rating %}
+            <span class="ms-rating">⭐ {{ product.rating }}</span>
+          {% endif %}
+          <a href="{% url 'products:product_detail' product.pk %}" class="ms-add">VIEW</a>
+        </div>
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center py-5 text-muted">
+      <i class="bi bi-shop fs-1 d-block mb-2"></i>
+      <p>No products available in this store yet.</p>
+    </div>
+    {% endfor %}
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <nav class="mt-4">
+    <ul class="pagination pagination-sm justify-content-center">
+      {% if page_obj.has_previous %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search %}&q={{ search }}{% endif %}&sort={{ sort }}">‹</a></li>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+          <a class="page-link" href="?page={{ num }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search %}&q={{ search }}{% endif %}&sort={{ sort }}">{{ num }}</a>
+        </li>
+      {% endfor %}
+      {% if page_obj.has_next %}
+        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if selected_category %}&category={{ selected_category }}{% endif %}{% if search %}&q={{ search }}{% endif %}&sort={{ sort }}">›</a></li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+  <!-- CTA -->
+  <div class="text-center mt-4 py-3">
+    <p class="text-muted small mb-2">Want to order? Register or login to place orders.</p>
+    <a href="{% url 'accounts:register' %}?ref={{ invite_code }}" class="btn btn-success px-4 me-2">
+      <i class="bi bi-person-plus me-1"></i>Register
+    </a>
+    <a href="{% url 'accounts:login' %}" class="btn btn-outline-secondary px-4">
+      <i class="bi bi-box-arrow-in-right me-1"></i>Login
+    </a>
+  </div>
+</div>
+
+<!-- App-like bottom navigation (mobile) -->
+<nav class="ms-bottom-nav">
+  <a href="{% url 'products:distributor_storefront' invite_code %}" class="active"><i class="bi bi-house-door-fill"></i>Home</a>
+  <a href="#" onclick="document.querySelector('.sticky-shop-toolbar input')?.focus();return false;"><i class="bi bi-search"></i>Search</a>
+  <a href="{% url 'cart:cart' %}">
+    <span class="position-relative">
+      <i class="bi bi-bag"></i>
+      <span class="ms-cart-count {% if not cart_count %}d-none{% endif %}" data-cart-badge>{{ cart_count }}</span>
+    </span>
+    Cart
+  </a>
+  {% if user.is_authenticated %}
+    <a href="{% url 'accounts:profile' %}"><i class="bi bi-person"></i>Account</a>
+  {% else %}
+    <a href="{% url 'accounts:login' %}"><i class="bi bi-person"></i>Login</a>
+  {% endif %}
+</nav>
+{% endblock %}

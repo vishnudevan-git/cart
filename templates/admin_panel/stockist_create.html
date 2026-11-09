@@ -1,0 +1,28 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}Create Stockist{% endblock %}
+{% block page_title %}📦 Create Stockist Account{% endblock %}
+{% block active_nav %}stockist_list{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'admin_panel:stockist_list' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Back to Stockists</a>
+</div>
+<div class="card border-0 shadow-sm" style="max-width:500px">
+  <div class="card-body p-4">
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3"><label class="form-label fw-semibold">Username *</label><input name="username" class="form-control" value="{{ post.username|default:'' }}" required></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Password *</label><input name="password" type="password" class="form-control" required></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Company Name *</label><input name="company_name" class="form-control" value="{{ post.company_name|default:'' }}" required></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Full Name</label><input name="first_name" class="form-control" value="{{ post.first_name|default:'' }}"></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Email</label><input name="email" type="email" class="form-control" value="{{ post.email|default:'' }}"></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Phone</label><input name="phone" class="form-control" value="{{ post.phone|default:'' }}"></div>
+      <div class="mb-3"><label class="form-label fw-semibold">Area (optional)</label><input name="area" class="form-control" value="{{ post.area|default:'' }}" placeholder="For future regional assignment"></div>
+      <button type="submit" class="btn btn-success w-100">Create Stockist</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/username_validation.js"></script>
+{% endblock %}

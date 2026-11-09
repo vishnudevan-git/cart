@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Project Checklist — Multi-Marketplace Platform</title>
+<style>
+  :root {
+    --green:#1f8f3a; --red:#dc3545; --amber:#f59e0b;
+    --blue:#0d6efd; --grey:#6b7280; --bg:#f9fafb;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:#1f2937;font-size:15px}
+  header{background:var(--green);color:#fff;padding:1.2rem 1.5rem;position:sticky;top:0;z-index:100;
+    display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+  header h1{font-size:1.3rem;font-weight:800}
+  .stats{display:flex;gap:1rem;font-size:.85rem;flex-wrap:wrap}
+  .stat{background:rgba(255,255,255,.2);border-radius:20px;padding:.25rem .75rem}
+  .stat b{font-size:1.1rem}
+  main{max-width:1100px;margin:0 auto;padding:1.5rem 1rem}
+  .note{background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:.75rem 1rem;margin-bottom:1.5rem;font-size:.9rem}
+
+  /* SECTION */
+  .section{margin-bottom:1.5rem;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+  .section-header{padding:.8rem 1.1rem;cursor:pointer;display:flex;align-items:center;gap:.6rem;user-select:none}
+  .section-header:hover{filter:brightness(.97)}
+  .section-header h2{font-size:1rem;font-weight:700;flex:1}
+  .section-header .badge{font-size:.72rem;font-weight:700;padding:.2rem .55rem;border-radius:20px;background:rgba(255,255,255,.35)}
+  .section-body{background:#fff}
+  .section-body.collapsed{display:none}
+
+  /* SUBSECTION */
+  .sub{border-top:1px solid #f1f5f9}
+  .sub-header{background:#f8fafc;padding:.55rem 1.1rem .55rem 1.5rem;font-size:.82rem;font-weight:700;
+    color:#374151;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;display:flex;align-items:center;gap:.5rem}
+  .sub-header:hover{background:#f1f5f9}
+  .sub-body.collapsed{display:none}
+
+  /* ITEM */
+  .item{display:flex;align-items:flex-start;gap:.75rem;padding:.6rem 1.1rem .6rem 2.2rem;
+    border-top:1px solid #f3f4f6;transition:background .15s}
+  .item:hover{background:#f9fafb}
+  .item-text{flex:1;line-height:1.45}
+  .item-text .title{font-size:.9rem}
+  .item-text .desc{font-size:.78rem;color:var(--grey);margin-top:.15rem}
+  .item-text .url{font-family:Consolas,monospace;font-size:.72rem;color:#2563eb;margin-top:.15rem}
+
+  /* STATUS BUTTONS */
+  .btns{display:flex;gap:.3rem;flex-shrink:0;margin-top:.05rem}
+  .btn{border:none;border-radius:6px;padding:.25rem .55rem;font-size:.7rem;font-weight:700;cursor:pointer;opacity:.38;transition:.15s}
+  .btn:hover{opacity:.75}
+  .btn.active{opacity:1}
+  .btn-ok{background:#d1fae5;color:#065f46}
+  .btn-ok.active{background:#10b981;color:#fff}
+  .btn-issue{background:#fee2e2;color:#991b1b}
+  .btn-issue.active{background:#ef4444;color:#fff}
+  .btn-skip{background:#f1f5f9;color:#475569}
+  .btn-skip.active{background:#94a3b8;color:#fff}
+
+  /* ROW states */
+  .item.done   {background:#f0fdf4}
+  .item.issue  {background:#fef2f2}
+  .item.skipped{background:#f8fafc;opacity:.7}
+
+  /* LEGEND / FILTER */
+  .toolbar{display:flex;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap;align-items:center}
+  .toolbar label{font-size:.82rem;font-weight:600;color:#374151}
+  .filter-btn{padding:.3rem .75rem;border:1.5px solid #d1d5db;border-radius:20px;
+    background:#fff;font-size:.78rem;cursor:pointer;font-weight:600}
+  .filter-btn.on{background:var(--green);color:#fff;border-color:var(--green)}
+
+  /* COLORS per role */
+  [data-color="red"]    .section-header{background:#dc3545;color:#fff}
+  [data-color="orange"] .section-header{background:#ea580c;color:#fff}
+  [data-color="amber"]  .section-header{background:#d97706;color:#fff}
+  [data-color="teal"]   .section-header{background:#0d9488;color:#fff}
+  [data-color="blue"]   .section-header{background:#2563eb;color:#fff}
+  [data-color="purple"] .section-header{background:#7c3aed;color:#fff}
+  [data-color="green"]  .section-header{background:#16a34a;color:#fff}
+  [data-color="grey"]   .section-header{background:#4b5563;color:#fff}
+  [data-color="pink"]   .section-header{background:#db2777;color:#fff}
+
+  progress-bar{display:block;height:4px;background:#d1fae5;margin:0}
+  .prog{height:4px;background:linear-gradient(90deg,#10b981,#34d399);width:0%;transition:.3s}
+
+  @media(max-width:600px){
+    .btns{flex-direction:column}
+    .item{padding:.6rem .6rem .6rem 1rem}
+  }
+  .print-btn{background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.5);color:#fff;
+    border-radius:20px;padding:.3rem .9rem;font-size:.8rem;cursor:pointer}
+  .print-btn:hover{background:rgba(255,255,255,.35)}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📋 Project Checklist — Multi-Marketplace</h1>
+    <div style="font-size:.78rem;opacity:.8;margin-top:.2rem">
+      Tick each item as you verify it. Progress is saved in the browser.
+    </div>
+  </div>
+  <div>
+    <div class="stats">
+      <div class="stat">✅ Done: <b id="cntOk">0</b></div>
+      <div class="stat">❌ Issues: <b id="cntIssue">0</b></div>
+      <div class="stat">⏭ Skipped: <b id="cntSkip">0</b></div>
+      <div class="stat">⬜ Pending: <b id="cntPend">0</b></div>
+    </div>
+    <div style="margin-top:.4rem;display:flex;gap:.5rem">
+      <button class="print-btn" onclick="window.print()">🖨 Print</button>
+      <button class="print-btn" onclick="resetAll()">🔄 Reset All</button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<div class="note">
+  <strong>How to use:</strong> Open each section, verify the item in your browser at
+  <code>localhost:8000</code>, then click <strong>✓</strong> (done), <strong>✗</strong> (issue found), or
+  <strong>→</strong> (skip for now). Work through the roles in order. 
+  <strong>Issues are saved</strong> — come back to them later.
+</div>
+
+<div class="toolbar">
+  <label>Filter:</label>
+  <button class="filter-btn on" data-filter="all">All</button>
+  <button class="filter-btn" data-filter="pending">Pending</button>
+  <button class="filter-btn" data-filter="issue">Issues</button>
+  <button class="filter-btn" data-filter="done">Done</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 1. ADMIN -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="red" id="sec-admin">
+  <div class="section-header" onclick="toggle(this)">
+    <span>👑</span>
+    <h2>1 — Admin Role</h2>
+    <span class="badge" id="badge-admin">0 / 0</span>
+    <span style="font-size:.8rem;opacity:.7">Login: 9000000005 / admin123</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-admin">
+    <div class="prog" id="prog-admin"></div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Login & Access</div>
+      <div class="sub-body">
+        <div class="item" data-id="a1">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Admin can log in</div><div class="url">localhost:8000/accounts/login/</div></div>
+        </div>
+        <div class="item" data-id="a2">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Admin sees dashboard with stats (orders, users, products)</div><div class="url">localhost:8000/admin-panel/dashboard/</div></div>
+        </div>
+        <div class="item" data-id="a3">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Non-admin cannot access admin panel (gets redirected)</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ User Management</div>
+      <div class="sub-body">
+        <div class="item" data-id="a4">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">See all users list (all roles)</div><div class="url">localhost:8000/admin-panel/users/</div></div>
+        </div>
+        <div class="item" data-id="a5">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Create a new user (assign a role)</div><div class="url">localhost:8000/admin-panel/users/create/</div></div>
+        </div>
+        <div class="item" data-id="a6">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Soft-delete a user → appears under Deleted tab</div></div>
+        </div>
+        <div class="item" data-id="a7">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Restore a deleted user</div><div class="url">localhost:8000/admin-panel/users/?deleted=1</div></div>
+        </div>
+        <div class="item" data-id="a8">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Reset any user's password</div></div>
+        </div>
+        <div class="item" data-id="a9">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">See Customers list — 100 customers, linked to their shops</div><div class="url">localhost:8000/admin-panel/customers/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Supplier Management</div>
+      <div class="sub-body">
+        <div class="item" data-id="a10">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">See all 37 suppliers, suspend/activate one</div><div class="url">localhost:8000/admin-panel/suppliers/</div></div>
+        </div>
+        <div class="item" data-id="a11">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Create a new supplier account</div><div class="url">localhost:8000/admin-panel/suppliers/create/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Stockist Management</div>
+      <div class="sub-body">
+        <div class="item" data-id="a12">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">See stockist list (2 stockists), suspend/activate</div><div class="url">localhost:8000/admin-panel/stockist/</div></div>
+        </div>
+        <div class="item" data-id="a13">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Create a new stockist (dedicated form with company info)</div><div class="url">localhost:8000/admin-panel/stockist/create/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Distributor Management</div>
+      <div class="sub-body">
+        <div class="item" data-id="a14">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text">
+            <div class="title">See all 6 Distributors — each links to a Stockist and supplies multiple Shops</div>
+            <div class="desc">Chain: Supplier → Stockist → Distributor → Shop. Distributor adds its margin (per unit or per kg) on top of stockist cost. 2 are currently suspended (Chennai Wholesale Distributors) — this needs to be resolved.</div>
+            <div class="url">localhost:8000/admin-panel/wholesale-distributors/</div>
+          </div>
+        </div>
+        <div class="item" data-id="a14b">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text">
+            <div class="title">⚠️ Reactivate or replace Chennai Wholesale Distributors (currently suspended)</div>
+            <div class="desc">Anna Nagar Organics and Velachery Fresh Store are linked to this suspended Distributor. Their pricing chain is incomplete until this is fixed.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Marketplace (Shop) Management</div>
+      <div class="sub-body">
+        <div class="item" data-id="a15">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">See 4 active shops with product counts — Anna Nagar (59), Velachery (42), E2E (32), North Chennai (11)</div><div class="url">localhost:8000/admin-panel/distributors/</div></div>
+        </div>
+        <div class="item" data-id="a16">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Suspend a shop (archives it, preserves all data)</div></div>
+        </div>
+        <div class="item" data-id="a17">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Price Trace — see full supplier→stockist→distributor→shop price chain for any product</div><div class="url">localhost:8000/admin-panel/price-trace/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Products & Categories</div>
+      <div class="sub-body">
+        <div class="item" data-id="a18">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">See all 59 approved products, filter by status/category/supplier</div><div class="url">localhost:8000/admin-panel/products/</div></div>
+        </div>
+        <div class="item" data-id="a19">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Approve / reject a pending product</div></div>
+        </div>
+        <div class="item" data-id="a20">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">See 7 categories (Dry Fruits, Spices, Organic, Nuts, Organic Products, Smoke Checks, Other)</div><div class="url">localhost:8000/admin-panel/categories/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Orders & Payments</div>
+      <div class="sub-body">
+        <div class="item" data-id="a21">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">See all orders (21 total), filter by status</div><div class="url">localhost:8000/admin-panel/orders/</div></div>
+        </div>
+        <div class="item" data-id="a22">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">13 pending payments visible — investigate why unresolved</div><div class="url">localhost:8000/admin-panel/orders/?status=delivered</div></div>
+        </div>
+        <div class="item" data-id="a23">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Run integrity audit — no errors expected</div><div class="desc">Terminal: venv\Scripts\python.exe manage.py audit_integrity</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 2. SUPPLIER -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="orange" id="sec-supplier">
+  <div class="section-header" onclick="toggle(this)">
+    <span>🏭</span>
+    <h2>2 — Supplier Role</h2>
+    <span class="badge" id="badge-supplier">0 / 0</span>
+    <span style="font-size:.8rem;opacity:.7">Login: 9700000001 / Test@12345</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-supplier">
+    <div class="prog" id="prog-supplier"></div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Login & Dashboard</div>
+      <div class="sub-body">
+        <div class="item" data-id="s1">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Supplier logs in and lands on Supplier Dashboard</div><div class="url">localhost:8000/supplier/dashboard/</div></div>
+        </div>
+        <div class="item" data-id="s2">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Dashboard shows total earnings, products, orders stats</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Product Management</div>
+      <div class="sub-body">
+        <div class="item" data-id="s3">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Supplier can add a new product (name, category, packs with price)</div><div class="url">localhost:8000/supplier/products/add/</div></div>
+        </div>
+        <div class="item" data-id="s4">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Product appears as "Pending" after adding (needs admin approval)</div><div class="url">localhost:8000/supplier/products/</div></div>
+        </div>
+        <div class="item" data-id="s5">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Supplier can edit existing product (packs, price)</div></div>
+        </div>
+        <div class="item" data-id="s6">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Supplier can see price history for their products</div><div class="url">localhost:8000/supplier/price-history/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Stock Management</div>
+      <div class="sub-body">
+        <div class="item" data-id="s7">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Supplier can update stock levels for their products</div><div class="url">localhost:8000/supplier/stock/</div></div>
+        </div>
+        <div class="item" data-id="s8">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Supplier can fulfil a stockist restock request (delivers stock, stockist qty goes up)</div><div class="url">localhost:8000/supplier/restock-requests/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Orders & Payments</div>
+      <div class="sub-body">
+        <div class="item" data-id="s9">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Supplier can see orders that include their products</div><div class="url">localhost:8000/supplier/orders/</div></div>
+        </div>
+        <div class="item" data-id="s10">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Payments center shows earnings and settlement records</div><div class="url">localhost:8000/payments/center/</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 3. STOCKIST -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="amber" id="sec-stockist">
+  <div class="section-header" onclick="toggle(this)">
+    <span>🏬</span>
+    <h2>3 — Stockist Role</h2>
+    <span class="badge" id="badge-stockist">0 / 0</span>
+    <span style="font-size:.8rem;opacity:.7">Login: 9000000004 / Test@12345</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-stockist">
+    <div class="prog" id="prog-stockist"></div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Dashboard & Inventory</div>
+      <div class="sub-body">
+        <div class="item" data-id="st1">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist logs in and sees dashboard with inventory summary</div><div class="url">localhost:8000/stockist/dashboard/</div></div>
+        </div>
+        <div class="item" data-id="st2">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Inventory grid shows products with stock levels</div><div class="url">localhost:8000/stockist/inventory/</div></div>
+        </div>
+        <div class="item" data-id="st3">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist can REDUCE stock manually (offline sales). Cannot increase manually.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Processing Charges (Price-Setting)</div>
+      <div class="sub-body">
+        <div class="item" data-id="st4">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist can set/edit processing charges per stage (packing, handling etc.)</div><div class="url">localhost:8000/stockist/processing-charges/</div></div>
+        </div>
+        <div class="item" data-id="st5">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist can RELEASE an approved product (charges_confirmed) so shops can list it</div></div>
+        </div>
+        <div class="item" data-id="st6">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Direct supply toggle — stockist can mark a product as "direct supply" (bypasses stockist charges)</div><div class="url">localhost:8000/stockist/direct-supply/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Order Fulfillment</div>
+      <div class="sub-body">
+        <div class="item" data-id="st7">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist sees confirmed orders needing pickup from supplier</div><div class="url">localhost:8000/stockist/orders/</div></div>
+        </div>
+        <div class="item" data-id="st8">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist can "Pick" an order (status → stockist_picked)</div></div>
+        </div>
+        <div class="item" data-id="st9">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist can "Deliver to shop" (status → at_distributor)</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Restock</div>
+      <div class="sub-body">
+        <div class="item" data-id="st10">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist can request restock from supplier (stock comes in only on delivery)</div><div class="url">localhost:8000/stockist/restock-requests/</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 4. SHOP (MARKETPLACE) -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="blue" id="sec-shop">
+  <div class="section-header" onclick="toggle(this)">
+    <span>🛒</span>
+    <h2>4 — Marketplace (Shop) Role</h2>
+    <span class="badge" id="badge-shop">0 / 0</span>
+    <span style="font-size:.8rem;opacity:.7">Login: 9100000020 / Test@12345</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-shop">
+    <div class="prog" id="prog-shop"></div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Dashboard</div>
+      <div class="sub-body">
+        <div class="item" data-id="sh1">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop logs in, sees dashboard with orders / revenue / customers</div><div class="url">localhost:8000/distributor/dashboard/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Catalogue & Pricing (Shared Products)</div>
+      <div class="sub-body">
+        <div class="item" data-id="sh2">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop sees product catalogue (59 shared products from suppliers)</div><div class="url">localhost:8000/distributor/products/</div></div>
+        </div>
+        <div class="item" data-id="sh3">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop can set its selling price for listed products (must be ≥ cost floor)</div></div>
+        </div>
+        <div class="item" data-id="sh4">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Global pricing setup — shop configures once before selling</div></div>
+        </div>
+        <div class="item" data-id="sh5">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Price trace: admin can verify price chain is correct for this shop</div><div class="url">localhost:8000/admin-panel/price-trace/</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Own Products (Shop-Private)</div>
+      <div class="sub-body">
+        <div class="item" data-id="sh6">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop can add its own private product (visible only in this shop)</div><div class="url">localhost:8000/distributor/my-products/new/</div></div>
+        </div>
+        <div class="item" data-id="sh7">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Template picker: type a product name, reuse from shared library</div><div class="desc">e.g. type "soap" — should show Lux Soap Bar from library</div></div>
+        </div>
+        <div class="item" data-id="sh8">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Bulk import from product library</div><div class="url">localhost:8000/distributor/my-products/library/</div></div>
+        </div>
+        <div class="item" data-id="sh9">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Own product NOT visible in another shop's storefront</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Customers</div>
+      <div class="sub-body">
+        <div class="item" data-id="sh10">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop's "My Customers" list shows all linked customers</div><div class="url">localhost:8000/distributor/customers/</div></div>
+        </div>
+        <div class="item" data-id="sh11">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop invite link/code works — new customer registration links to this shop</div></div>
+        </div>
+        <div class="item" data-id="sh12">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Customer entering store key after signup gets linked to shop</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Orders</div>
+      <div class="sub-body">
+        <div class="item" data-id="sh13">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop sees new order, can confirm it</div><div class="url">localhost:8000/distributor/orders/</div></div>
+        </div>
+        <div class="item" data-id="sh14">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop marks order out-for-delivery</div><div class="url">localhost:8000/delivery/</div></div>
+        </div>
+        <div class="item" data-id="sh15">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Partial delivery: shop selects specific items, marks them delivered, partial COD collected</div></div>
+        </div>
+        <div class="item" data-id="sh16">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Full delivery: all items at once, full COD collected, payment auto-marked paid</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Stock</div>
+      <div class="sub-body">
+        <div class="item" data-id="sh17">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop can see its own stock levels, reduce manually</div><div class="url">localhost:8000/distributor/my-stock/</div></div>
+        </div>
+        <div class="item" data-id="sh18">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop can request restock (stock comes up only when delivered by stockist)</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 5. CUSTOMER -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="green" id="sec-customer">
+  <div class="section-header" onclick="toggle(this)">
+    <span>👤</span>
+    <h2>5 — Customer Role</h2>
+    <span class="badge" id="badge-customer">0 / 0</span>
+    <span style="font-size:.8rem;opacity:.7">Login: 9321000001 / GoodPass!234</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-customer">
+    <div class="prog" id="prog-customer"></div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Registration & Login</div>
+      <div class="sub-body">
+        <div class="item" data-id="c1">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Customer can register via shop invite link (auto-links to that shop)</div><div class="desc">e.g. localhost:8000/store/LAA43JSG/ then register</div></div>
+        </div>
+        <div class="item" data-id="c2">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Customer can log in (two-step: mobile/email → password)</div><div class="url">localhost:8000/accounts/login/</div></div>
+        </div>
+        <div class="item" data-id="c3">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Registration does NOT ask for pincode anymore (removed — collected in address)</div></div>
+        </div>
+        <div class="item" data-id="c4">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Password must not be all-numbers (Django validator)</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Shopping</div>
+      <div class="sub-body">
+        <div class="item" data-id="c5">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Customer sees only their linked shop's products (not other shops)</div><div class="url">localhost:8000/products/</div></div>
+        </div>
+        <div class="item" data-id="c6">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Add to cart, update qty, remove item</div><div class="url">localhost:8000/cart/</div></div>
+        </div>
+        <div class="item" data-id="c7">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Checkout — only COD option, address required</div><div class="url">localhost:8000/orders/checkout/</div></div>
+        </div>
+        <div class="item" data-id="c8">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Free delivery above threshold works (delivery charge = ₹0 above limit)</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Orders & Tracking</div>
+      <div class="sub-body">
+        <div class="item" data-id="c9">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Customer order list shows all their orders</div><div class="url">localhost:8000/orders/my-orders/</div></div>
+        </div>
+        <div class="item" data-id="c10">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Order timeline advances correctly through all 6 stages</div><div class="desc">Pending → Confirmed → Picked from Supplier → At Local Store (shop name) → Out for Delivery → Delivered</div></div>
+        </div>
+        <div class="item" data-id="c11">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Per-item status shows (Delivered / On the way / Coming soon / Preparing)</div></div>
+        </div>
+        <div class="item" data-id="c12">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Express delivery (shop has stock): timeline shows 4 steps, no stockist steps</div></div>
+        </div>
+        <div class="item" data-id="c13">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Payment shows collected amount and pending amount for partial COD</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Account</div>
+      <div class="sub-body">
+        <div class="item" data-id="c14">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Customer can update profile (name, phone, email)</div><div class="url">localhost:8000/accounts/profile/</div></div>
+        </div>
+        <div class="item" data-id="c15">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Customer can add/edit delivery addresses (pincode lookup works here)</div><div class="url">localhost:8000/accounts/addresses/</div></div>
+        </div>
+        <div class="item" data-id="c16">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Customer can change their own password</div><div class="url">localhost:8000/accounts/change-password/</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 6. PRICING CHAIN -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="teal" id="sec-pricing">
+  <div class="section-header" onclick="toggle(this)">
+    <span>💰</span>
+    <h2>6 — Price Chain (Supplier → Stockist → Distributor → Shop)</h2>
+    <span class="badge" id="badge-pricing">0 / 0</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-pricing">
+    <div class="prog" id="prog-pricing"></div>
+
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Price Stages</div>
+      <div class="sub-body">
+        <div class="item" data-id="p1">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Supplier sets base price for each product pack</div></div>
+        </div>
+        <div class="item" data-id="p2">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stockist sets processing charges (packing, handling etc.) — added to base price</div></div>
+        </div>
+        <div class="item" data-id="p3">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text">
+            <div class="title">Distributor margin — added on top of the stockist cost</div>
+            <div class="desc">The Distributor sits between Stockist and Shop. Charges per unit or per kg. Verify a Distributor is assigned to each shop and is ACTIVE (not suspended).</div>
+            <div class="url">localhost:8000/admin-panel/wholesale-distributors/</div>
+          </div>
+        </div>
+        <div class="item" data-id="p3b">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text">
+            <div class="title">⚠️ Anna Nagar + Velachery: their Distributor (Chennai Wholesale Distributors) is SUSPENDED</div>
+            <div class="desc">When the Distributor is suspended, its margin is not applied to the cost floor — shops may be pricing without the Distributor's cut. Fix: reactivate Chennai Wholesale Distributors, or reassign these shops to an active Distributor.</div>
+            <div class="url">localhost:8000/admin-panel/wholesale-distributors/</div>
+          </div>
+        </div>
+        <div class="item" data-id="p4">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Cost floor = supplier price + stockist charges + Distributor margin. Shop price cannot go below this.</div></div>
+        </div>
+        <div class="item" data-id="p5">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Shop sets selling price (≥ floor, ≤ MRP). Customer pays this price.</div></div>
+        </div>
+        <div class="item" data-id="p6">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Verify with Price Trace tool: pick any shop + product, see full breakdown</div><div class="url">localhost:8000/admin-panel/price-trace/</div></div>
+        </div>
+        <div class="item" data-id="p7">
+          <div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div>
+          <div class="item-text"><div class="title">Stale price alert works — if supplier changes price, shop is prompted to re-price</div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 7. ORDER LIFECYCLE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="purple" id="sec-orders">
+  <div class="section-header" onclick="toggle(this)">
+    <span>📦</span>
+    <h2>7 — Order Lifecycle</h2>
+    <span class="badge" id="badge-orders">0 / 0</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-orders">
+    <div class="prog" id="prog-orders"></div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Normal Flow (Supplier-fulfilled)</div>
+      <div class="sub-body">
+        <div class="item" data-id="o1"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Customer places order → status: Pending</div></div></div>
+        <div class="item" data-id="o2"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Shop confirms → status: Confirmed</div></div></div>
+        <div class="item" data-id="o3"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Stockist picks from supplier → status: Picked from Supplier</div></div></div>
+        <div class="item" data-id="o4"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Stockist delivers to shop → status: At Local Store</div></div></div>
+        <div class="item" data-id="o5"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Shop marks out-for-delivery → status: Out for Delivery</div></div></div>
+        <div class="item" data-id="o6"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Shop marks delivered → status: Delivered, COD payment auto-closed to Paid</div></div></div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Express Flow (Shop has stock)</div>
+      <div class="sub-body">
+        <div class="item" data-id="o7"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">If shop has all items in stock, order starts at At Local Store (skips supplier/stockist)</div></div></div>
+        <div class="item" data-id="o8"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Customer sees 4-step Express timeline (not 6-step)</div></div></div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Partial Delivery</div>
+      <div class="sub-body">
+        <div class="item" data-id="o9"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Shop can deliver some items, collect partial COD → status: Partially Delivered</div></div></div>
+        <div class="item" data-id="o10"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Customer sees per-item status (Delivered / On the way / Coming soon)</div></div></div>
+        <div class="item" data-id="o11"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">COD collection history shows each instalment (batch 1: ₹X, batch 2: ₹Y)</div></div></div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Cancellation</div>
+      <div class="sub-body">
+        <div class="item" data-id="o12"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Order can be cancelled from Pending / Confirmed / any non-final stage</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 8. PAYMENTS -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="grey" id="sec-payments">
+  <div class="section-header" onclick="toggle(this)">
+    <span>💳</span>
+    <h2>8 — Payments & Settlements</h2>
+    <span class="badge" id="badge-payments">0 / 0</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-payments">
+    <div class="prog" id="prog-payments"></div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ COD (only payment method)</div>
+      <div class="sub-body">
+        <div class="item" data-id="pay1"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Checkout shows only "Cash on Delivery" option (no UPI/card)</div></div></div>
+        <div class="item" data-id="pay2"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">On delivery: payment auto-marked Paid with timestamp</div></div></div>
+        <div class="item" data-id="pay3"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Partial COD: amount_collected increments per batch, fully_paid when total reached</div></div></div>
+        <div class="item" data-id="pay4"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">13 pending payments exist — run audit to find any delivered orders still pending</div><div class="desc">Terminal: venv\Scripts\python.exe manage.py audit_integrity</div></div></div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Settlements (between tiers)</div>
+      <div class="sub-body">
+        <div class="item" data-id="pay5"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Ledger entries created on order: customer→shop, stockist charge, distributor margin</div></div></div>
+        <div class="item" data-id="pay6"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Payments center shows active/completed settlements</div><div class="url">localhost:8000/payments/center/</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- 9. SYSTEM HEALTH -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="section" data-color="pink" id="sec-system">
+  <div class="section-header" onclick="toggle(this)">
+    <span>🔧</span>
+    <h2>9 — System Health & Operations</h2>
+    <span class="badge" id="badge-system">0 / 0</span>
+    <span>▾</span>
+  </div>
+  <div class="section-body" id="body-system">
+    <div class="prog" id="prog-system"></div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Request Logging</div>
+      <div class="sub-body">
+        <div class="item" data-id="sys1"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">A new request log file is created each server start (timestamped)</div><div class="desc">Check: logs/ folder has requests_YYYY-MM-DD_HH-MM-SS.log</div></div></div>
+        <div class="item" data-id="sys2"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Each log entry shows: time | user(role) | method | status | duration | IP | URL</div></div></div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ Data Integrity Audit</div>
+      <div class="sub-body">
+        <div class="item" data-id="sys3"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">audit_integrity command runs with 0 error-level issues</div><div class="desc">Terminal: venv\Scripts\python.exe manage.py audit_integrity</div></div></div>
+        <div class="item" data-id="sys4"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Audit: no customers with orders but no shop link</div></div></div>
+        <div class="item" data-id="sys5"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Audit: no shop selling below cost floor (loss)</div></div></div>
+        <div class="item" data-id="sys6"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Anna Nagar + Velachery linked to SUSPENDED wholesaler — resolve this</div><div class="desc">Either reactivate Chennai Wholesale Distributors, reassign shops, or remove the wholesaler tier</div></div></div>
+      </div>
+    </div>
+    <div class="sub">
+      <div class="sub-header" onclick="toggleSub(this)">▸ To-Do / Known Decisions Pending</div>
+      <div class="sub-body">
+        <div class="item" data-id="sys7"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">🔴 Distributor tier: confirmed part of chain (Supplier → Stockist → Distributor → Shop). Fix the code naming — internally it's called "wholesaler" but should be "distributor." Current UI label "Distributor" is already correct.</div><div class="desc">This is a code-level rename (no data change). The wholesaler role/model can be renamed to distributor_tier or similar for clarity. Low priority — UI is already correct.</div></div></div>
+        <div class="item" data-id="sys8"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Initialize Git repository (no version control exists — all changes are unversioned)</div></div></div>
+        <div class="item" data-id="sys9"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Rentals feature — verify if it's needed or can be disabled</div><div class="url">localhost:8000/rentals/admin/</div></div></div>
+        <div class="item" data-id="sys10"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Clean up "Smoke Checks" and "Other" categories (test/empty categories)</div></div></div>
+        <div class="item" data-id="sys11"><div class="btns"><button class="btn btn-ok">✓</button><button class="btn btn-issue">✗</button><button class="btn btn-skip">→</button></div><div class="item-text"><div class="title">Production checklist: set DEBUG=False, ALLOWED_HOSTS, HTTPS, real SECRET_KEY before launch</div></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</main>
+
+<script>
+// ── State saved in localStorage ──
+const KEY = 'cart_checklist_v2';
+let state = {};
+try { state = JSON.parse(localStorage.getItem(KEY) || '{}'); } catch(e) {}
+
+function save() { localStorage.setItem(KEY, JSON.stringify(state)); }
+
+// ── Wire all status buttons ──
+document.querySelectorAll('.item').forEach(row => {
+  const id = row.dataset.id;
+  const [btnOk, btnIss, btnSkip] = row.querySelectorAll('.btn');
+
+  function applyState(s, animate) {
+    [btnOk, btnIss, btnSkip].forEach(b => b.classList.remove('active'));
+    row.classList.remove('done','issue','skipped');
+    if (s === 'ok')   { btnOk.classList.add('active');   row.classList.add('done'); }
+    if (s === 'issue'){ btnIss.classList.add('active');  row.classList.add('issue'); }
+    if (s === 'skip') { btnSkip.classList.add('active'); row.classList.add('skipped'); }
+    if (animate) { row.style.transition='background .3s'; }
+  }
+
+  if (state[id]) applyState(state[id]);
+
+  btnOk.addEventListener('click', () => {
+    state[id] = state[id]==='ok' ? '' : 'ok';
+    applyState(state[id], true); save(); updateAll();
+  });
+  btnIss.addEventListener('click', () => {
+    state[id] = state[id]==='issue' ? '' : 'issue';
+    applyState(state[id], true); save(); updateAll();
+  });
+  btnSkip.addEventListener('click', () => {
+    state[id] = state[id]==='skip' ? '' : 'skip';
+    applyState(state[id], true); save(); updateAll();
+  });
+});
+
+// ── Toggle sections ──
+function toggle(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('collapsed');
+  header.querySelector('span:last-child').textContent =
+    body.classList.contains('collapsed') ? '▸' : '▾';
+}
+function toggleSub(header) {
+  const body = header.nextElementSibling;
+  body.classList.toggle('collapsed');
+  header.querySelector('span:first-child').textContent =
+    body.classList.contains('collapsed') ? '▸' : '▾';
+}
+
+// ── Update counts ──
+function updateAll() {
+  const all = document.querySelectorAll('.item');
+  let ok=0, issue=0, skip=0;
+  all.forEach(r => {
+    const s = state[r.dataset.id];
+    if(s==='ok') ok++;
+    else if(s==='issue') issue++;
+    else if(s==='skip') skip++;
+  });
+  document.getElementById('cntOk').textContent    = ok;
+  document.getElementById('cntIssue').textContent = issue;
+  document.getElementById('cntSkip').textContent  = skip;
+  document.getElementById('cntPend').textContent  = all.length - ok - issue - skip;
+
+  // per-section badge + progress bar
+  document.querySelectorAll('.section').forEach(sec => {
+    const id = sec.id.replace('sec-','');
+    const items = sec.querySelectorAll('.item');
+    const done = Array.from(items).filter(r => state[r.dataset.id]==='ok').length;
+    const badge = document.getElementById('badge-'+id);
+    const prog  = document.getElementById('prog-'+id);
+    if(badge) badge.textContent = done + ' / ' + items.length;
+    if(prog)  prog.style.width  = (items.length ? done/items.length*100 : 0) + '%';
+  });
+}
+
+// ── Filter ──
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', function() {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('on'));
+    this.classList.add('on');
+    const f = this.dataset.filter;
+    document.querySelectorAll('.item').forEach(r => {
+      const s = state[r.dataset.id] || '';
+      let show = f==='all' ||
+        (f==='done' && s==='ok') ||
+        (f==='issue' && s==='issue') ||
+        (f==='pending' && !s);
+      r.style.display = show ? '' : 'none';
+    });
+  });
+});
+
+function resetAll() {
+  if(!confirm('Reset ALL checkmarks? This clears your progress.')) return;
+  state = {}; save();
+  document.querySelectorAll('.item').forEach(r => {
+    r.classList.remove('done','issue','skipped');
+    r.querySelectorAll('.btn').forEach(b => b.classList.remove('active'));
+  });
+  updateAll();
+}
+
+updateAll();
+</script>
+</body>
+</html>

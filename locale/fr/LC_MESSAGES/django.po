@@ -1,0 +1,270 @@
+# French translations
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: fr\n"
+
+msgid "English"
+msgstr "Anglais"
+
+msgid "Tamil"
+msgstr "Tamoul"
+
+msgid "Telugu"
+msgstr "Télougou"
+
+msgid "Kannada"
+msgstr "Kannada"
+
+msgid "Hindi"
+msgstr "Hindi"
+
+msgid "French"
+msgstr "Français"
+
+msgid "Home"
+msgstr "Accueil"
+
+msgid "Shop"
+msgstr "Boutique"
+
+msgid "Login"
+msgstr "Connexion"
+
+msgid "Register"
+msgstr "S'inscrire"
+
+msgid "Logout"
+msgstr "Déconnexion"
+
+msgid "Profile"
+msgstr "Profil"
+
+msgid "My Orders"
+msgstr "Mes commandes"
+
+msgid "Dashboard"
+msgstr "Tableau de bord"
+
+msgid "Search products…"
+msgstr "Rechercher des produits…"
+
+msgid "Add to Cart"
+msgstr "Ajouter au panier"
+
+msgid "Checkout"
+msgstr "Commander"
+
+msgid "Username"
+msgstr "Nom d'utilisateur"
+
+msgid "Password"
+msgstr "Mot de passe"
+
+msgid "Submit"
+msgstr "Soumettre"
+
+msgid "Cancel"
+msgstr "Annuler"
+
+msgid "Save"
+msgstr "Enregistrer"
+
+msgid "Delete"
+msgstr "Supprimer"
+
+msgid "Edit"
+msgstr "Modifier"
+
+msgid "Back"
+msgstr "Retour"
+
+msgid "Supplier Portal"
+msgstr "Portail fournisseur"
+
+msgid "Admin Panel"
+msgstr "Panneau d'administration"
+
+msgid "Storefront"
+msgstr "Vitrine"
+
+msgid "Fresh Organic Food, Direct from Farmers"
+msgstr "Aliments biologiques frais, directement des agriculteurs"
+
+msgid "100% Organic & Natural"
+msgstr "100% Biologique et Naturel"
+
+msgid "Fresh from the Farm."
+msgstr "Frais de la ferme."
+
+msgid "Straight to Your Door."
+msgstr "Directement à votre porte."
+
+msgid "LaKrish Mart connects you directly with organic farmers and natural food producers. No middlemen. No chemicals. Just pure, honest food — delivered by your trusted local distributor."
+msgstr "LaKrish Mart vous connecte directement avec des agriculteurs biologiques. Pas d'intermédiaires. Pas de produits chimiques. Une nourriture pure — livrée par votre distributeur local de confiance."
+
+msgid "Login to Shop"
+msgstr "Se connecter pour acheter"
+
+msgid "Register Free"
+msgstr "S'inscrire gratuitement"
+
+msgid "Dry Fruits & Nuts"
+msgstr "Fruits secs et noix"
+
+msgid "Spices"
+msgstr "Épices"
+
+msgid "Natural Foods"
+msgstr "Aliments naturels"
+
+msgid "Products"
+msgstr "Produits"
+
+msgid "Farmers"
+msgstr "Agriculteurs"
+
+msgid "Cities"
+msgstr "Villes"
+
+msgid "Why LaKrish Mart?"
+msgstr "Pourquoi LaKrish Mart ?"
+
+msgid "We believe food should be honest, clean, and traceable."
+msgstr "Nous croyons que la nourriture doit être honnête, propre et traçable."
+
+msgid "Direct from Farmers"
+msgstr "Directement des agriculteurs"
+
+msgid "We source directly from certified organic farmers. No unnecessary middlemen, no inflated prices."
+msgstr "Nous nous approvisionnons directement auprès d'agriculteurs biologiques certifiés."
+
+msgid "No Chemicals"
+msgstr "Sans produits chimiques"
+
+msgid "Every product is free from synthetic pesticides, preservatives, and artificial additives."
+msgstr "Chaque produit est exempt de pesticides synthétiques et de conservateurs."
+
+msgid "Home Made Quality"
+msgstr "Qualité artisanale"
+
+msgid "Many of our products are handcrafted in small batches — the way your grandmother used to make them."
+msgstr "Beaucoup de nos produits sont fabriqués à la main en petites quantités."
+
+msgid "Local Delivery"
+msgstr "Livraison locale"
+
+msgid "Your local distributor delivers fresh to your doorstep. Fast, reliable, and community-driven."
+msgstr "Votre distributeur local livre frais à votre porte. Rapide et fiable."
+
+msgid "What We Offer"
+msgstr "Ce que nous offrons"
+
+msgid "A curated selection of nature's best — in every size you need."
+msgstr "Une sélection soignée des meilleurs produits naturels — dans chaque taille."
+
+msgid "Dry Fruits"
+msgstr "Fruits secs"
+
+msgid "Dates, Apricots, Raisins"
+msgstr "Dattes, Abricots, Raisins secs"
+
+msgid "Nuts"
+msgstr "Noix"
+
+msgid "Almonds, Cashews, Walnuts"
+msgstr "Amandes, Noix de cajou, Noix"
+
+msgid "Pepper, Cardamom, Cinnamon"
+msgstr "Poivre, Cardamome, Cannelle"
+
+msgid "Seeds"
+msgstr "Graines"
+
+msgid "Chia, Flax, Sunflower"
+msgstr "Chia, Lin, Tournesol"
+
+msgid "Turmeric, Honey, Coconut Oil"
+msgstr "Curcuma, Miel, Huile de coco"
+
+msgid "Cold-pressed oils, raw honey"
+msgstr "Huiles pressées à froid, miel brut"
+
+msgid "How It Works"
+msgstr "Comment ça marche"
+
+msgid "Simple, transparent, and community-powered."
+msgstr "Simple, transparent et communautaire."
+
+msgid "Create your free account. Use your distributor's invite code to shop from their store."
+msgstr "Créez votre compte gratuit. Utilisez le code d'invitation de votre distributeur."
+
+msgid "Browse & Choose"
+msgstr "Parcourir et choisir"
+
+msgid "See your distributor's curated product list with their prices. Pick your size and quantity."
+msgstr "Consultez la liste de produits de votre distributeur avec leurs prix."
+
+msgid "Place Order"
+msgstr "Passer commande"
+
+msgid "Add to cart and checkout. Pay on delivery or via UPI. No advance payment required."
+msgstr "Ajoutez au panier et commandez. Payez à la livraison ou via UPI."
+
+msgid "Get Delivered"
+msgstr "Se faire livrer"
+
+msgid "Your local distributor delivers fresh organic products right to your door."
+msgstr "Votre distributeur local livre des produits biologiques frais à votre porte."
+
+msgid "Our Promise to You"
+msgstr "Notre promesse envers vous"
+
+msgid "Certified Organic"
+msgstr "Certifié biologique"
+
+msgid "All products sourced from verified organic farms and natural producers."
+msgstr "Tous les produits proviennent de fermes biologiques vérifiées."
+
+msgid "Fair Prices"
+msgstr "Prix équitables"
+
+msgid "Direct sourcing means better prices for you and fair pay for farmers."
+msgstr "L'approvisionnement direct signifie de meilleurs prix pour vous et une rémunération équitable pour les agriculteurs."
+
+msgid "Fresh Stock"
+msgstr "Stock frais"
+
+msgid "Products are sourced in small batches to ensure freshness and quality."
+msgstr "Les produits sont approvisionnés en petites quantités pour garantir la fraîcheur."
+
+msgid "Community First"
+msgstr "La communauté d'abord"
+
+msgid "We support local distributors and farmers in your neighbourhood."
+msgstr "Nous soutenons les distributeurs locaux et les agriculteurs de votre quartier."
+
+msgid "Organic Certified"
+msgstr "Certifié biologique"
+
+msgid "Artificial Additives"
+msgstr "Additifs artificiels"
+
+msgid "Farmer Partners"
+msgstr "Partenaires agriculteurs"
+
+msgid "Happy Customers"
+msgstr "Clients satisfaits"
+
+msgid "Ready to eat clean?"
+msgstr "Prêt à manger sainement ?"
+
+msgid "Join thousands of families who have switched to organic living with LaKrish Mart."
+msgstr "Rejoignez des milliers de familles qui ont adopté le mode de vie biologique avec LaKrish Mart."
+
+msgid "Create Free Account"
+msgstr "Créer un compte gratuit"
+
+msgid "Have a distributor code? Enter it during registration to shop from your local store."
+msgstr "Vous avez un code distributeur ? Entrez-le lors de l'inscription."

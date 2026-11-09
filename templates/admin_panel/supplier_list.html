@@ -1,0 +1,99 @@
+{% extends 'admin_panel/partner_list_base.html' %}
+{% comment %}
+Suppliers list. Uses the common partner-list layout; only the supplier-specific
+columns, rows and mobile cards live here. All the standard scaffolding (tabs,
+search, bulk bar, card table) comes from partner_list_base.html. Feature
+toggles (show_tabs, create_url, bulk_action_url, etc.) are passed by the
+supplier_list view.
+{% endcomment %}
+
+{% block colspan %}6{% endblock %}
+
+{% block table_head %}
+  <th data-col="name">{% include 'partials/sort_header.html' with field="name" label="Company" current_sort=sort %}</th>
+  <th data-col="category">{% include 'partials/sort_header.html' with field="category" label="Category" current_sort=sort %}</th>
+  <th data-col="username">Username</th>
+  <th data-col="status">{% include 'partials/sort_header.html' with field="status" label="Status" current_sort=sort %}</th>
+  <th data-col="actions">Actions</th>
+{% endblock %}
+
+{% block rows %}
+  {% for s in suppliers %}
+  <tr>
+    <td><input type="checkbox" class="form-check-input row-check" name="supplier_ids" value="{{ s.pk }}"></td>
+    <td class="fw-semibold" data-col="name">
+      <a href="{% url 'admin_panel:supplier_detail' s.pk %}" class="text-decoration-none">{{ s.company_name }}</a>
+      {% with roles=s.user.get_roles_list %}
+        {% if 'distributor' in roles %}
+          {% with d=s.user.distributor_profile %}
+            {% if d and d.status == 'suspended' %}
+              <div><span class="badge bg-warning text-dark" style="font-size:.65rem"><i class="bi bi-pause-circle me-1"></i>Marketplace Suspended</span></div>
+            {% endif %}
+          {% endwith %}
+        {% endif %}
+      {% endwith %}
+    </td>
+    <td data-col="category">{{ s.get_category_display }}</td>
+    <td data-col="username">{{ s.user.username }}</td>
+    <td data-col="status"><span class="badge {% if s.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">{{ s.get_status_display }}</span></td>
+    <td data-col="actions">
+      <div class="d-flex gap-1">
+        {% if status_filter == 'deleted' %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_restore' 'supplier' s.pk %}"
+                  class="btn btn-sm btn-success"
+                  data-confirm="Restore {{ s.company_name }}?" data-confirm-title="Restore Supplier?" data-confirm-type="success" data-confirm-icon="✅">Restore</button>
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_purge' 'supplier' s.pk %}"
+                  class="btn btn-sm btn-outline-danger"
+                  data-confirm="Permanently archive {{ s.company_name }}? This cannot be undone."
+                  data-confirm-title="Delete permanently?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete permanently</button>
+        {% elif s.status == 'approved' %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:supplier_suspend' s.pk %}"
+                  class="btn btn-sm btn-warning"
+                  data-confirm="Suspend {{ s.company_name }}? They won't be able to access their portal."
+                  data-confirm-title="Suspend Supplier?" data-confirm-type="warning" data-confirm-icon="⚠️">Suspend</button>
+        {% else %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:supplier_activate' s.pk %}"
+                  class="btn btn-sm btn-success"
+                  data-confirm="Activate {{ s.company_name }}?"
+                  data-confirm-title="Activate Supplier?" data-confirm-type="success" data-confirm-icon="✅">Activate</button>
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_soft_delete' 'supplier' s.pk %}"
+                  class="btn btn-sm btn-outline-danger"
+                  data-confirm="Delete {{ s.company_name }}? It moves to the Deleted tab and stays recoverable until the grace period ends."
+                  data-confirm-title="Delete Supplier?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete</button>
+        {% endif %}
+      </div>
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6" class="text-center text-muted py-4">No suppliers found.</td></tr>
+  {% endfor %}
+{% endblock %}
+
+{% block empty_row %}{% endblock %}
+
+{% block mobile_cards %}
+  {% for s in suppliers %}
+  <div class="card border-0 shadow-sm mb-2 p-3">
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <div>
+        <div class="fw-semibold"><a href="{% url 'admin_panel:supplier_detail' s.pk %}" class="text-decoration-none text-dark">{{ s.company_name }}</a></div>
+        <div class="text-muted small">{{ s.get_category_display }} · {{ s.user.username }}</div>
+      </div>
+      <span class="badge {% if s.status == 'approved' %}bg-success{% else %}bg-danger{% endif %}">{{ s.get_status_display }}</span>
+    </div>
+    <div class="d-flex gap-2">
+      {% if s.status == 'approved' %}
+        <button type="submit" formmethod="post" formaction="{% url 'admin_panel:supplier_suspend' s.pk %}"
+                class="btn btn-sm btn-warning w-100"
+                data-confirm="Suspend {{ s.company_name }}?" data-confirm-title="Suspend Supplier?" data-confirm-type="warning" data-confirm-icon="⚠️">Suspend</button>
+      {% else %}
+        <button type="submit" formmethod="post" formaction="{% url 'admin_panel:supplier_activate' s.pk %}"
+                class="btn btn-sm btn-success w-100"
+                data-confirm="Activate {{ s.company_name }}?" data-confirm-title="Activate Supplier?" data-confirm-type="success" data-confirm-icon="✅">Activate</button>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">No suppliers found.</p>
+  {% endfor %}
+{% endblock %}

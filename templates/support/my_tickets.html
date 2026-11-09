@@ -1,0 +1,75 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}My Support Tickets{% endblock %}
+{% block page_title %}My Support Tickets{% endblock %}
+
+{% block sidebar %}
+  {% include 'partials/role_support_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h5 class="mb-0">Your Tickets</h5>
+  <a href="{% url 'support:submit_ticket' %}" class="btn btn-success btn-sm">
+    <i class="bi bi-plus-circle me-1"></i>New Ticket
+  </a>
+</div>
+
+{% if tickets %}
+  <!-- Desktop -->
+  <div class="card border-0 shadow-sm d-none d-md-block">
+    <table class="table align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>#</th>
+          <th>Subject</th>
+          <th>Type</th>
+          <th>Status</th>
+          <th>Priority</th>
+          <th>Submitted</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ticket in tickets %}
+        <tr>
+          <td class="text-muted small">{{ ticket.pk }}</td>
+          <td>{{ ticket.subject }}</td>
+          <td><span class="badge bg-light text-dark border">{{ ticket.get_ticket_type_display }}</span></td>
+          <td><span class="badge {{ ticket.status_badge_class }}">{{ ticket.get_status_display }}</span></td>
+          <td><span class="badge {{ ticket.priority_badge_class }}">{{ ticket.get_priority_display }}</span></td>
+          <td class="text-muted small">{{ ticket.created_at|date:"d M Y" }}</td>
+          <td>
+            <a href="{% url 'support:ticket_detail' ticket.pk %}" class="btn btn-sm btn-outline-success">View</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Mobile -->
+  <div class="d-md-none">
+    {% for ticket in tickets %}
+    <div class="card border-0 shadow-sm mb-2 p-3">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="fw-semibold">{{ ticket.subject }}</div>
+          <div class="text-muted small mt-1">{{ ticket.get_ticket_type_display }} · {{ ticket.created_at|date:"d M Y" }}</div>
+        </div>
+        <span class="badge {{ ticket.status_badge_class }}">{{ ticket.get_status_display }}</span>
+      </div>
+      <div class="mt-2">
+        <a href="{% url 'support:ticket_detail' ticket.pk %}" class="btn btn-sm btn-outline-success">View Details</a>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+{% else %}
+  <div class="card border-0 shadow-sm p-5 text-center text-muted">
+    <i class="bi bi-inbox fs-1 mb-2"></i>
+    <p class="mb-2">You haven't submitted any tickets yet.</p>
+    <a href="{% url 'support:submit_ticket' %}" class="btn btn-success btn-sm">Submit your first ticket</a>
+  </div>
+{% endif %}
+{% endblock %}

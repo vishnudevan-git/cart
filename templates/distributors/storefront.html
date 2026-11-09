@@ -1,0 +1,59 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Storefront{% endblock %}
+{% block page_title %}🏪 Storefront Preview{% endblock %}
+{% block active_nav %}storefront{% endblock %}
+{% block content %}
+<div class="alert alert-info small py-2 mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  This is a preview of what your customers see. Share your invite link to bring customers to your store.
+</div>
+
+{% if dist.logo %}
+<div class="d-flex align-items-center gap-3 mb-3">
+  <img src="{{ dist.logo.url }}" alt="Logo" style="height:60px;border-radius:8px">
+  <div>
+    <div class="fw-bold fs-5">{{ dist.company_name }}</div>
+    {% if dist.tagline %}<div class="text-muted small">{{ dist.tagline }}</div>{% endif %}
+  </div>
+</div>
+{% else %}
+<div class="mb-3">
+  <div class="fw-bold fs-5">{{ dist.company_name }}</div>
+  {% if dist.tagline %}<div class="text-muted small">{{ dist.tagline }}</div>{% endif %}
+  <div class="text-muted small">{{ dist.area }}</div>
+</div>
+{% endif %}
+
+<div class="row g-3">
+  {% for dp in listed %}
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm h-100">
+      {% if dp.product.image %}
+      <img src="{{ dp.product.image.url }}" class="card-img-top" style="height:140px;object-fit:cover" alt="{{ dp.product.name }}">
+      {% endif %}
+      <div class="card-body p-2">
+        <div class="fw-semibold small">{{ dp.product.name }}</div>
+        <div class="text-muted" style="font-size:.75rem">{{ dp.product.category.name }}</div>
+        {% for v in dp.product.variants.all %}
+          {% if v.is_active %}
+          <div class="small mt-1">
+            <span class="badge bg-secondary">{{ v.label }}</span>
+            {% with dvp=v.dist_prices.all %}
+              {% for p in dvp %}{% if p.distributor == dist %}
+                <span class="text-success fw-semibold">₹{{ p.selling_price }}</span>
+              {% endif %}{% endfor %}
+            {% endwith %}
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12 text-center text-muted py-5">
+    <i class="bi bi-grid fs-1"></i>
+    <p class="mt-2">No products listed yet. Go to <a href="{% url 'distributors:product_catalogue' %}">Product Catalogue</a> to list products.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

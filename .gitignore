@@ -1,0 +1,50 @@
+# Environment & secrets
+.env
+*.env.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environment
+venv/
+env/
+.venv/
+.venv-win/
+winvenv/
+runvenv/
+
+# Django
+db.sqlite3
+db.sqlite3.bak-*
+db_demo.sqlite3
+db.sqlite3-journal
+*.mo
+staticfiles/
+media/
+project_runbook.html
+transaction_customer_flow_report.html
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# AI Tools
+.kiro/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Distribution
+*.egg-info/
+dist/
+build/
+
+# Logs
+*.log

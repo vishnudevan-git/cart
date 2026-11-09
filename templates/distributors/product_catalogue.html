@@ -1,0 +1,1002 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Product Catalogue{% endblock %}
+{% block page_title %}Product Catalogue{% endblock %}
+{% block active_nav %}product_catalogue{% endblock %}
+{% block content %}
+<style>
+  .setup-locked {
+    opacity: 0.45;
+    pointer-events: none;
+    user-select: none;
+  }
+</style>
+
+<!-- Filter bar -->
+<div class="d-flex flex-wrap gap-2 align-items-center mb-3" id="filterBar">
+  <a href="?{% if supplier_filter %}supplier={{ supplier_filter }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}status=" 
+     class="btn btn-sm {% if not status_filter %}btn-success{% else %}btn-outline-secondary{% endif %}">
+    All <span class="badge bg-secondary ms-1">{{ products_data|length }}</span>
+  </a>
+  <a href="?{% if supplier_filter %}supplier={{ supplier_filter }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}status=listed" 
+     class="btn btn-sm {% if status_filter == 'listed' %}btn-success{% else %}btn-outline-success{% endif %}">
+    Listed <span class="badge bg-success ms-1">{{ listed_count }}</span>
+  </a>
+  <a href="?{% if supplier_filter %}supplier={{ supplier_filter }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}status=unlisted" 
+     class="btn btn-sm {% if status_filter == 'unlisted' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">
+    Not Listed <span class="badge bg-secondary ms-1">{{ unlisted_count }}</span>
+  </a>
+  
+  {% if unlisted_count > 0 %}
+  <button type="button" class="btn btn-sm btn-success" data-bs-toggle="modal" data-bs-target="#bulkListModal">
+    <i class="bi bi-check-circle me-1"></i>List All {{ unlisted_count }}
+  </button>
+  {% endif %}
+  <a href="?{% if supplier_filter %}supplier={{ supplier_filter }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}status=global_price" 
+     class="btn btn-sm {% if status_filter == 'global_price' %}btn-warning text-dark{% else %}btn-outline-warning{% endif %}">
+    Global Price <span class="badge bg-warning text-dark ms-1">{{ global_price_count }}</span>
+  </a>
+  <a href="?{% if supplier_filter %}supplier={{ supplier_filter }}&{% endif %}{% if category_filter %}category={{ category_filter }}&{% endif %}status=manual_price" 
+     class="btn btn-sm {% if status_filter == 'manual_price' %}btn-info text-dark{% else %}btn-outline-info{% endif %}">
+    Manual Price <span class="badge bg-info text-dark ms-1">{{ manual_price_count }}</span>
+  </a>
+
+  <form method="get" class="d-flex gap-2 align-items-center ms-auto">
+    {% if status_filter %}<input type="hidden" name="status" value="{{ status_filter }}">{% endif %}
+    <select name="category" class="form-select form-select-sm" style="max-width:160px" onchange="this.form.submit()">
+      <option value="">All Categories</option>
+      {% for c in categories %}
+        <option value="{{ c.pk }}" {% if category_filter == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <select name="supplier" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
+      <option value="">All Suppliers</option>
+      {% for s in suppliers %}
+        <option value="{{ s.pk }}" {% if supplier_filter == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.company_name }}</option>
+      {% endfor %}
+    </select>
+    {% if supplier_filter or category_filter %}
+      <a href="?{% if status_filter %}status={{ status_filter }}{% endif %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    {% endif %}
+  </form>
+</div>
+
+<p class="text-muted small mb-3">
+  Admin price = what you pay admin. Your price = what your customers pay.
+  <strong>Selling price cannot exceed MRP.</strong>
+</p>
+
+{% if require_global_pricing_setup %}
+<div class="modal fade" id="forceGlobalPricingModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-warning-subtle">
+        <h5 class="modal-title fw-bold"><i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Global Pricing Required</h5>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Set Global Pricing to continue using marketplace pages.</p>
+        <p class="text-muted small mb-0">Fill at least one unit type and click <strong>Apply to All</strong> in the Global Pricing section on this page.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-warning" onclick="scrollToGlobalPricing()">Set Global Pricing Now</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Global Auto-List Panel -->
+<div class="card border-0 shadow-sm border-start border-success border-4 p-3 mb-3" id="autoListPanel">
+  <div class="d-flex align-items-center gap-3 justify-content-between">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-lightning-charge text-success fs-5"></i>
+      <div>
+        <div class="fw-semibold">Auto-List New Products</div>
+        <div class="text-muted small">Automatically list all new approved products from admin & stockist</div>
+      </div>
+    </div>
+    <form method="post" action="{% url 'distributors:toggle_auto_list' %}" style="display:none" id="autoListForm">
+      {% csrf_token %}
+      <input type="hidden" name="auto_list_new_products" id="autoListInput" value="1">
+    </form>
+    <div class="form-check form-switch mb-0">
+      <input class="form-check-input" type="checkbox" id="autoListToggle" 
+             {% if dist.auto_list_new_products %}checked{% endif %}
+             onchange="toggleAutoList(this)">
+      <label class="form-check-label ms-2 fw-semibold" for="autoListToggle">
+        <span id="autoListStatus" class="text-success">{% if dist.auto_list_new_products %}ON{% else %}OFF{% endif %}</span>
+        <span id="autoListSpinner" class="spinner-border spinner-border-sm ms-1" style="display:none;width:1rem;height:1rem;"></span>
+      </label>
+    </div>
+  </div>
+</div>
+<div class="card border-0 shadow-sm border-start border-warning border-4 p-3 mb-3" id="globalPricingCard">
+  <div class="d-flex align-items-center gap-2" style="cursor:pointer" onclick="toggleGlobalPricing()">
+    <i class="bi bi-sliders text-warning fs-5"></i>
+    <span class="fw-semibold">Global Pricing</span>
+    <span class="badge bg-warning text-dark">Applies to ALL products</span>
+    <span class="ms-auto">
+      <i class="bi bi-chevron-down" id="globalPricingChevron"></i>
+    </span>
+    <div class="form-check form-switch mb-0 ms-2" onclick="event.stopPropagation()">
+      <input class="form-check-input" type="checkbox" id="globalPricingToggle" onchange="toggleGlobalPricing()" checked>
+    </div>
+  </div>
+  <div id="globalPricingBody" class="mt-2">
+  <p class="text-muted small mb-2">Set margin by product unit type. Only filled rows are applied. Per-product overrides can still be set below.</p>
+  <form method="post" action="{% url 'distributors:apply_global_pricing' %}" id="globalPricingForm">
+    {% csrf_token %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-2" style="max-width:700px">
+        <thead>
+          <tr class="small text-muted">
+            <th>Unit Type</th>
+            <th>Margin Mode</th>
+            <th>Margin Value</th>
+            <th>Max % Cap <span class="text-muted fw-normal" title="Optional. Limits how much % the price can increase over base price. Leave blank for no cap.">ⓘ</span></th>
+            <th>Current</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="badge bg-secondary">⚖️ Weight (kg/g)</span></td>
+            <td>
+              <select name="mode_weight" class="form-select form-select-sm" style="width:140px" onchange="onGlobalModeChange('weight', this.value)">
+                <option value="percent" {% if global_pricing.weight.mode == 'percent' %}selected{% endif %}>% of price</option>
+                <option value="per_unit" {% if global_pricing.weight.mode == 'per_unit' %}selected{% endif %}>₹ per kg</option>
+              </select>
+            </td>
+            <td><input type="number" name="value_weight" class="form-control form-control-sm" style="width:100px" step="0.5" min="0" placeholder="e.g. 10" value="{{ global_pricing.weight.value|default:'' }}"></td>
+            <td><input type="number" name="cap_weight" id="cap_weight" class="form-control form-control-sm" style="width:90px" step="1" min="0" max="500" placeholder="e.g. 20" value="{% if global_pricing.weight.mode == 'per_unit' and not global_pricing.weight.cap %}10{% else %}{{ global_pricing.weight.cap|default:'' }}{% endif %}" title="Max % increase allowed over base price"></td>
+            <td>
+              {% if global_pricing.weight %}
+                <span class="badge bg-light text-dark border">{{ global_pricing.weight.value|floatformat:"0" }}{% if global_pricing.weight.mode == 'percent' %}%{% else %} ₹/kg{% endif %}{% if global_pricing.weight.cap %} · cap {{ global_pricing.weight.cap|floatformat:"0" }}%{% endif %}</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td><span class="badge bg-info text-dark">💧 Volume (l/ml)</span></td>
+            <td>
+              <select name="mode_volume" class="form-select form-select-sm" style="width:140px" onchange="onGlobalModeChange('volume', this.value)">
+                <option value="percent" {% if global_pricing.volume.mode == 'percent' %}selected{% endif %}>% of price</option>
+                <option value="per_unit" {% if global_pricing.volume.mode == 'per_unit' %}selected{% endif %}>₹ per litre</option>
+              </select>
+            </td>
+            <td><input type="number" name="value_volume" class="form-control form-control-sm" style="width:100px" step="0.5" min="0" placeholder="e.g. 10" value="{{ global_pricing.volume.value|default:'' }}"></td>
+            <td><input type="number" name="cap_volume" id="cap_volume" class="form-control form-control-sm" style="width:90px" step="1" min="0" max="500" placeholder="e.g. 20" value="{% if global_pricing.volume.mode == 'per_unit' and not global_pricing.volume.cap %}10{% else %}{{ global_pricing.volume.cap|default:'' }}{% endif %}" title="Max % increase allowed over base price"></td>
+            <td>
+              {% if global_pricing.volume %}
+                <span class="badge bg-light text-dark border">{{ global_pricing.volume.value|floatformat:"0" }}{% if global_pricing.volume.mode == 'percent' %}%{% else %} ₹/l{% endif %}{% if global_pricing.volume.cap %} · cap {{ global_pricing.volume.cap|floatformat:"0" }}%{% endif %}</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+          <tr>
+            <td><span class="badge bg-success">📦 Pieces (qty)</span></td>
+            <td>
+              <select name="mode_pieces" class="form-select form-select-sm" style="width:140px" onchange="onGlobalModeChange('pieces', this.value)">
+                <option value="percent" {% if global_pricing.pieces.mode == 'percent' %}selected{% endif %}>% of price</option>
+                <option value="per_unit" {% if global_pricing.pieces.mode == 'per_unit' %}selected{% endif %}>₹ per piece</option>
+              </select>
+            </td>
+            <td><input type="number" name="value_pieces" class="form-control form-control-sm" style="width:100px" step="0.5" min="0" placeholder="e.g. 5" value="{{ global_pricing.pieces.value|default:'' }}"></td>
+            <td><input type="number" name="cap_pieces" id="cap_pieces" class="form-control form-control-sm" style="width:90px" step="1" min="0" max="500" placeholder="e.g. 20" value="{% if global_pricing.pieces.mode == 'per_unit' and not global_pricing.pieces.cap %}10{% else %}{{ global_pricing.pieces.cap|default:'' }}{% endif %}" title="Max % increase allowed over base price"></td>
+            <td>
+              {% if global_pricing.pieces %}
+                <span class="badge bg-light text-dark border">{{ global_pricing.pieces.value|floatformat:"0" }}{% if global_pricing.pieces.mode == 'percent' %}%{% else %} ₹/pc{% endif %}{% if global_pricing.pieces.cap %} · cap {{ global_pricing.pieces.cap|floatformat:"0" }}%{% endif %}</span>
+              {% else %}
+                <span class="text-muted small">—</span>
+              {% endif %}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <button type="submit" class="btn btn-warning px-4 fw-semibold" onclick="return confirm('This will recalculate prices for ALL products of the selected types. Continue?')">
+      <i class="bi bi-lightning-fill me-1"></i>Apply to All
+    </button>
+  </form>
+  </div><!-- end globalPricingBody -->
+</div>
+
+<!-- Bulk Excel export / import -->
+<div id="postGlobalSection">
+<div class="d-flex gap-2 align-items-center mb-3 flex-wrap">
+  <a href="{% url 'distributors:catalogue_export' %}" class="btn btn-outline-success btn-sm">
+    <i class="bi bi-file-earmark-excel me-1"></i>Download as Excel
+  </a>
+  <button class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#importModal">
+    <i class="bi bi-upload me-1"></i>Upload Excel
+  </button>
+  <span class="text-muted small">Edit prices, margin mode and listed status offline, then upload.</span>
+</div>
+
+<!-- Import Modal -->
+<div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post" action="{% url 'distributors:catalogue_import' %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header">
+          <h6 class="modal-title"><i class="bi bi-upload me-1"></i>Upload Catalogue Excel</h6>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted mb-3">
+            Upload the Excel file you downloaded and edited. Only <strong>Your Price</strong>,
+            <strong>Margin Mode</strong>, <strong>Margin Value</strong> and <strong>Listed</strong>
+            columns are applied. Do not change product_id or variant_id columns.
+          </p>
+          <input type="file" name="catalogue_file" class="form-control" accept=".xlsx" required>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-success"><i class="bi bi-check-circle me-1"></i>Import</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk List All Modal -->
+<div class="modal fade" id="bulkListModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h6 class="modal-title"><i class="bi bi-check-circle me-1"></i>List All Unlisted Products</h6>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">
+          <strong>This will list all {{ unlisted_count }} unlisted products</strong> using their current prices.
+        </p>
+        <div class="alert alert-info small mb-0">
+          <i class="bi bi-info-circle me-1"></i>
+          Products will appear on your store immediately. Customers will be able to purchase them.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <form method="post" action="{% url 'distributors:bulk_list_all' %}" style="display:inline">
+          {% csrf_token %}
+          {% if supplier_filter %}<input type="hidden" name="supplier_filter" value="{{ supplier_filter }}">{% endif %}
+          {% if category_filter %}<input type="hidden" name="category_filter" value="{{ category_filter }}">{% endif %}
+          <button type="submit" class="btn btn-success"><i class="bi bi-check-circle me-1"></i>Yes, List All</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% for group in grouped_products %}
+<!-- Select-All bar (shown once, above first group) -->
+{% if forloop.first %}
+<div class="d-flex align-items-center gap-3 mb-2 px-1" id="selectAllBar">
+  <label class="d-flex align-items-center gap-2 mb-0" style="cursor:pointer">
+    <input type="checkbox" id="selectAllCb" class="form-check-input mt-0" style="width:18px;height:18px">
+    <span class="small fw-semibold text-muted">Select All</span>
+  </label>
+  <span class="badge bg-primary rounded-pill px-3 py-1" id="selectedCountBadge" style="display:none">0 selected</span>
+</div>
+{% endif %}
+<div class="mb-4">
+  <div class="row g-3">
+    {% for pd in group %}
+    {% with p=pd.product dp=pd.dp %}
+    <div class="{% if group|length > 1 %}col-12 col-md-6{% else %}col-12{% endif %}">
+      {% with has_stale=pd.variants|dictsort:"price_stale" %}
+      <div class="card border-0 shadow-sm h-100 {% if pd.is_listed %}border border-success{% endif %}"
+           id="product-card-{{ p.pk }}" data-product-pk="{{ p.pk }}" data-is-listed="{{ pd.is_listed|yesno:'true,false' }}">
+        {% for vd in pd.variants %}{% if vd.price_stale %}
+        <div class="alert alert-warning py-1 px-3 mb-0 small rounded-0">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          Supplier changed price on one or more variants. Review and save to update.
+        </div>
+        {% endif %}{% endfor %}
+
+        <!-- Card header: product info + controls -->
+        <div class="card-header ">
+          <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+            <!-- Product name + supplier -->
+            <div class="d-flex align-items-center gap-2">
+              <input type="checkbox" class="form-check-input product-select-cb mt-0 flex-shrink-0"
+                     data-product-pk="{{ p.pk }}" style="width:18px;height:18px;cursor:pointer">
+              {% if p.image %}<img src="{{ p.image.url }}" style="height:36px;width:36px;object-fit:cover;border-radius:6px">{% endif %}
+              <div>
+                <div class="fw-semibold">{{ p.name }}
+                  {% if pd.charges_pending %}
+                    <span class="badge bg-warning text-dark ms-1" style="font-size:.65rem">⏳ Pending Stockist Charges</span>
+                  {% endif %}
+                </div>
+                <div class="text-muted small">{{ p.category.name }} · <strong class="text-success">{{ p.supplier.company_name }}</strong></div>
+              </div>
+            </div>
+
+            {% if pd.charges_pending %}
+            <!-- Charges not confirmed — show read-only notice -->
+            <span class="text-muted small"><i class="bi bi-lock me-1"></i>Pricing locked until stockist confirms charges</span>
+            {% else %}
+            <!-- List toggle + Save -->
+            <form method="post" action="{% url 'distributors:save_product_listing' p.pk %}"
+                  id="form-{{ p.pk }}" class="d-flex align-items-center gap-2 flex-wrap"
+                  onsubmit="preserveFilters(this)">
+              {% csrf_token %}
+
+              <!-- List toggle -->
+              <div class="form-check form-switch mb-0">
+                <input class="form-check-input" type="checkbox" name="is_listed" value="1"
+                       id="listed-{{ p.pk }}" {% if pd.is_listed %}checked{% endif %}
+                       onchange="toggleListingImmediate({{ p.pk }}, this)">
+                <label class="form-check-label small" for="listed-{{ p.pk }}">
+                  List
+                  <span id="list-spinner-{{ p.pk }}" class="spinner-border spinner-border-sm ms-1"
+                        style="display:none;width:.75rem;height:.75rem"></span>
+                </label>
+              </div>
+
+              <!-- Margin mode selector -->
+              <select name="margin_mode" class="form-select form-select-sm margin-mode-select"
+                      style="width:130px" data-product="{{ p.pk }}"
+                      id="mode-{{ p.pk }}">
+                <option value="percent" {% if not dp or dp.margin_mode == 'percent' %}selected{% endif %}>% Markup</option>
+                <option value="per_unit" {% if dp and dp.margin_mode == 'per_unit' %}selected{% endif %}>₹ per kg/l</option>
+              </select>
+
+              <!-- Margin value -->
+              <div class="d-flex align-items-center gap-1">
+                <span class="small text-muted margin-label-{{ p.pk }}">
+                  {% if dp and dp.margin_mode == 'per_unit' %}₹/kg:{% else %}Margin %:{% endif %}
+                </span>
+                <input type="number" name="margin_percent" step="0.5" min="0"
+                       value="{{ dp.margin_percent|default_if_none:'' }}"
+                       placeholder="{{ dist.default_margin_percent }}"
+                       class="form-control form-control-sm margin-pct-input" style="width:70px"
+                       data-product="{{ p.pk }}">
+              </div>
+
+              <button type="submit" class="btn btn-success btn-sm px-2">Save</button>
+            </form>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- Variant price table -->
+        <div class="card-body p-0">
+          <div class="table-wrap">
+            <table class="table align-middle mb-0 small">
+              <thead class="table-light">
+                <tr>
+                  <th>Variant</th>
+                  <th>Supplier ₹</th>
+                  <th>Charges</th>
+                  <th>Stockist Price ₹</th>
+                  <th>MRP / Suggested</th>
+                  <th>Your Price</th>
+                  <th>Margin</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for vd in pd.variants %}
+                {% with v=vd.variant dvp=vd.dvp %}
+                <tr>
+                  <td><span class="badge bg-secondary">{{ v.label }}</span></td>
+                  <td class="text-muted">₹{{ vd.supplier_price|floatformat:"0" }}</td>
+                  <td class="small">
+                    {% if vd.charges_breakdown %}
+                      {% for c in vd.charges_breakdown %}
+                        <div class="text-muted" style="font-size:.72rem">
+                          {{ c.stage }}: +₹{{ c.amount }}
+                        </div>
+                      {% endfor %}
+                    {% else %}
+                      <span class="text-muted">—</span>
+                    {% endif %}
+                  </td>
+                  <td class="fw-semibold text-primary">₹{{ vd.stockist_price|floatformat:"0" }}</td>
+                  <td>
+                    {% if p.show_mrp and v.mrp %}
+                      <span class="badge bg-warning text-dark" title="Printed MRP — you cannot sell above this">₹{{ v.mrp|floatformat:"0" }}</span>
+                    {% elif p.show_suggested_price and v.suggested_price %}
+                      <span class="badge bg-info text-dark" title="Suggested price (no MRP sticker) — a guide to keep your price low">₹{{ v.suggested_price|floatformat:"0" }} <span class="fw-normal">suggested</span></span>
+                    {% else %}
+                      <span class="text-muted small">—</span>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <input type="number" name="selling_price_{{ v.pk }}" step="1" min="0"
+                           value="{{ vd.selling_price|floatformat:0 }}" form="form-{{ p.pk }}"
+                           class="form-control form-control-sm dist-price" style="width:85px"
+                           data-admin="{{ vd.stockist_price|floatformat:0 }}"
+                           data-vid="{{ v.pk }}"
+                           data-product="{{ p.pk }}"
+                            data-master-unit="{{ p.master_unit }}"
+                           data-variant-label="{{ v.label }}"
+                           data-unit-grams="{{ v.unit_grams }}"
+                           {% if p.show_mrp and v.mrp %}
+                             data-mrp="{{ v.mrp|floatformat:0 }}"
+                             max="{{ v.mrp|floatformat:0 }}"
+                           {% elif p.show_suggested_price and v.suggested_price %}
+                             data-suggest="{{ v.suggested_price|floatformat:0 }}"
+                           {% endif %}
+                           {% if pd.charges_pending %}readonly disabled{% endif %}>
+                    {% if p.show_mrp and v.mrp %}
+                    <div class="text-muted" style="font-size:0.7rem">max ₹{{ v.mrp|floatformat:"0" }}</div>
+                    {% elif p.show_suggested_price and v.suggested_price %}
+                    <div class="text-muted suggest-hint" data-vid="{{ v.pk }}" style="font-size:0.7rem">suggested ₹{{ v.suggested_price|floatformat:"0" }}</div>
+                    {% endif %}
+                    <input type="hidden" name="base_price_{{ v.pk }}" value="{{ vd.stockist_price }}" form="form-{{ p.pk }}">
+                  </td>
+                  <td class="fw-semibold text-success" id="margin-{{ v.pk }}"
+                      data-admin="{{ vd.stockist_price }}"
+                      data-sell="{{ vd.selling_price }}">
+                    {% if dvp %}
+                      ₹{{ dvp.distributor_margin|floatformat:"0" }}
+                    {% else %}
+                      —
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endwith %}
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <div class="p-2 text-end">
+            {% if pd.is_listed %}
+              <span class="listed-status-badge text-success small"><i class="bi bi-check-circle-fill"></i> Listed</span>
+            {% else %}
+              <span class="listed-status-badge text-muted small"><i class="bi bi-dash-circle"></i> Not listed</span>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+      {% endwith %}
+    </div>
+    {% endwith %}
+    {% endfor %}
+  </div>
+</div>
+{% empty %}
+<p class="text-muted text-center py-5">No approved products available yet.</p>
+{% endfor %}
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<!-- ════════════════════════════════════════════════════════════════
+     FLOATING BULK ACTION BAR
+     Appears when ≥1 product checkbox is checked
+════════════════════════════════════════════════════════════════ -->
+<div id="bulkActionBar"
+     style="display:none;position:fixed;bottom:28px;left:50%;transform:translateX(-50%);z-index:1060;white-space:nowrap">
+  <div style="background:#0f172a;border:1px solid #334155;border-radius:50px;padding:10px 20px;
+              box-shadow:0 8px 32px rgba(0,0,0,.55);display:flex;align-items:center;gap:12px">
+    <!-- count pill -->
+    <span id="bulkCountPill"
+          style="background:#3b82f6;color:#fff;border-radius:50px;padding:3px 14px;font-size:.82rem;font-weight:700;min-width:32px;text-align:center">
+      0
+    </span>
+    <span style="color:#94a3b8;font-size:.82rem;font-weight:600">selected</span>
+    <div style="width:1px;height:20px;background:#334155;flex-shrink:0"></div>
+
+    <!-- Apply Global Pricing -->
+    <button class="btn btn-warning btn-sm px-3 fw-semibold" id="bulkApplyBtn"
+            onclick="bulkApplyGlobalPricing()" style="border-radius:50px">
+      <i class="bi bi-lightning-fill me-1"></i>Apply Global Pricing
+    </button>
+
+    <!-- Bulk List -->
+    <button class="btn btn-success btn-sm px-3 fw-semibold" id="bulkListBtn"
+            onclick="bulkToggleListing('list')" style="border-radius:50px">
+      <i class="bi bi-toggle-on me-1"></i>List
+    </button>
+
+    <!-- Bulk Unlist -->
+    <button class="btn btn-sm px-3 fw-semibold" id="bulkUnlistBtn"
+            onclick="bulkToggleListing('unlist')"
+            style="border-radius:50px;background:#334155;color:#94a3b8;border:none">
+      <i class="bi bi-toggle-off me-1"></i>Unlist
+    </button>
+
+    <!-- Clear -->
+    <button onclick="clearBulkSelection()"
+            title="Clear selection"
+            style="background:none;border:none;color:#64748b;font-size:1rem;line-height:1;padding:0 4px;cursor:pointer">
+      <i class="bi bi-x-lg"></i>
+    </button>
+  </div>
+</div>
+
+<!-- Toast notification (reusable) -->
+<div id="bulkToast"
+     style="display:none;position:fixed;bottom:90px;left:50%;transform:translateX(-50%);z-index:1070;
+            background:#1e293b;color:#f1f5f9;padding:10px 22px;border-radius:8px;font-size:.85rem;
+            box-shadow:0 4px 16px rgba(0,0,0,.4);border-left:4px solid #22c55e">
+  <span id="bulkToastMsg"></span>
+</div>
+
+<script>
+// Parse label and return per-unit multiplier used by backend for per_unit mode.
+function parseUnitMultiplier(label) {
+  const m = (label || '').trim().toLowerCase().match(/^([\d.]+)\s*(kg|g|ml|l|litre|liter)?$/);
+  if (!m) return 1;
+  const num = parseFloat(m[1]);
+  const unit = (m[2] || 'g').toLowerCase();
+  if (unit === 'kg' || unit === 'l' || unit === 'litre' || unit === 'liter') return num;
+  return num / 1000;
+}
+
+function getCapPercentForMasterUnit(masterUnit) {
+  const unitKey = masterUnit === 'g' ? 'weight' : (masterUnit === 'ml' ? 'volume' : 'pieces');
+  const capEl = document.querySelector(`[name="cap_${unitKey}"]`);
+  if (!capEl) return null;
+  const cap = parseFloat(capEl.value);
+  return Number.isFinite(cap) && cap > 0 ? cap : null;
+}
+
+// Update margin display when selling price is edited manually
+function updateMarginDisplay(input) {
+  const admin = parseFloat(input.dataset.admin) || 0;
+  const sell  = parseFloat(input.value) || 0;
+  const mrp   = parseFloat(input.dataset.mrp) || null;
+  const margin = sell - admin;
+  const pct    = admin > 0 ? (margin / admin * 100) : 0;
+  const el = document.getElementById('margin-' + input.dataset.vid);
+  if (el) {
+    el.innerHTML =
+      `<span>₹${Math.round(margin)}</span>` +
+      `<br><small style="opacity:.7;font-size:.72rem">(${pct.toFixed(1)}%)</small>`;
+    el.className = 'fw-semibold ' + (margin >= 0 ? 'text-success' : 'text-danger');
+  }
+  if (mrp && sell > mrp) {
+    input.classList.add('is-invalid');
+  } else {
+    input.classList.remove('is-invalid');
+  }
+  // Suggested price is guidance, not a hard cap: warn softly, never block.
+  const suggest = parseFloat(input.dataset.suggest) || null;
+  const hint = document.querySelector('.suggest-hint[data-vid="' + input.dataset.vid + '"]');
+  if (suggest) {
+    const over = sell > suggest;
+    input.style.borderColor = over ? '#ffc107' : '';
+    if (hint) {
+      hint.classList.toggle('text-danger', over);
+      hint.classList.toggle('text-muted', !over);
+      hint.textContent = over
+        ? '⚠ above suggested ₹' + suggest
+        : 'suggested ₹' + suggest;
+    }
+  }
+}
+
+document.querySelectorAll('.dist-price').forEach(input => {
+  input.addEventListener('input', function() { updateMarginDisplay(this); });
+});
+
+// Update label when mode changes
+document.querySelectorAll('.margin-mode-select').forEach(sel => {
+  sel.addEventListener('change', function() {
+    const pk = this.dataset.product;
+    const label = document.querySelector('.margin-label-' + pk);
+    const amountInput = document.querySelector(`.margin-pct-input[data-product="${pk}"]`);
+
+    // Prevent cross-mode carry-over: clear amount when switching % <-> per-unit.
+    if (amountInput) {
+      amountInput.value = '';
+    }
+
+    if (label) label.textContent = this.value === 'per_unit' ? '₹/kg:' : 'Margin %:';
+  });
+});
+
+// Apply margin to all variant prices for a product
+function applyMargin(productPk) {
+  const modeEl = document.getElementById('mode-' + productPk);
+  const pctInput = document.querySelector(`.margin-pct-input[data-product="${productPk}"]`);
+  if (!modeEl || !pctInput) return;
+  const mode = modeEl.value;
+  const val = parseFloat(pctInput.value);
+  if (isNaN(val)) return;
+
+  document.querySelectorAll(`.dist-price[data-product="${productPk}"]`).forEach(priceInput => {
+    const admin = parseFloat(priceInput.dataset.admin) || 0;
+    const mrp   = parseFloat(priceInput.dataset.mrp) || null;
+    const label = priceInput.dataset.variantLabel || '';
+    const masterUnit = priceInput.dataset.masterUnit || 'g';
+    let newSell;
+
+    if (mode === 'per_unit') {
+      const multiplier = parseUnitMultiplier(label);
+      newSell = admin + (val * multiplier);
+
+      const capPct = getCapPercentForMasterUnit(masterUnit);
+      if (capPct) {
+        const maxAllowed = admin * (1 + capPct / 100);
+        if (newSell > maxAllowed) newSell = maxAllowed;
+      }
+    } else {
+      // % of admin price
+      newSell = admin * (1 + val / 100);
+    }
+
+    if (mrp && newSell > mrp) newSell = mrp;
+    if (newSell < admin) newSell = admin;
+
+    priceInput.value = Math.round(newSell);
+    updateMarginDisplay(priceInput);
+  });
+}
+
+// Live update when margin % input changes
+document.querySelectorAll('.margin-pct-input').forEach(pctInput => {
+  pctInput.addEventListener('input', function() {
+    applyMargin(this.dataset.product);
+  });
+});
+
+// Preserve query filters when form submits
+function preserveFilters(form) {
+  const status = new URLSearchParams(window.location.search).get('status');
+  const category = new URLSearchParams(window.location.search).get('category');
+  const supplier = new URLSearchParams(window.location.search).get('supplier');
+  if (status) form.appendChild(Object.assign(document.createElement('input'), {type: 'hidden', name: 'next_status', value: status}));
+  if (category) form.appendChild(Object.assign(document.createElement('input'), {type: 'hidden', name: 'next_category', value: category}));
+  if (supplier) form.appendChild(Object.assign(document.createElement('input'), {type: 'hidden', name: 'next_supplier', value: supplier}));
+}
+
+// Show/hide Max % Cap input based on margin mode selection
+function toggleCap(unit, mode) {
+  // Cap stays visible always in global area. It is enforced only for per-unit mode server-side.
+  const capInput = document.getElementById('cap_' + unit);
+  if (capInput) capInput.style.display = '';
+}
+
+function onGlobalModeChange(unit, mode) {
+  const valueInput = document.querySelector(`[name="value_${unit}"]`);
+  const capInput = document.getElementById('cap_' + unit);
+
+  // Prevent cross-mode carry-over in top global pricing inputs.
+  if (valueInput) {
+    valueInput.value = '';
+  }
+
+  if (capInput) {
+    if (mode === 'per_unit' && !capInput.value) {
+      capInput.value = '10';
+    }
+    if (mode === 'percent') {
+      capInput.value = '';
+    }
+  }
+
+  toggleCap(unit, mode);
+}
+
+// Toggle auto-list with loading state
+function toggleAutoList(checkbox) {
+  const spinner = document.getElementById('autoListSpinner');
+  const form = document.getElementById('autoListForm');
+  
+  // Show spinner
+  if (spinner) spinner.style.display = 'inline-block';
+  checkbox.disabled = true;
+  
+  // Set value and submit
+  document.querySelector('#autoListInput').value = checkbox.checked ? '1' : '0';
+  form.submit();
+}
+
+// Toggle Global Pricing panel
+function toggleGlobalPricing() {
+  const body = document.getElementById('globalPricingBody');
+  const chevron = document.getElementById('globalPricingChevron');
+  const toggle = document.getElementById('globalPricingToggle');
+  const isVisible = body.style.display !== 'none';
+  body.style.display = isVisible ? 'none' : 'block';
+  chevron.className = isVisible ? 'bi bi-chevron-right' : 'bi bi-chevron-down';
+  toggle.checked = !isVisible;
+  localStorage.setItem('globalPricingOpen', !isVisible);
+}
+
+// Restore toggle state from localStorage
+document.addEventListener('DOMContentLoaded', function() {
+  const saved = localStorage.getItem('globalPricingOpen');
+  if (saved === 'false') {
+    const body = document.getElementById('globalPricingBody');
+    const chevron = document.getElementById('globalPricingChevron');
+    const toggle = document.getElementById('globalPricingToggle');
+    if (body) body.style.display = 'none';
+    if (chevron) chevron.className = 'bi bi-chevron-right';
+    if (toggle) toggle.checked = false;
+  }
+
+  // ── Feature 1: initialise all margin cells with ₹X.XX (Y.Y%) on page load ──
+  document.querySelectorAll('.dist-price').forEach(input => updateMarginDisplay(input));
+
+  {% if require_global_pricing_setup %}
+  lockNonGlobalOptions();
+  const forceModalEl = document.getElementById('forceGlobalPricingModal');
+  if (forceModalEl) {
+    const forceModal = new bootstrap.Modal(forceModalEl, {
+      backdrop: 'static',
+      keyboard: false,
+    });
+    forceModal.show();
+  }
+  {% endif %}
+});
+
+function scrollToGlobalPricing() {
+  const modalEl = document.getElementById('forceGlobalPricingModal');
+  const modalInstance = modalEl ? bootstrap.Modal.getInstance(modalEl) : null;
+  if (modalInstance) {
+    modalInstance.hide();
+  }
+
+  const panel = document.querySelector('#globalPricingBody') || document.querySelector('#globalPricingForm');
+  if (!panel) return;
+  if (document.getElementById('globalPricingBody')) {
+    document.getElementById('globalPricingBody').style.display = 'block';
+  }
+  if (document.getElementById('globalPricingChevron')) {
+    document.getElementById('globalPricingChevron').className = 'bi bi-chevron-down';
+  }
+  if (document.getElementById('globalPricingToggle')) {
+    document.getElementById('globalPricingToggle').checked = true;
+  }
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function lockNonGlobalOptions() {
+  ['filterBar', 'autoListPanel', 'postGlobalSection'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.classList.add('setup-locked');
+    }
+  });
+}
+
+// ── Immediate single-product list/unlist on toggle change ────────
+async function toggleListingImmediate(productPk, checkbox) {
+  const action  = checkbox.checked ? 'list' : 'unlist';
+  const spinner = document.getElementById('list-spinner-' + productPk);
+
+  checkbox.disabled = true;
+  if (spinner) spinner.style.display = 'inline-block';
+
+  try {
+    const res  = await fetch('{% url "distributors:bulk_toggle_listing" %}', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body:    JSON.stringify({ product_pks: [productPk], action }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      const card = document.getElementById('product-card-' + productPk);
+      if (card) {
+        if (data.is_listed) {
+          card.classList.add('border', 'border-success');
+        } else {
+          card.classList.remove('border', 'border-success');
+        }
+        const badge = card.querySelector('.listed-status-badge');
+        if (badge) {
+          badge.innerHTML = data.is_listed
+            ? '<i class="bi bi-check-circle-fill"></i> Listed'
+            : '<i class="bi bi-dash-circle"></i> Not listed';
+          badge.className = 'listed-status-badge small ' +
+            (data.is_listed ? 'text-success' : 'text-muted');
+        }
+      }
+      showBulkToast(data.is_listed ? '✓ Listed' : '✓ Unlisted');
+    } else {
+      // Revert toggle on failure
+      checkbox.checked = !checkbox.checked;
+      showBulkToast(data.error || 'Failed to update.', true);
+    }
+  } catch (err) {
+    checkbox.checked = !checkbox.checked;
+    showBulkToast('Network error. Please try again.', true);
+  } finally {
+    checkbox.disabled = false;
+    if (spinner) spinner.style.display = 'none';
+  }
+}
+
+// ════════════════════════════════════════════════════════════════
+//  FEATURE 2 – BULK SELECTION & ACTION BAR
+// ════════════════════════════════════════════════════════════════
+
+// ── helpers ──────────────────────────────────────────────────────
+function getCsrfToken() {
+  return document.querySelector('[name=csrfmiddlewaretoken]')?.value || '';
+}
+
+function getSelectedPks() {
+  return [...document.querySelectorAll('.product-select-cb:checked')]
+    .map(cb => cb.dataset.productPk);
+}
+
+function showBulkToast(msg, isError = false) {
+  const toast = document.getElementById('bulkToast');
+  const msgEl = document.getElementById('bulkToastMsg');
+  toast.style.borderLeftColor = isError ? '#ef4444' : '#22c55e';
+  msgEl.textContent = msg;
+  toast.style.display = 'block';
+  setTimeout(() => { toast.style.display = 'none'; }, 3500);
+}
+
+function setBarButtonsDisabled(disabled) {
+  ['bulkApplyBtn', 'bulkListBtn', 'bulkUnlistBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.disabled = disabled; el.style.opacity = disabled ? '.5' : '1'; }
+  });
+}
+
+// ── selection state ───────────────────────────────────────────────
+function refreshBulkBar() {
+  const pks   = getSelectedPks();
+  const count = pks.length;
+  const bar   = document.getElementById('bulkActionBar');
+  const badge = document.getElementById('selectedCountBadge');
+  const pill  = document.getElementById('bulkCountPill');
+
+  bar.style.display  = count > 0 ? 'block' : 'none';
+  badge.style.display = count > 0 ? '' : 'none';
+  badge.textContent  = `${count} selected`;
+  pill.textContent   = count;
+
+  // Highlight selected cards with a subtle ring
+  document.querySelectorAll('.product-select-cb').forEach(cb => {
+    const card = document.getElementById('product-card-' + cb.dataset.productPk);
+    if (card) {
+      card.style.outline = cb.checked ? '2px solid #3b82f6' : '';
+      card.style.outlineOffset = cb.checked ? '-2px' : '';
+    }
+  });
+}
+
+// Individual checkbox click
+document.addEventListener('change', function(e) {
+  if (e.target.classList.contains('product-select-cb')) {
+    refreshBulkBar();
+    // Sync master checkbox state
+    const all  = document.querySelectorAll('.product-select-cb').length;
+    const chk  = document.querySelectorAll('.product-select-cb:checked').length;
+    const master = document.getElementById('selectAllCb');
+    if (master) {
+      master.checked       = chk === all;
+      master.indeterminate = chk > 0 && chk < all;
+    }
+  }
+});
+
+// Master "Select All" checkbox
+document.addEventListener('change', function(e) {
+  if (e.target.id === 'selectAllCb') {
+    document.querySelectorAll('.product-select-cb')
+      .forEach(cb => { cb.checked = e.target.checked; });
+    refreshBulkBar();
+  }
+});
+
+function clearBulkSelection() {
+  document.querySelectorAll('.product-select-cb').forEach(cb => { cb.checked = false; });
+  const master = document.getElementById('selectAllCb');
+  if (master) { master.checked = false; master.indeterminate = false; }
+  refreshBulkBar();
+}
+
+// ── read global pricing form values ──────────────────────────────
+function readGlobalPricingConfig() {
+  const cfg = {};
+  ['weight', 'volume', 'pieces'].forEach(u => {
+    const modeEl  = document.querySelector(`[name="mode_${u}"]`);
+    const valEl   = document.querySelector(`[name="value_${u}"]`);
+    const capEl   = document.getElementById(`cap_${u}`);
+    if (modeEl)  cfg[`mode_${u}`]  = modeEl.value;
+    if (valEl)   cfg[`value_${u}`] = valEl.value;
+    if (capEl)   cfg[`cap_${u}`]   = capEl.value;
+  });
+  return cfg;
+}
+
+// ── Apply Global Pricing to selected ─────────────────────────────
+async function bulkApplyGlobalPricing() {
+  const pks = getSelectedPks();
+  if (!pks.length) return;
+
+  const config = readGlobalPricingConfig();
+  const hasValue = ['weight', 'volume', 'pieces'].some(u => config[`value_${u}`]);
+  if (!hasValue) {
+    showBulkToast('Set at least one margin value in Global Pricing first.', true);
+    return;
+  }
+
+  if (!confirm(`Apply current Global Pricing settings to ${pks.length} selected product(s)?`)) return;
+
+  setBarButtonsDisabled(true);
+
+  try {
+    const res  = await fetch('{% url "distributors:bulk_apply_global_pricing" %}', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body:    JSON.stringify({ product_pks: pks, ...config }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      // Update DOM price inputs and margin cells without page reload
+      if (data.variant_prices) {
+        Object.entries(data.variant_prices).forEach(([vid, price]) => {
+          const inp = document.querySelector(`.dist-price[data-vid="${vid}"]`);
+          if (inp) { inp.value = parseFloat(price).toFixed(2); updateMarginDisplay(inp); }
+        });
+      }
+      showBulkToast(`✓ ${data.message}`);
+    } else {
+      showBulkToast(data.error || 'Failed.', true);
+    }
+  } catch (err) {
+    showBulkToast('Network error. Please try again.', true);
+  } finally {
+    setBarButtonsDisabled(false);
+  }
+}
+
+// ── Bulk List / Unlist selected ───────────────────────────────────
+async function bulkToggleListing(action) {
+  const pks = getSelectedPks();
+  if (!pks.length) return;
+
+  const verb = action === 'list' ? 'list' : 'unlist';
+  if (!confirm(`${verb.charAt(0).toUpperCase() + verb.slice(1)} ${pks.length} selected product(s)?`)) return;
+
+  setBarButtonsDisabled(true);
+
+  try {
+    const res  = await fetch('{% url "distributors:bulk_toggle_listing" %}', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+      body:    JSON.stringify({ product_pks: pks, action }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      const isListed = data.is_listed;
+      // Update card borders & listed badge in DOM
+      data.updated_pks.forEach(pk => {
+        const card = document.getElementById('product-card-' + pk);
+        if (card) {
+          card.dataset.isListed = isListed ? 'true' : 'false';
+          if (isListed) {
+            card.classList.add('border', 'border-success');
+          } else {
+            card.classList.remove('border', 'border-success');
+          }
+          const badge = card.querySelector('.listed-status-badge');
+          if (badge) {
+            badge.innerHTML = isListed
+              ? '<i class="bi bi-check-circle-fill"></i> Listed'
+              : '<i class="bi bi-dash-circle"></i> Not listed';
+            badge.className = 'listed-status-badge small ' + (isListed ? 'text-success' : 'text-muted');
+          }
+          // ← sync the List toggle switch
+          const toggle = document.getElementById('listed-' + pk);
+          if (toggle) toggle.checked = isListed;
+        }
+      });
+      showBulkToast(`✓ ${data.message}`);
+    } else {
+      showBulkToast(data.error || 'Failed.', true);
+    }
+  } catch (err) {
+    showBulkToast('Network error. Please try again.', true);
+  } finally {
+    setBarButtonsDisabled(false);
+  }
+}
+</script>
+{% endblock %}

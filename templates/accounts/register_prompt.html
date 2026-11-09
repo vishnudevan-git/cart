@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load i18n %}
+{% block title %}Create Account — LaKrish Mart{% endblock %}
+{% block content %}
+<div class="container mt-5">
+  <div class="row justify-content-center">
+    <div class="col-md-5">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4">
+          <h4 class="mb-4">It looks like you are new to LaKrish Mart</h4>
+          
+          <div class="mb-3 d-flex align-items-center">
+            <span class="fs-5">{{ identifier }}</span>
+            <a href="{% url 'accounts:login' %}" class="text-decoration-none ms-3 fw-semibold">Change</a>
+          </div>
+          
+          <p class="text-muted mb-4">Let's create an account using your mobile number or email ID</p>
+          
+          <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-warning w-100 fw-semibold rounded-pill py-2 text-dark border-0">Proceed to create an account</button>
+          </form>
+          
+          <hr class="mt-4 mb-4">
+          
+          <div>
+            <p class="fw-bold mb-1">Already a customer?</p>
+            <a href="{% url 'accounts:login' %}" class="text-decoration-none">Sign in with another email or mobile number</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

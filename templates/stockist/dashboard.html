@@ -1,0 +1,53 @@
+{% extends 'stockist/base_stockist.html' %}
+{% block title %}Stockist Dashboard{% endblock %}
+{% block page_title %}📦 Stockist Dashboard — {{ stockist.company_name }}{% endblock %}
+{% block active_nav %}dashboard{% endblock %}
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">Total Variants</div>
+      <div class="fs-4 fw-bold">{{ total_variants }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">In Stock</div>
+      <div class="fs-4 fw-bold text-success">{{ in_stock }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">Low Stock (≤10)</div>
+      <div class="fs-4 fw-bold text-warning">{{ low_stock }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card border-0 shadow-sm stat-card p-3">
+      <div class="small text-muted">Pending Restock</div>
+      <div class="fs-4 fw-bold text-danger">{{ pending_restock }}</div>
+    </div>
+  </div>
+</div>
+
+<h6 class="fw-semibold mb-2">Recently Updated Inventory</h6>
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light"><tr><th>Product</th><th>Variant</th><th>Qty</th><th>Updated</th></tr></thead>
+      <tbody>
+        {% for inv in recent_inventory %}
+        <tr class="{% if inv.quantity == 0 %}table-danger{% elif inv.quantity <= 10 %}table-warning{% endif %}">
+          <td>{{ inv.variant.product.name }}</td>
+          <td><span class="badge bg-secondary">{{ inv.variant.label }}</span></td>
+          <td class="fw-semibold">{{ inv.quantity }}</td>
+          <td class="small text-muted">{{ inv.updated_at|date:"d M, H:i" }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-center text-muted py-3">No inventory yet. <a href="{% url 'stockist:inventory' %}">Add stock</a></td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

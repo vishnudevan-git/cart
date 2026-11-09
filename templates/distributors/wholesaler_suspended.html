@@ -1,0 +1,11 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Account Suspended{% endblock %}
+{% block page_title %}Account Suspended{% endblock %}
+{% block content %}
+<div class="text-center py-5">
+  <div class="display-6 mb-2">⛔</div>
+  <h4>Account Suspended</h4>
+  <p class="text-muted">Your Distributor account for <strong>{{ wholesaler.company_name }}</strong> has been suspended. Please contact the admin.</p>
+  <a href="{% url 'accounts:logout' %}" class="btn btn-outline-secondary">Logout</a>
+</div>
+{% endblock %}

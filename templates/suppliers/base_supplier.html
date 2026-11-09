@@ -1,0 +1,5 @@
+{% extends 'base_dashboard.html' %}
+
+{% block sidebar %}
+  {% include 'suppliers/partials/sidebar.html' with active_nav=active_nav|default:'' %}
+{% endblock %}

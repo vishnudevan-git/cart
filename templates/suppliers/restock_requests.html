@@ -1,0 +1,219 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% load qty_tags %}
+{% block title %}Restock Requests{% endblock %}
+{% block page_title %}📋 Restock Requests from Marketplaces{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='restock_requests' %}{% endblock %}
+{% block content %}
+
+{% if pending_count %}
+<div class="alert alert-warning py-2 small mb-3">
+  <i class="bi bi-bell-fill me-1"></i>
+  <strong>{{ pending_count }}</strong> pending request{{ pending_count|pluralize }}. Prepare the stock, then hand it over or dispatch it.
+</div>
+{% endif %}
+
+<!-- Status tabs -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="?status=pending" class="btn btn-sm {% if status_filter == 'pending' %}btn-warning{% else %}btn-outline-secondary{% endif %}">
+    Pending {% if pending_count %}<span class="badge bg-danger ms-1">{{ pending_count }}</span>{% endif %}
+  </a>
+  {% for val, label in status_choices %}{% if val != 'pending' %}
+  <a href="?status={{ val }}" class="btn btn-sm {% if status_filter == val %}btn-success{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
+  {% endif %}{% endfor %}
+  <a href="?status=all" class="btn btn-sm {% if status_filter == 'all' %}btn-secondary{% else %}btn-outline-secondary{% endif %}">All</a>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr>
+          <th>#</th><th>Marketplace</th><th>Product</th>
+          <th class="text-end">Qty</th><th class="text-end">Your stock</th>
+          <th>Method</th><th>Requested</th><th>Status</th><th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in requests %}
+        <tr class="{% if r.status == 'pending' %}table-warning{% endif %}">
+          <td class="text-muted">{{ r.pk }}</td>
+          <td class="fw-semibold">{{ r.distributor.company_name }}</td>
+          <td>
+            {{ r.variant.product.name }}
+            <span class="badge bg-secondary ms-1">{{ r.variant.label }}</span>
+          </td>
+
+          {# Quantity: a loose request is a weight, a packed request is a pack count #}
+          <td class="text-end fw-bold">
+            {% if r.loose_grams %}
+              {{ r.loose_grams|human_qty:r.variant.product.master_unit }}
+              <span class="badge bg-info text-dark ms-1">Loose</span>
+            {% else %}
+              {{ r.quantity_requested }}
+            {% endif %}
+          </td>
+
+          {# Can the supplier actually cover it? Red when stock is short. #}
+          <td class="text-end">
+            {% if r.loose_grams %}
+              {% if r.variant.product.master_stock_grams < r.loose_grams %}
+                <span class="text-danger fw-semibold" title="Not enough stock to cover this request">
+                  {{ r.variant.product.master_stock_grams|human_qty:r.variant.product.master_unit }}
+                  <i class="bi bi-exclamation-triangle-fill"></i></span>
+              {% else %}
+                <span class="text-muted">{{ r.variant.product.master_stock_grams|human_qty:r.variant.product.master_unit }}</span>
+              {% endif %}
+            {% else %}
+              {% if r.variant.stock < r.quantity_requested %}
+                <span class="text-danger fw-semibold" title="Not enough stock to cover this request">
+                  {{ r.variant.stock }} <i class="bi bi-exclamation-triangle-fill"></i></span>
+              {% else %}
+                <span class="text-muted">{{ r.variant.stock }}</span>
+              {% endif %}
+            {% endif %}
+          </td>
+
+          <td class="small text-muted text-nowrap">
+            {% if r.fulfillment_method == 'stockist_pickup' %}🚗 Stockist pickup
+            {% elif r.fulfillment_method == 'supplier_transport' %}🚛 Transport
+            {% elif r.fulfillment_method == 'supplier_courier' %}📦 Courier
+            {% else %}—{% endif %}
+          </td>
+          <td class="text-muted">{{ r.requested_at|date:"d M Y, H:i" }}</td>
+          <td>
+            {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
+            {% elif r.status == 'approved' %}<span class="badge bg-info text-dark">Approved by Stockist</span>
+            {% elif r.status == 'stockist_picked' %}<span class="badge bg-primary">📦 Picked by Stockist</span>
+            {% elif r.status == 'in_transit' %}
+              <span class="badge bg-info">🚚 In Transit</span>
+              {# The dispatch details the supplier typed in were never shown anywhere before #}
+              {% if r.tracking_info %}<div class="text-muted mt-1" style="font-size:.75rem">{{ r.tracking_info }}</div>{% endif %}
+            {% elif r.status == 'delivered' %}<span class="badge bg-success">✓ Delivered</span>
+            {% elif r.status == 'rejected' %}<span class="badge bg-danger">Rejected</span>
+            {% endif %}
+          </td>
+
+          <td class="text-end">
+            {% if r.variant.product.direct_supply and r.status != 'delivered' and r.status != 'rejected' %}
+            {% comment %}Stage 7: direct-supply — the supplier delivers straight to
+            the shop; no stockist in between, no commissions.{% endcomment %}
+            <div class="d-inline-flex gap-1">
+              <form method="post" class="d-inline"
+                    data-confirm="Deliver directly to {{ r.distributor.company_name }}? Your stock reduces by the delivered amount."
+                    data-confirm-type="success" data-confirm-title="Direct delivery?">
+                {% csrf_token %}
+                <input type="hidden" name="req_id" value="{{ r.pk }}">
+                <input type="hidden" name="action" value="deliver_direct">
+                <button class="btn btn-sm btn-success text-nowrap"><i class="bi bi-truck me-1"></i>Deliver (direct)</button>
+              </form>
+              <form method="post" class="d-inline"
+                    data-confirm="Reject request #{{ r.pk }} from {{ r.distributor.company_name }}?"
+                    data-confirm-type="danger" data-confirm-title="Reject request?">
+                {% csrf_token %}
+                <input type="hidden" name="req_id" value="{{ r.pk }}">
+                <input type="hidden" name="action" value="reject">
+                <button class="btn btn-sm btn-outline-danger">Reject</button>
+              </form>
+            </div>
+
+            {% elif r.status == 'pending' or r.status == 'approved' %}
+            <div class="d-inline-flex gap-1">
+              <button type="button" class="btn btn-sm btn-primary text-nowrap"
+                      data-bs-toggle="collapse" data-bs-target="#disp{{ r.pk }}">
+                <i class="bi bi-send me-1"></i>{% if r.fulfillment_method == 'stockist_pickup' %}Hand over…{% else %}Dispatch…{% endif %}
+              </button>
+              <form method="post" class="d-inline"
+                    data-confirm="Reject request #{{ r.pk }} from {{ r.distributor.company_name }}? They will see it as rejected."
+                    data-confirm-type="danger" data-confirm-title="Reject request?">
+                {% csrf_token %}
+                <input type="hidden" name="req_id" value="{{ r.pk }}">
+                <input type="hidden" name="action" value="reject">
+                <button class="btn btn-sm btn-outline-danger">Reject</button>
+              </form>
+            </div>
+            <div class="collapse mt-2 text-start" id="disp{{ r.pk }}">
+              <form method="post" class="border rounded p-2 bg-light"
+                    data-confirm="{% if r.fulfillment_method == 'stockist_pickup' %}Confirm that {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} has been handed over to the stockist?{% else %}Dispatch {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to {{ r.distributor.company_name }}?{% endif %}"
+                    data-confirm-type="success"
+                    data-confirm-title="{% if r.fulfillment_method == 'stockist_pickup' %}Handed over?{% else %}Dispatch now?{% endif %}">
+                {% csrf_token %}
+                <input type="hidden" name="req_id" value="{{ r.pk }}">
+                <input type="hidden" name="action" value="dispatch">
+                <label class="form-label small mb-1" for="trk{{ r.pk }}">
+                  {% if r.fulfillment_method == 'stockist_pickup' %}Stockist's vehicle no. (optional)
+                  {% elif r.fulfillment_method == 'supplier_courier' %}Courier name / tracking no.
+                  {% else %}Vehicle / LR no.{% endif %}
+                </label>
+                <input type="text" id="trk{{ r.pk }}" name="tracking_info" maxlength="200"
+                       class="form-control form-control-sm mb-2">
+                <button class="btn btn-sm btn-primary w-100">
+                  <i class="bi bi-send me-1"></i>{% if r.fulfillment_method == 'stockist_pickup' %}Confirm hand over{% else %}Confirm dispatch{% endif %}
+                </button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="9" class="text-center text-muted py-5">
+            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+            {% if status_filter == 'all' %}No restock requests yet.{% else %}No requests with this status.{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% comment %}Stage 7: stockist inventory increases ONLY via these fulfilments —
+goods move supplier → stockist, so supplier stock drops the same moment.{% endcomment %}
+<div class="card border-0 shadow-sm mt-4">
+  <div class="card-header bg-white fw-semibold">
+    <i class="bi bi-boxes me-1"></i>Restock Requests from Stockists
+  </div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr><th>#</th><th>Stockist</th><th>Product</th><th>Pack</th><th>Qty</th><th>My Stock</th><th>Status</th><th>Requested</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for r in stockist_requests %}
+        <tr>
+          <td class="text-muted">#{{ r.pk }}</td>
+          <td>{{ r.stockist.company_name }}</td>
+          <td class="fw-semibold">{{ r.variant.product.name }}</td>
+          <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
+          <td class="fw-semibold">{{ r.quantity_requested }}</td>
+          <td class="{% if r.variant.stock < r.quantity_requested %}text-danger fw-semibold{% else %}text-muted{% endif %}">{{ r.variant.stock }}</td>
+          <td>
+            {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
+            {% elif r.status == 'fulfilled' %}<span class="badge bg-success">Fulfilled</span>
+            {% else %}<span class="badge bg-danger">{{ r.get_status_display }}</span>{% endif %}
+          </td>
+          <td class="text-muted">{{ r.requested_at|date:"d M, H:i" }}</td>
+          <td class="text-end">
+            {% if r.status == 'pending' %}
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="kind" value="stockist">
+              <input type="hidden" name="req_id" value="{{ r.pk }}">
+              <button name="action" value="fulfil" class="btn btn-sm btn-success"
+                      data-confirm="Send {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to {{ r.stockist.company_name }}? Your stock reduces by the same amount."
+                      data-confirm-type="success" data-confirm-title="Fulfil request?">Fulfil</button>
+              <button name="action" value="reject" class="btn btn-sm btn-outline-danger"
+                      data-confirm="Reject stockist request #{{ r.pk }}?"
+                      data-confirm-type="danger" data-confirm-title="Reject request?">Reject</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="9" class="text-center text-muted py-4">No stockist requests yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

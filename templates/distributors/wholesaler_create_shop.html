@@ -1,0 +1,35 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Create Shop{% endblock %}
+{% block page_title %}Create a new Shop (Marketplace){% endblock %}
+{% block content %}
+<a href="{% url 'wholesaler:dashboard' %}" class="btn btn-sm btn-outline-secondary mb-3"><i class="bi bi-arrow-left me-1"></i>Back to dashboard</a>
+{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>{% endfor %}
+
+<div class="card border-0 shadow-sm" style="max-width:32rem;">
+  <div class="card-body">
+    <p class="text-muted small">Create a shop under you. The shop gets an invite code so its customers can join by code or mobile number.</p>
+    <form method="post">
+      {% csrf_token %}
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Shop name</label>
+        <input type="text" name="company_name" class="form-control" value="{{ post.company_name|default:'' }}" required>
+      </div>
+      <div class="row g-2">
+        <div class="col-md-6 mb-3">
+          <label class="form-label fw-semibold">Login (mobile or email)</label>
+          <input type="text" name="username" class="form-control" value="{{ post.username|default:'' }}" required>
+        </div>
+        <div class="col-md-6 mb-3">
+          <label class="form-label fw-semibold">Password</label>
+          <input type="text" name="password" class="form-control" required>
+        </div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Area <span class="text-muted small">(optional)</span></label>
+        <input type="text" name="area" class="form-control" value="{{ post.area|default:'' }}">
+      </div>
+      <button type="submit" class="btn btn-success">Create Shop</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

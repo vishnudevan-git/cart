@@ -1,0 +1,6 @@
+{% for item in ui_supplier_sidebar_items %}
+<a class="nav-link {% if active_nav == item.key %}active{% endif %}" href="{% url item.url_name %}">
+  <i class="bi {{ item.icon }}"></i> {{ item.label }}
+  {% if item.key == 'restock_requests' and pending_count %}<span class="badge bg-danger ms-1">{{ pending_count }}</span>{% endif %}
+</a>
+{% endfor %}

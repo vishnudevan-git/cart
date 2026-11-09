@@ -1,0 +1,60 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Submit Support Ticket{% endblock %}
+{% block page_title %}Submit a Support Ticket{% endblock %}
+
+{% block sidebar %}
+  {% include 'partials/role_support_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header  fw-semibold">
+        <i class="bi bi-ticket-perforated me-2 text-success"></i>New Support Ticket
+      </div>
+      <div class="card-body p-4">
+        <form method="post" enctype="multipart/form-data" novalidate>
+          {% csrf_token %}
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Ticket Type <span class="text-danger">*</span></label>
+            <select name="ticket_type" class="form-select" required>
+              <option value="">— Select type —</option>
+              {% for val, label in ticket_type_choices %}
+                <option value="{{ val }}" {% if request.POST.ticket_type == val %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Subject <span class="text-danger">*</span></label>
+            <input type="text" name="subject" class="form-control"
+                   value="{{ request.POST.subject }}"
+                   placeholder="Brief summary of your issue" required maxlength="200">
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Description <span class="text-danger">*</span></label>
+            <textarea name="description" class="form-control" rows="5"
+                      placeholder="Describe your issue in detail..." required>{{ request.POST.description }}</textarea>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Screenshot / Image <span class="text-muted small">(optional)</span></label>
+            <input type="file" name="image" class="form-control" accept="image/*">
+            <div class="form-text">Upload a screenshot if it helps explain the issue.</div>
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success px-4">
+              <i class="bi bi-send me-1"></i>Submit Ticket
+            </button>
+            <a href="{% url 'support:my_tickets' %}" class="btn btn-outline-secondary">My Tickets</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,238 @@
+{% comment %}
+Shared product/stock table — used by the supplier "My Products" page and the
+admin "Stock" (read-only) page so both share one layout.
+
+Context expected:
+  products      product objects annotated by the view with: display_variants,
+                detail_variants, total_stock_grams, master_unit, variant_count,
+                stock_breakdown, stock_total_packs, detail_is_pool,
+                pricing_mode, status, charges_confirmed, direct_supply,
+                image, sku, name, category (+ supplier when show_supplier)
+  table_id      unique id for the table (column toggle)
+  show_actions  True  -> Edit/Delete column + pricing auto/manual toggle (supplier)
+                False -> read-only (admin stock view)
+  show_supplier True to add a Supplier column (admin, across suppliers)
+{% endcomment %}
+{% load qty_tags humanize %}
+
+<!-- Desktop table -->
+<div class="card border-0 shadow-sm d-none d-md-block">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0" id="{{ table_id }}">
+      <thead class="table-light">
+        <tr>
+          <th data-col="image">Image</th>
+          <th data-col="sku">SKU</th>
+          <th data-col="name">Name</th>
+          {% if show_supplier %}<th data-col="supplier">Supplier</th>{% endif %}
+          <th data-col="category">Category</th>
+          <th data-col="packs">Packs &amp; Stock</th>
+          <th data-col="status">Status</th>
+          {% if show_actions %}<th data-col="actions">Actions</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr data-product-row="{{ p.pk }}">
+          <td data-col="image">{% if p.image %}<img src="{{ p.image.url }}" style="height:40px;width:40px;object-fit:cover;border-radius:6px" alt="{{ p.name }}">{% else %}🌿{% endif %}</td>
+          <td data-col="sku" class="text-nowrap"><code class="small">{{ p.sku }}</code></td>
+          <td data-col="name" class="fw-semibold">{{ p.name }}
+            {% if p.direct_supply %}<span class="badge bg-info text-dark ms-1" title="Delivered straight to shops — no stockist, no commissions">DIRECT</span>{% endif %}
+          </td>
+          {% if show_supplier %}<td data-col="supplier" class="small text-muted">{{ p.supplier.company_name }}</td>{% endif %}
+          <td data-col="category">{{ p.category.name|default:"—" }}</td>
+          <td data-col="packs">
+            <div class="d-flex flex-column gap-1" style="max-width:340px">
+              {# — Stock summary line — #}
+              <div class="d-flex align-items-center flex-wrap gap-1">
+                {% if p.total_stock_grams %}
+                  <span class="fw-semibold" title="{{ p.total_stock_grams|exact_qty:p.master_unit }}">{{ p.total_stock_grams|human_qty:p.master_unit }}</span>
+                  {% if p.variant_count > 1 %}<span class="text-muted" style="font-size:.7rem">· {{ p.variant_count }} variants</span>{% endif %}
+                {% elif p.stock_breakdown %}
+                  <span class="fw-semibold">{{ p.stock_total_packs }} <span class="fw-normal text-muted" style="font-size:.7rem">packs</span></span>
+                  {% if p.variant_count > 1 %}<span class="text-muted" style="font-size:.7rem">· {{ p.variant_count }} variants</span>{% endif %}
+                {% else %}
+                  <span class="text-muted small">No stock</span>
+                {% endif %}
+                {% if show_actions %}
+                  {% if p.pricing_mode == 'auto' %}
+                    <span class="badge bg-success pricing-badge ms-1" style="font-size:.62rem;cursor:pointer"
+                          data-pk="{{ p.pk }}" data-mode="auto" title="Auto price. Click to switch to Manual price">⚡ Auto</span>
+                  {% else %}
+                    <span class="badge bg-warning text-dark pricing-badge ms-1" style="font-size:.62rem;cursor:pointer"
+                          data-pk="{{ p.pk }}" data-mode="manual" title="Manual price. Click to switch to Auto price">✏️ Manual</span>
+                  {% endif %}
+                {% endif %}
+              </div>
+              {# — Pack + price pills (all shown, wrapped) — #}
+              <div class="pack-cell d-flex flex-wrap align-items-center gap-1">
+                {% for v in p.display_variants %}
+                  <span class="badge bg-light text-dark border" style="font-size:.7rem">{{ v.label }} ₹{{ v.selling_price|inr }}</span>
+                {% empty %}
+                  <span class="text-muted small">—</span>
+                {% endfor %}
+                {% if p.detail_variants or show_downstream %}
+                  <button type="button" class="btn btn-sm btn-link p-0 stock-row-toggle text-decoration-none ms-1"
+                          data-target="detail-{{ table_id }}-{{ p.pk }}" style="font-size:.72rem"
+                          aria-expanded="false" title="Show variant, pack{% if show_downstream %} & downstream stock{% endif %} details">
+                    <i class="bi bi-chevron-down me-1 toggle-chevron"></i>details
+                  </button>
+                {% endif %}
+              </div>
+            </div>
+          </td>
+          <td data-col="status">
+            {% if p.status == 'approved' %}
+              <span class="badge bg-success">Approved</span>
+            {% elif p.status == 'rejected' %}
+              <span class="badge bg-danger">Rejected</span>
+            {% elif p.status == 'pending' and p.charges_confirmed %}
+              <span class="badge bg-success">Live in Store</span>
+            {% else %}
+              <span class="badge bg-warning text-dark">Pending Approval</span>
+            {% endif %}
+          </td>
+          {% if show_actions %}
+          <td data-col="actions" class="text-nowrap">
+            <a href="{% url 'suppliers:product_edit' p.pk %}" class="btn btn-sm btn-outline-primary" title="Edit {{ p.name }}"><i class="bi bi-pencil-square"></i></a>
+            <a href="{% url 'suppliers:product_delete' p.pk %}" class="btn btn-sm btn-outline-danger ms-1" title="Delete {{ p.name }}"><i class="bi bi-trash"></i></a>
+          </td>
+          {% endif %}
+        </tr>
+        {% if p.detail_variants or show_downstream %}
+        <tr id="detail-{{ table_id }}-{{ p.pk }}" class="stock-detail-row d-none">
+          <td colspan="10" class="bg-light-subtle border-top-0 p-0">
+            <div class="p-3">
+              {% if show_downstream %}
+              <div class="mb-3">
+                <div class="fw-semibold small mb-2 text-muted"><i class="bi bi-diagram-3 me-1"></i>Downstream stock (held below the supplier)</div>
+                {% if p.ds_rows or p.ds_shop_loose_grams %}
+                <div class="border rounded bg-white" style="max-width:640px">
+                  <table class="table table-sm mb-0 align-middle" style="font-size:.76rem">
+                    <thead>
+                      <tr class="text-muted">
+                        <th class="fw-normal">Variant / Pack</th>
+                        <th class="fw-normal text-center">Stockist</th>
+                        <th class="fw-normal text-center">Distributor</th>
+                        <th class="fw-normal text-center">Shop</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for r in p.ds_rows %}
+                      <tr>
+                        <td>{% if r.variant_name %}{{ r.variant_name }} · {% endif %}{{ r.variant_label }}</td>
+                        <td class="text-center">{% if r.stockist %}{{ r.stockist }}{% else %}<span class="text-muted">0</span>{% endif %}</td>
+                        <td class="text-center">{% if r.distributor %}{{ r.distributor }}{% else %}<span class="text-muted">0</span>{% endif %}</td>
+                        <td class="text-center">{% if r.shop %}<span class="fw-semibold">{{ r.shop }}</span>{% else %}<span class="text-muted">0</span>{% endif %}</td>
+                      </tr>
+                      {% empty %}
+                      <tr><td colspan="4" class="text-muted">No packed units held downstream.</td></tr>
+                      {% endfor %}
+                      {% if p.ds_shop_loose_grams %}
+                      <tr class="table-light">
+                        <td><i class="bi bi-droplet me-1 text-info"></i>Loose / bulk pool (shop)</td>
+                        <td class="text-center text-muted">—</td>
+                        <td class="text-center text-muted">—</td>
+                        <td class="text-center fw-semibold">{{ p.ds_shop_loose_grams|human_qty:p.ds_shop_loose_unit }}</td>
+                      </tr>
+                      {% endif %}
+                    </tbody>
+                    <tfoot>
+                      <tr class="fw-semibold border-top">
+                        <td class="text-muted">Total (packed)</td>
+                        <td class="text-center">{{ p.ds_stockist }}</td>
+                        <td class="text-center">{{ p.ds_distributor }}</td>
+                        <td class="text-center">{{ p.ds_shop }}</td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+                {% else %}
+                <span class="text-muted small">No stock held below the supplier.</span>
+                {% endif %}
+              </div>
+              {% endif %}
+              {% if p.detail_variants %}
+              <div class="fw-semibold small mb-2 text-muted"><i class="bi bi-box-seam me-1"></i>{{ p.name }} — variants &amp; packs</div>
+              <div class="row g-2">
+                {% for vt in p.detail_variants %}
+                <div class="col-12 col-lg-6 col-xl-4">
+                  <div class="border rounded bg-white h-100">
+                    <div class="d-flex justify-content-between align-items-center px-2 py-1 border-bottom">
+                      <span class="fw-semibold small">{{ vt.name }}</span>
+                      {% if p.detail_is_pool and vt.pool_grams %}
+                        <span class="badge bg-info-subtle text-info-emphasis border" style="font-size:.66rem">pool {{ vt.pool_grams|human_qty:p.master_unit }}</span>
+                      {% endif %}
+                    </div>
+                    <table class="table table-sm mb-0" style="font-size:.74rem">
+                      <thead><tr class="text-muted"><th class="fw-normal">Pack</th><th class="fw-normal text-end">Price</th><th class="fw-normal text-end">Stock</th></tr></thead>
+                      <tbody>
+                        {% for pk in vt.packs %}
+                        <tr><td>{{ pk.label }}</td><td class="text-end">₹{{ pk.price|inr }}</td><td class="text-end">{{ pk.stock }}</td></tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="text-muted">No packs.</td></tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endif %}
+        {% empty %}
+        <tr><td colspan="10" class="text-center text-muted py-4">No products found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Mobile cards -->
+<div class="d-md-none">
+  {% for p in products %}
+  <div class="card border-0 shadow-sm mb-2">
+    <div class="card-body p-3">
+      <div class="d-flex gap-3 align-items-start">
+        {% if p.image %}
+          <img src="{{ p.image.url }}" style="height:56px;width:56px;object-fit:cover;border-radius:8px;flex-shrink:0" alt="{{ p.name }}">
+        {% else %}
+          <div class="bg-light rounded d-flex align-items-center justify-content-center" style="height:56px;width:56px;font-size:1.5rem;flex-shrink:0">🌿</div>
+        {% endif %}
+        <div class="flex-grow-1">
+          <div class="fw-semibold small">{{ p.name }}</div>
+          <div class="text-muted" style="font-size:.75rem">{% if show_supplier %}{{ p.supplier.company_name }} · {% endif %}{{ p.category.name|default:"—" }}</div>
+          <div class="d-flex flex-wrap align-items-center gap-1 mt-1">
+            {% for v in p.display_variants %}
+            <span class="badge bg-light text-dark border" style="font-size:.7rem">{{ v.label }} ₹{{ v.selling_price|inr }}</span>
+            {% endfor %}
+            <span class="badge {% if p.status == 'approved' %}bg-success{% elif p.status == 'rejected' %}bg-danger{% elif p.status == 'pending' and p.charges_confirmed %}bg-success{% else %}bg-warning text-dark{% endif %}" style="font-size:.65rem">
+              {% if p.status == 'pending' and p.charges_confirmed %}Live in Store{% else %}{{ p.get_status_display }}{% endif %}
+            </span>
+          </div>
+          {% if show_downstream %}
+          <div class="mt-1 d-flex flex-wrap gap-1" style="font-size:.66rem">
+            <span class="text-muted">Downstream:</span>
+            <span class="badge bg-primary-subtle text-primary border">S {{ p.ds_stockist }}</span>
+            <span class="badge bg-info-subtle text-info border">D {{ p.ds_distributor }}</span>
+            <span class="badge bg-success-subtle text-success border">Shop {{ p.ds_shop }}</span>
+            <span class="text-muted">= {{ p.ds_total }}</span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% if show_actions %}
+      <div class="d-flex gap-2 mt-2">
+        <a href="{% url 'suppliers:product_edit' p.pk %}" class="btn btn-sm btn-outline-primary flex-fill">Edit</a>
+        <a href="{% url 'suppliers:product_delete' p.pk %}" class="btn btn-sm btn-outline-danger flex-fill">Delete</a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">No products found.</p>
+  {% endfor %}
+</div>

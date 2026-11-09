@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ project_name }} - Live Project Runbook</title>
+  <style>
+    :root {
+      --bg: #f7f9fc;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --accent: #0b7285;
+      --accent-2: #0f9d58;
+      --warn: #b45309;
+      --danger: #b91c1c;
+      --line: #e5e7eb;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      color: var(--text);
+      background: radial-gradient(circle at top right, #e0f2fe 0%, var(--bg) 35%);
+      line-height: 1.45;
+    }
+
+    header {
+      background: linear-gradient(135deg, #0f172a 0%, #0f3a4a 60%, #0b7285 100%);
+      color: #fff;
+      padding: 28px 18px;
+    }
+
+    header h1 { margin: 0 0 8px; font-size: 1.7rem; }
+    header p { margin: 4px 0; opacity: 0.9; }
+
+    .container {
+      width: min(1200px, 95vw);
+      margin: 20px auto 50px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 16px;
+      box-shadow: 0 8px 22px rgba(2, 6, 23, 0.05);
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+    }
+
+    .status {
+      border-radius: 10px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: #f8fafc;
+    }
+
+    .on { color: var(--accent-2); font-weight: 700; }
+    .off { color: var(--danger); font-weight: 700; }
+
+    h2 { margin: 0 0 10px; font-size: 1.1rem; }
+    h3 { margin: 8px 0; font-size: 1rem; }
+    ul { margin: 0; padding-left: 18px; }
+    li { margin: 5px 0; }
+    details {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fafcff;
+      padding: 8px 12px;
+    }
+    summary {
+      cursor: pointer;
+      font-weight: 700;
+      color: #1e3a8a;
+    }
+    .muted { color: var(--muted); }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .btn {
+      display: inline-block;
+      text-decoration: none;
+      color: #fff;
+      background: var(--accent);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.92rem;
+    }
+
+    .btn.secondary { background: #334155; }
+    .btn.warn { background: var(--warn); }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+      font-size: 0.92rem;
+    }
+
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th { background: #f8fafc; }
+    code {
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      padding: 1px 6px;
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.85rem;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 16px;
+    }
+
+    @media (min-width: 960px) {
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{{ project_name }} - Live Project Runbook</h1>
+    <p>Single source of truth for business rules, models, references, and safe demo access.</p>
+    <p>Generated live from current codebase at: {{ generated_at|date:"Y-m-d H:i:s" }}</p>
+  </header>
+
+  <div class="container">
+    <section class="card">
+      <h2>Demo Mode Controls (Admin Toggle)</h2>
+      <div class="status-grid">
+        <div class="status">
+          <div class="muted">Demo Mode</div>
+          <div class="{% if demo_mode_enabled %}on{% else %}off{% endif %}">
+            {% if demo_mode_enabled %}Enabled{% else %}Disabled{% endif %}
+          </div>
+        </div>
+        <div class="status">
+          <div class="muted">No-Credential Demo Login</div>
+          <div class="{% if demo_allow_quick_login %}on{% else %}off{% endif %}">
+            {% if demo_allow_quick_login %}Allowed{% else %}Blocked{% endif %}
+          </div>
+        </div>
+        <div class="status">
+          <div class="muted">Real Transaction Writes</div>
+          <div class="{% if demo_block_transactions %}off{% else %}on{% endif %}">
+            {% if demo_block_transactions %}Blocked for demo sessions{% else %}Allowed{% endif %}
+          </div>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:10px;">
+        Admin can change this at <code>/django-admin/admin_panel/sitesettings/1/change/</code>
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>Quick Runtime Endpoints</h2>
+      <p class="muted">Use these addresses for environment validation.</p>
+      <ul>
+        <li><strong>PROD Base:</strong> <code>{{ prod_base_url }}</code></li>
+        <li><strong>DEMO Base:</strong> <code>{{ demo_base_url }}</code></li>
+        <li><strong>Live Runbook:</strong> <code>{{ prod_base_url }}/runbook/</code> (refreshes snapshot automatically)</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Quick Demo Access (No Credentials)</h2>
+      <p class="muted">Use these links when demo mode is enabled. They log in to a pre-existing sample account by role on the demo server.</p>
+      <div class="links">
+        {% for item in demo_links %}
+          <a class="btn" href="{{ item.url }}">{{ item.label }}</a>
+        {% endfor %}
+        <a class="btn secondary server-link" data-path="/accounts/logout/" href="/accounts/logout/">Logout Demo Session</a>
+      </div>
+      <p class="muted" style="margin-top:10px;">Write actions under orders, payments, and transactions are blocked in demo sessions when configured.</p>
+      <p class="muted" style="margin-top:6px;">If this page is opened as a local file, links automatically target http://127.0.0.1:8000.</p>
+    </section>
+
+    <section class="card">
+      <h2>Logic Details (Important for AI Validation)</h2>
+      <p class="muted">These are the key business rules to validate first. They are intentionally concise and high signal.</p>
+      {% for section in logic_sections %}
+        <details {% if forloop.first %}open{% endif %} style="margin-top:10px;">
+          <summary>{{ section.title }}</summary>
+          <ul style="margin-top:8px;">
+            {% for rule in section.rules %}
+              <li>{{ rule }}</li>
+            {% endfor %}
+          </ul>
+        </details>
+      {% endfor %}
+    </section>
+
+    <section class="card">
+      <h2>Notes for Gemini</h2>
+      <p><strong>{{ ai_collab.headline }}</strong></p>
+      <p class="muted">{{ ai_collab.summary }}</p>
+
+      <details open style="margin-top:10px;">
+        <summary>Validated System Strengths</summary>
+        <ul style="margin-top:8px;">
+          {% for item in ai_collab.validated_strengths %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+
+      <details open style="margin-top:10px;">
+        <summary>{{ ai_collab.recommendation.title }}</summary>
+        <ul style="margin-top:8px;">
+          {% for item in ai_collab.recommendation.items %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+
+      <details style="margin-top:10px;">
+        <summary>Targeted Technical Architecture Questions (with final decisions)</summary>
+        {% for q in ai_collab.targeted_questions %}
+          <div style="margin-top:10px; padding:10px; border:1px solid var(--line); border-radius:8px; background:#fff;">
+            <p style="margin:0 0 6px;"><strong>{{ q.title }}</strong></p>
+            <p style="margin:0 0 6px;"><span class="muted">Scenario:</span> {{ q.scenario }}</p>
+            <p style="margin:0;"><span class="muted">Decision:</span> {{ q.decision }}</p>
+          </div>
+        {% endfor %}
+      </details>
+
+      <details style="margin-top:10px;">
+        <summary>Implementation Scope</summary>
+        <ul style="margin-top:8px;">
+          {% for item in ai_collab.implementation_scope %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+
+      <details style="margin-top:10px;">
+        <summary>Implementation Layer Order</summary>
+        <ul style="margin-top:8px;">
+          {% for item in ai_collab.implementation_order %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+
+      <details style="margin-top:10px;">
+        <summary>Acceptance Checks</summary>
+        <ul style="margin-top:8px;">
+          {% for item in ai_collab.acceptance_checks %}
+            <li>{{ item }}</li>
+          {% endfor %}
+        </ul>
+      </details>
+
+      {% if ai_collab.foundation_layer_status %}
+      {% with fls=ai_collab.foundation_layer_status %}
+      <details style="margin-top:10px;" open>
+        <summary style="font-weight:700;font-size:1.05em;">
+          ✅ Foundation Layer Status —
+          <span style="color:{% if fls.status == 'COMPLETE' %}#2e7d32{% else %}#e65100{% endif %};">
+            {{ fls.status }}
+          </span>
+          <span class="muted" style="font-weight:400;font-size:0.9em;">({{ fls.completed_on }})</span>
+        </summary>
+
+        {% for change in fls.changes %}
+        <div style="margin:14px 0 6px;border-left:3px solid {% if change.type == 'NEW FILE' %}#1565c0{% else %}#6a1b9a{% endif %};padding-left:12px;">
+          <p style="margin:0 0 4px;">
+            <code style="background:#f0f4ff;padding:2px 6px;border-radius:3px;">{{ change.file }}</code>
+            <span style="margin-left:8px;font-size:0.78em;font-weight:700;color:{% if change.type == 'NEW FILE' %}#1565c0{% else %}#6a1b9a{% endif %};text-transform:uppercase;letter-spacing:0.5px;">{{ change.type }}</span>
+          </p>
+          <p style="margin:0 0 6px;font-weight:600;">{{ change.what }}</p>
+          <ul style="margin:0;padding-left:18px;">
+            {% for detail in change.details %}
+              <li style="font-size:0.9em;margin-bottom:3px;">{{ detail }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+        {% endfor %}
+
+        <div style="margin-top:14px;background:#f1f8e9;border-radius:6px;padding:10px 14px;">
+          <p style="margin:0 0 6px;font-weight:700;color:#2e7d32;">🧪 Test Results (all passed)</p>
+          <ul style="margin:0;padding-left:18px;">
+            {% for t in fls.tests_passed %}
+              <li style="font-size:0.88em;margin-bottom:2px;">✅ {{ t }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      </details>
+      {% endwith %}
+      {% endif %}
+    </section>
+
+    <div class="grid-2">
+      <section class="card">
+        <h2>Project Apps and Models</h2>
+        {% for app in app_models %}
+          <h3>{{ app.app_label }}</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>DB Table</th>
+                <th>Fields</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for model in app.models %}
+                <tr>
+                  <td>{{ model.name }}</td>
+                  <td><code>{{ model.table }}</code></td>
+                  <td>{{ model.fields }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="muted">No models</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% endfor %}
+      </section>
+
+      <section class="card">
+        <h2>Reference Files in Repository Root</h2>
+        <p class="muted">Useful documentation and generated reports available in the project root.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Reference File</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ref in references %}
+              <tr><td><code>{{ ref }}</code></td></tr>
+            {% empty %}
+              <tr><td class="muted">No reference files found</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+
+        <div class="links" style="margin-top:12px;">
+          <a class="btn warn server-link" data-path="/runbook/" href="/runbook/">Refresh Live Runbook</a>
+          <span class="muted">Export snapshot file with: <code>python manage.py export_project_runbook</code></span>
+        </div>
+      </section>
+    </div>
+
+    <section class="card">
+      <h2>URL Summary</h2>
+      <p class="muted">Full URL map is optional and hidden by default to reduce reading load.</p>
+      <p><strong>Total Routes:</strong> {{ route_summary.total_routes }}</p>
+      <table>
+        <thead>
+          <tr>
+            <th>Top Module</th>
+            <th>Route Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in route_summary.module_counts %}
+            <tr>
+              <td><code>/{{ item.module }}/</code></td>
+              <td>{{ item.count }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <details style="margin-top:12px;" {% if show_url_map %}open{% endif %}>
+        <summary>Full URL Map (advanced)</summary>
+        <p class="muted" style="margin-top:10px;">This section is mainly for deep trace/debug use.</p>
+        <table>
+          <thead>
+            <tr>
+              <th>Route</th>
+              <th>Name</th>
+              <th>View</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for route in routes %}
+              <tr>
+                <td><code>{{ route.route }}</code></td>
+                <td>{{ route.name }}</td>
+                <td><code>{{ route.lookup }}</code></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </details>
+    </section>
+  </div>
+  <script>
+    (function () {
+      if (window.location.protocol !== 'file:') {
+        return;
+      }
+      const serverBase = 'http://127.0.0.1:8000';
+      document.querySelectorAll('.server-link').forEach(function (link) {
+        const path = link.getAttribute('data-path') || '/';
+        link.setAttribute('href', serverBase + path);
+      });
+    })();
+  </script>
+</body>
+</html>

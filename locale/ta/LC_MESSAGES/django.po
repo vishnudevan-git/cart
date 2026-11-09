@@ -1,0 +1,270 @@
+# Tamil translations
+msgid ""
+msgstr ""
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: ta\n"
+
+msgid "English"
+msgstr "ஆங்கிலம்"
+
+msgid "Tamil"
+msgstr "தமிழ்"
+
+msgid "Telugu"
+msgstr "తెలుగు"
+
+msgid "Kannada"
+msgstr "ಕನ್ನಡ"
+
+msgid "Hindi"
+msgstr "हिन्दी"
+
+msgid "French"
+msgstr "ஃப்ரெஞ்சு"
+
+msgid "Home"
+msgstr "முகப்பு"
+
+msgid "Shop"
+msgstr "கடை"
+
+msgid "Login"
+msgstr "உள்நுழைய"
+
+msgid "Register"
+msgstr "பதிவு செய்க"
+
+msgid "Logout"
+msgstr "வெளியேறு"
+
+msgid "Profile"
+msgstr "சுயவிவரம்"
+
+msgid "My Orders"
+msgstr "என் ஆர்டர்கள்"
+
+msgid "Dashboard"
+msgstr "டாஷ்போர்டு"
+
+msgid "Search products…"
+msgstr "பொருட்களை தேடுங்கள்…"
+
+msgid "Add to Cart"
+msgstr "கார்ட்டில் சேர்"
+
+msgid "Checkout"
+msgstr "செலுத்து"
+
+msgid "Username"
+msgstr "பயனர் பெயர்"
+
+msgid "Password"
+msgstr "கடவுச்சொல்"
+
+msgid "Submit"
+msgstr "சமர்ப்பிக்கவும்"
+
+msgid "Cancel"
+msgstr "ரத்து செய்"
+
+msgid "Save"
+msgstr "சேமி"
+
+msgid "Delete"
+msgstr "நீக்கு"
+
+msgid "Edit"
+msgstr "திருத்து"
+
+msgid "Back"
+msgstr "திரும்பு"
+
+msgid "Supplier Portal"
+msgstr "சப்ளையர் போர்டல்"
+
+msgid "Admin Panel"
+msgstr "நிர்வாக பலகை"
+
+msgid "Storefront"
+msgstr "கடை முன்பக்கம்"
+
+msgid "Fresh Organic Food, Direct from Farmers"
+msgstr "விவசாயிகளிடமிருந்து நேரடியாக புதிய இயற்கை உணவு"
+
+msgid "100% Organic & Natural"
+msgstr "100% இயற்கை"
+
+msgid "Fresh from the Farm."
+msgstr "பண்ணையிலிருந்து புதியது."
+
+msgid "Straight to Your Door."
+msgstr "நேரடியாக உங்கள் வீட்டிற்கு."
+
+msgid "LaKrish Mart connects you directly with organic farmers and natural food producers. No middlemen. No chemicals. Just pure, honest food — delivered by your trusted local distributor."
+msgstr "லக்ரிஷ் மார்ட் உங்களை நேரடியாக இயற்கை விவசாயிகளுடன் இணைக்கிறது. இடைத்தரகர்கள் இல்லை. ரசாயனங்கள் இல்லை. தூய உணவு — உங்கள் நம்பகமான உள்ளூர் விநியோகஸ்தர் மூலம் வழங்கப்படுகிறது."
+
+msgid "Login to Shop"
+msgstr "கடையில் உள்நுழைய"
+
+msgid "Register Free"
+msgstr "இலவசமாக பதிவு செய்க"
+
+msgid "Dry Fruits & Nuts"
+msgstr "உலர் பழங்கள் & கொட்டைகள்"
+
+msgid "Spices"
+msgstr "மசாலா"
+
+msgid "Natural Foods"
+msgstr "இயற்கை உணவுகள்"
+
+msgid "Products"
+msgstr "பொருட்கள்"
+
+msgid "Farmers"
+msgstr "விவசாயிகள்"
+
+msgid "Cities"
+msgstr "நகரங்கள்"
+
+msgid "Why LaKrish Mart?"
+msgstr "ஏன் லக்ரிஷ் மார்ட்?"
+
+msgid "We believe food should be honest, clean, and traceable."
+msgstr "உணவு நேர்மையாகவும், சுத்தமாகவும் இருக்க வேண்டும் என்று நம்புகிறோம்."
+
+msgid "Direct from Farmers"
+msgstr "விவசாயிகளிடமிருந்து நேரடியாக"
+
+msgid "We source directly from certified organic farmers. No unnecessary middlemen, no inflated prices."
+msgstr "சான்றளிக்கப்பட்ட இயற்கை விவசாயிகளிடமிருந்து நேரடியாக பெறுகிறோம்."
+
+msgid "No Chemicals"
+msgstr "ரசாயனங்கள் இல்லை"
+
+msgid "Every product is free from synthetic pesticides, preservatives, and artificial additives."
+msgstr "ஒவ்வொரு பொருளும் செயற்கை பூச்சிக்கொல்லிகள் மற்றும் பதப்படுத்திகளிலிருந்து விடுபட்டது."
+
+msgid "Home Made Quality"
+msgstr "வீட்டு தரம்"
+
+msgid "Many of our products are handcrafted in small batches — the way your grandmother used to make them."
+msgstr "எங்கள் பல பொருட்கள் சிறிய தொகுதிகளில் கையால் தயாரிக்கப்படுகின்றன."
+
+msgid "Local Delivery"
+msgstr "உள்ளூர் டெலிவரி"
+
+msgid "Your local distributor delivers fresh to your doorstep. Fast, reliable, and community-driven."
+msgstr "உங்கள் உள்ளூர் விநியோகஸ்தர் புதியதாக வீட்டு வாசலில் வழங்குகிறார்."
+
+msgid "What We Offer"
+msgstr "நாங்கள் என்ன வழங்குகிறோம்"
+
+msgid "A curated selection of nature's best — in every size you need."
+msgstr "இயற்கையின் சிறந்தவற்றின் தொகுப்பு — உங்களுக்கு தேவையான அளவில்."
+
+msgid "Dry Fruits"
+msgstr "உலர் பழங்கள்"
+
+msgid "Dates, Apricots, Raisins"
+msgstr "பேரீச்சம்பழம், ஆப்ரிகாட், திராட்சை"
+
+msgid "Nuts"
+msgstr "கொட்டைகள்"
+
+msgid "Almonds, Cashews, Walnuts"
+msgstr "பாதாம், முந்திரி, வால்நட்"
+
+msgid "Pepper, Cardamom, Cinnamon"
+msgstr "மிளகு, ஏலக்காய், இலவங்கப்பட்டை"
+
+msgid "Seeds"
+msgstr "விதைகள்"
+
+msgid "Chia, Flax, Sunflower"
+msgstr "சியா, ஆளி, சூரியகாந்தி"
+
+msgid "Turmeric, Honey, Coconut Oil"
+msgstr "மஞ்சள், தேன், தேங்காய் எண்ணெய்"
+
+msgid "Cold-pressed oils, raw honey"
+msgstr "குளிர் அழுத்த எண்ணெய்கள், மூல தேன்"
+
+msgid "How It Works"
+msgstr "எப்படி செயல்படுகிறது"
+
+msgid "Simple, transparent, and community-powered."
+msgstr "எளிமையான, வெளிப்படையான மற்றும் சமூக சக்தி கொண்டது."
+
+msgid "Create your free account. Use your distributor's invite code to shop from their store."
+msgstr "உங்கள் இலவச கணக்கை உருவாக்குங்கள். விநியோகஸ்தரின் அழைப்பு குறியீட்டை பயன்படுத்துங்கள்."
+
+msgid "Browse & Choose"
+msgstr "உலாவி தேர்வு செய்க"
+
+msgid "See your distributor's curated product list with their prices. Pick your size and quantity."
+msgstr "விநியோகஸ்தரின் பொருட்கள் பட்டியலை விலையுடன் பாருங்கள்."
+
+msgid "Place Order"
+msgstr "ஆர்டர் செய்க"
+
+msgid "Add to cart and checkout. Pay on delivery or via UPI. No advance payment required."
+msgstr "கார்ட்டில் சேர்த்து செலுத்துங்கள். டெலிவரியில் அல்லது UPI மூலம் பணம் செலுத்துங்கள்."
+
+msgid "Get Delivered"
+msgstr "டெலிவரி பெறுங்கள்"
+
+msgid "Your local distributor delivers fresh organic products right to your door."
+msgstr "உங்கள் உள்ளூர் விநியோகஸ்தர் புதிய இயற்கை பொருட்களை வீட்டிற்கு வழங்குகிறார்."
+
+msgid "Our Promise to You"
+msgstr "உங்களுக்கான எங்கள் வாக்குறுதி"
+
+msgid "Certified Organic"
+msgstr "சான்றளிக்கப்பட்ட இயற்கை"
+
+msgid "All products sourced from verified organic farms and natural producers."
+msgstr "அனைத்து பொருட்களும் சரிபார்க்கப்பட்ட இயற்கை பண்ணைகளிலிருந்து."
+
+msgid "Fair Prices"
+msgstr "நியாயமான விலைகள்"
+
+msgid "Direct sourcing means better prices for you and fair pay for farmers."
+msgstr "நேரடி கொள்முதல் உங்களுக்கு சிறந்த விலையையும் விவசாயிகளுக்கு நியாயமான ஊதியத்தையும் தருகிறது."
+
+msgid "Fresh Stock"
+msgstr "புதிய இருப்பு"
+
+msgid "Products are sourced in small batches to ensure freshness and quality."
+msgstr "புதுமை மற்றும் தரத்தை உறுதிப்படுத்த சிறிய தொகுதிகளில் பொருட்கள் பெறப்படுகின்றன."
+
+msgid "Community First"
+msgstr "சமூகம் முதலில்"
+
+msgid "We support local distributors and farmers in your neighbourhood."
+msgstr "உங்கள் அக்கம்பக்கத்தில் உள்ள உள்ளூர் விநியோகஸ்தர்கள் மற்றும் விவசாயிகளை ஆதரிக்கிறோம்."
+
+msgid "Organic Certified"
+msgstr "இயற்கை சான்றிதழ்"
+
+msgid "Artificial Additives"
+msgstr "செயற்கை சேர்க்கைகள்"
+
+msgid "Farmer Partners"
+msgstr "விவசாய கூட்டாளிகள்"
+
+msgid "Happy Customers"
+msgstr "மகிழ்ச்சியான வாடிக்கையாளர்கள்"
+
+msgid "Ready to eat clean?"
+msgstr "சுத்தமான உணவு சாப்பிட தயாரா?"
+
+msgid "Join thousands of families who have switched to organic living with LaKrish Mart."
+msgstr "லக்ரிஷ் மார்ட்டுடன் இயற்கை வாழ்க்கைக்கு மாறிய ஆயிரக்கணக்கான குடும்பங்களில் சேருங்கள்."
+
+msgid "Create Free Account"
+msgstr "இலவச கணக்கை உருவாக்குங்கள்"
+
+msgid "Have a distributor code? Enter it during registration to shop from your local store."
+msgstr "விநியோகஸ்தர் குறியீடு உள்ளதா? பதிவின் போது உள்ளிடுங்கள்."

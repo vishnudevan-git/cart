@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% load i18n %}
+
+{% block title %}{% trans "Terms of Use" %}{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <h1 class="mb-4">{% trans "Terms of Use" %}</h1>
+      <p class="text-muted mb-4">{% trans "Last updated: May 19, 2026" %}</p>
+
+      <section class="mb-4">
+        <h3>1. {% trans "Acceptance of Terms" %}</h3>
+        <p>{% trans "By accessing and using this platform, you accept and agree to be bound by the terms and provision of this agreement. If you do not agree to abide by the above, please do not use this service." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>2. {% trans "User Accounts" %}</h3>
+        <p>{% trans "When you create an account, you must provide accurate, complete, and current information. You are responsible for maintaining the confidentiality of your password and account. You agree to accept responsibility for all activities that occur under your account. You must notify us immediately of any unauthorized use of your account." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>3. {% trans "Product Information" %}</h3>
+        <p>{% trans "We strive to provide accurate product descriptions, pricing, and availability. However, we do not warrant that product descriptions, pricing, or other content of any part of the site is accurate, complete, reliable, current, or error-free. If a product offered is not as described, your sole remedy is to return it unused." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>4. {% trans "Pricing and Availability" %}</h3>
+        <p>{% trans "All prices are subject to change without notice. We reserve the right to limit quantities and discontinue products. We reserve the right to refuse or cancel any order." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>5. {% trans "Ordering and Payment" %}</h3>
+        <p>{% trans "All orders are subject to acceptance and confirmation. We reserve the right to refuse any order you place with us. We may require additional verifications or information before accepting any order. Payment must be received before order shipment." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>6. {% trans "Shipping and Delivery" %}</h3>
+        <p>{% trans "Delivery dates are estimates only and not guaranteed. We are not responsible for delays caused by third-party delivery partners, weather conditions, or acts of God. Risk of loss passes to you upon delivery to the carrier." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>7. {% trans "Returns and Refunds" %}</h3>
+        <p>{% trans "Products may be returned within 7 days of receipt if unused and in original condition. Refunds will be processed within 10-15 business days. Some items may not be eligible for return. Return shipping costs are the responsibility of the customer unless the return is due to our error." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>8. {% trans "Prohibited Activities" %}</h3>
+        <p>{% trans "You agree not to:" %}</p>
+        <ul>
+          <li>{% trans "Harass or cause distress or inconvenience to any person" %}</li>
+          <li>{% trans "Transmit obscene or offensive content or disrupt the normal flow of dialogue within our website" %}</li>
+          <li>{% trans "Attempt to gain unauthorized access to our systems" %}</li>
+          <li>{% trans "Use the site to conduct any unlawful activity" %}</li>
+          <li>{% trans "Resell or redistribute access to this platform" %}</li>
+          <li>{% trans "Use automated scripts or bots without permission" %}</li>
+        </ul>
+      </section>
+
+      <section class="mb-4">
+        <h3>9. {% trans "Limitation of Liability" %}</h3>
+        <p>{% trans "In no event shall we be liable to you or any third-party for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of the site or services, even if we have been advised of the possibility of such damages." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>10. {% trans "Modification of Terms" %}</h3>
+        <p>{% trans "We reserve the right to modify these terms at any time. Your continued use of the site following the posting of modified terms will mean that you accept and agree to the changes." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>11. {% trans "Governing Law" %}</h3>
+        <p>{% trans "These terms and conditions are governed by and construed in accordance with the laws of India, and you irrevocably submit to the exclusive jurisdiction of the courts located in India." %}</p>
+      </section>
+
+      <section class="mb-4">
+        <h3>12. {% trans "Contact Us" %}</h3>
+        <p>{% trans "If you have any questions about these Terms of Use, please contact us through the support page." %}</p>
+      </section>
+
+      <div class="alert alert-info mt-5">
+        <p class="mb-0"><strong>{% trans "Note:" %}</strong> {% trans "These are generic terms. Consult with a legal professional to ensure full compliance with applicable laws in your jurisdiction." %}</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

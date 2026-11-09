@@ -1,0 +1,198 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% load humanize qty_tags %}
+{% block title %}Supplier Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='dashboard' %}{% endblock %}
+{% block content %}
+<!-- ── Quick-action shortcuts ───────────────────────────────────────── -->
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <a href="{% url 'suppliers:product_add' %}" class="btn btn-success btn-sm"><i class="bi bi-plus-lg me-1"></i>Add Product</a>
+  <a href="{% url 'suppliers:stock_manage' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-box-seam me-1"></i>Manage Stock</a>
+  <a href="{% url 'suppliers:restock_requests' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-arrow-repeat me-1"></i>Restock Requests</a>
+  <a href="{% url 'payments:center' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-wallet2 me-1"></i>Payments Center</a>
+  <a href="{% url 'suppliers:procurement_accounts' %}" class="btn btn-outline-success btn-sm"><i class="bi bi-receipt me-1"></i>Procurement</a>
+</div>
+
+<!-- ── Action-required alerts ───────────────────────────────────────── -->
+{% if alert_total %}
+<div class="alert alert-warning border-2 d-flex flex-wrap align-items-center gap-3 shadow-sm" role="alert">
+  <i class="bi bi-exclamation-triangle-fill fs-4 flex-shrink-0"></i>
+  <div class="flex-fill">
+    <div class="fw-bold mb-1">Action required ({{ alert_total }})</div>
+    <div class="d-flex flex-wrap gap-2 small">
+      {% if restock_pending %}
+        <a href="{% url 'suppliers:restock_requests' %}" class="badge bg-danger text-decoration-none">
+          {{ restock_pending }} restock request{{ restock_pending|pluralize }} pending
+        </a>
+      {% endif %}
+      {% if stockist_restock_pending %}
+        <a href="{% url 'suppliers:restock_requests' %}" class="badge bg-danger text-decoration-none">
+          {{ stockist_restock_pending }} stockist restock{{ stockist_restock_pending|pluralize }} pending
+        </a>
+      {% endif %}
+      {% if disputed_settlements %}
+        <a href="{% url 'payments:center' %}" class="badge bg-dark text-decoration-none">
+          {{ disputed_settlements }} payment quer{{ disputed_settlements|pluralize:"y,ies" }} raised
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Financial summary cards ──────────────────────────────────────── -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-4 col-xl">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="text-muted small">Earned (delivered)</div>
+      <div class="fs-4 fw-bold text-success">₹{{ earned_delivered|inr }}</div>
+      <div class="text-muted" style="font-size:11px">value of delivered orders</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="text-muted small">Pending (undelivered)</div>
+      <div class="fs-4 fw-bold text-warning">₹{{ pending_undelivered|inr }}</div>
+      <div class="text-muted" style="font-size:11px">orders not yet delivered</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="text-muted small">Settled</div>
+      <div class="fs-4 fw-bold text-success">₹{{ settled_amount|inr }}</div>
+      <div class="text-muted" style="font-size:11px">confirmed settlements received</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="text-muted small">Awaiting settlement</div>
+      <div class="fs-4 fw-bold text-warning">₹{{ awaiting_settlement|inr }}</div>
+      <div class="text-muted" style="font-size:11px">pending / in-query settlements</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4 col-xl">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="text-muted small">Procurement receivable</div>
+      <div class="fs-4 fw-bold text-primary">₹{{ procurement_receivable|inr }}</div>
+      <div class="text-muted" style="font-size:11px">B2B owed by stockists</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Inventory + profile cards ────────────────────────────────────── -->
+<div class="row g-3 mb-3">
+  <div class="col-6 col-md-3">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="text-muted small">Products</div>
+      <div class="fs-3 fw-bold">{{ product_count }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="text-muted small">Stock Value</div>
+      <div class="fs-4 fw-bold text-success" title="Total ₹ value of all your on-hand pack stock (stock × selling price)">
+        ₹{{ stock_value|inr }}
+      </div>
+      <div class="text-muted" style="font-size:11px">{{ total_units|inr }} units on hand</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="text-muted small">Company</div>
+      <div class="fw-bold small mt-1">{{ supplier.company_name }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card stat-card border-0 shadow-sm p-3 h-100">
+      <div class="d-flex justify-content-between align-items-start">
+        <div>
+          <div class="text-muted small">Pickup Address</div>
+          <div class="small mt-1">{{ supplier.address|default:"<span class='text-danger'>Not set</span>"|safe }}</div>
+        </div>
+        <button class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#addressModal">
+          <i class="bi bi-pencil"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Shipment status counters ─────────────────────────────────────── -->
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-body py-3">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <span class="fw-semibold small"><i class="bi bi-truck me-1"></i>Shipment status</span>
+      <a href="{% url 'suppliers:orders' %}" class="small text-decoration-none">View all →</a>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      {% for s in shipment_counters %}
+      <a href="{% url 'suppliers:orders' %}" class="text-decoration-none">
+        <div class="border rounded px-3 py-2 text-center" style="min-width:92px">
+          <div class="fs-5 fw-bold {% if s.count %}text-dark{% else %}text-muted{% endif %}">{{ s.count }}</div>
+          <div class="text-muted" style="font-size:11px">{{ s.label }}</div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<!-- Pickup Address Modal -->
+<div class="modal fade" id="addressModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0">
+        <h5 class="modal-title fw-bold">📍 Pickup Address</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="post" action="{% url 'suppliers:update_address' %}">
+        {% csrf_token %}
+        <div class="modal-body">
+          <p class="text-muted small mb-2">This address is shown to the stockist when they need to pick up your products.</p>
+          <textarea name="address" class="form-control" rows="4" placeholder="Enter your full pickup address...">{{ supplier.address }}</textarea>
+        </div>
+        <div class="modal-footer border-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-success">Save Address</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-header  fw-semibold">Recent Orders</div>
+  <!-- Desktop -->
+  <div class="table-wrap d-none d-md-block">
+    <table class="table align-middle mb-0">
+      <thead class="table-light"><tr><th>Order #</th><th>Product</th><th>Qty</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for item in recent_orders %}
+        <tr>
+          <td>#{{ item.order.id }}</td>
+          <td>{{ item.product.name }}</td>
+          <td>{{ item.quantity }}</td>
+          <td><span class="badge bg-warning text-dark">{{ item.order.get_status_display }}</span></td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" class="text-muted text-center py-3">No orders yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <!-- Mobile -->
+  <div class="d-md-none p-2">
+    {% for item in recent_orders %}
+    <div class="d-flex justify-content-between align-items-center py-2 border-bottom small">
+      <div>
+        <div class="fw-semibold">#{{ item.order.id }} — {{ item.product.name }}</div>
+        <div class="text-muted">Qty: {{ item.quantity }}</div>
+      </div>
+      <span class="badge bg-warning text-dark">{{ item.order.get_status_display }}</span>
+    </div>
+    {% empty %}
+    <p class="text-muted text-center py-3 mb-0">No orders yet.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

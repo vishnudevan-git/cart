@@ -1,0 +1,9 @@
+{% if active_role == 'supplier' %}
+  {% include 'suppliers/partials/sidebar.html' with active_nav='support' %}
+{% elif active_role == 'distributor' %}
+  {% include 'distributors/partials/sidebar.html' with active_nav='support' %}
+{% elif active_role == 'stockist' %}
+  {% include 'stockist/partials/sidebar.html' with active_nav='support' %}
+{% elif active_role == 'admin' or user.is_superuser %}
+  {% include 'admin_panel/partials/sidebar.html' %}
+{% endif %}

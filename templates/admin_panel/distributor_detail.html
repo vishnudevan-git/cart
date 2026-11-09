@@ -1,0 +1,126 @@
+{% extends 'admin_panel/base_admin.html' %}
+{% block title %}{{ distributor.company_name }} | Admin{% endblock %}
+{% block page_title %}{{ distributor.company_name }} Details{% endblock %}
+{% block active_nav %}distributor_list{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <a href="{% url 'admin_panel:distributor_list' %}" class="text-decoration-none text-muted mb-2 d-inline-block"><i class="bi bi-arrow-left"></i> Back to Marketplaces</a>
+        <h2 class="h3 mb-0">{{ distributor.company_name }}</h2>
+        <span class="badge {% if distributor.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">{{ distributor.status|title }}</span>
+    </div>
+    <div>
+        <a href="{% url 'admin_panel:user_detail' distributor.user.pk %}" class="btn btn-outline-secondary">View Connected User Profile</a>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title fw-bold">Marketplace Config</h5>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2"><strong>Invite Code:</strong> <span class="badge bg-primary fs-6">{{ distributor.invite_code }}</span></li>
+                    <li class="mb-2"><strong>Default Margin:</strong> {{ distributor.default_margin_percent|floatformat:1 }}%</li>
+                    <li class="mb-2"><strong>Delivery Charge:</strong> ₹{{ distributor.delivery_charge }}</li>
+                    <li class="mb-2"><strong>Free Delivery Above:</strong> {% if distributor.free_delivery_above > 0 %}₹{{ distributor.free_delivery_above }}{% else %}<span class="text-muted">N/A</span>{% endif %}</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h5 class="card-title fw-bold">Contact Info</h5>
+                <ul class="list-unstyled mb-0">
+                    <li class="mb-2"><strong>Name:</strong> {{ distributor.user.get_full_name }}</li>
+                    <li class="mb-2"><strong>Area/Coverage:</strong> {{ distributor.area|default:"Not specified" }}</li>
+                    <li class="mb-2"><strong>Mobile:</strong> <a href="tel:{{ distributor.phone|default:distributor.user.phone|default:distributor.user.username }}">{{ distributor.phone|default:distributor.user.phone|default:distributor.user.username }}</a></li>
+                    <li class="mb-2"><strong>Email:</strong> <a href="mailto:{{ distributor.user.email }}">{{ distributor.user.email|default:"N/A" }}</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-3" id="distTab" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="customers-tab" data-bs-toggle="tab" data-bs-target="#customers" type="button" role="tab" aria-selected="true">Customers ({{ customers.count }})</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders" type="button" role="tab" aria-selected="False">Orders ({{ orders.count }})</button>
+  </li>
+</ul>
+
+<div class="tab-content" id="distTabContent">
+  <!-- Customers Tab -->
+  <div class="tab-pane fade show active" id="customers" role="tabpanel">
+    <div class="card shadow-sm">
+        <div class="card-body p-0 table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Customer</th>
+                        <th>Mobile</th>
+                        <th>Joined On</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for customer in customers %}
+                    <tr>
+                        <td><a href="{% url 'admin_panel:user_detail' customer.pk %}" class="fw-bold text-decoration-none">{{ customer.get_full_name|default:"-- No Name --" }}</a></td>
+                        <td>{{ customer.username }}</td>
+                        <td>{{ customer.date_joined|date:"M d, Y" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3" class="text-center text-muted py-4">No customers registered under this marketplace yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+  </div>
+
+  <!-- Orders Tab -->
+  <div class="tab-pane fade" id="orders" role="tabpanel">
+    <div class="card shadow-sm">
+        <div class="card-body p-0 table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Order ID</th>
+                        <th>Customer</th>
+                        <th>Amount</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td><a href="{% url 'admin_panel:order_detail' order.pk %}" class="fw-bold">#{{ order.id|stringformat:"05d" }}</a></td>
+                        <td>{{ order.customer.get_full_name|default:order.customer.username }}</td>
+                        <td>₹{{ order.total_amount }}</td>
+                        <td>
+                            {% if order.status == 'pending' %}<span class="badge bg-warning">Pending</span>
+                            {% elif order.status == 'cancelled' %}<span class="badge bg-danger">Cancelled</span>
+                            {% elif order.status == 'delivered' %}<span class="badge bg-success">Delivered</span>
+                            {% else %}<span class="badge bg-info">{{ order.get_status_display }}</span>{% endif %}
+                        </td>
+                        <td>{{ order.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted py-4">No orders placed through this marketplace yet.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

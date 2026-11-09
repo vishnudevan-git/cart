@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% block title %}Edit Order #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-3 mb-5" style="max-width:720px">
+  <div class="d-flex align-items-center gap-2 mb-3">
+    <a href="{% url 'orders:order_detail' order.pk %}" class="btn btn-sm btn-outline-secondary">← Back</a>
+    <h4 class="fw-semibold mb-0">Edit Order #{{ order.id }}</h4>
+    <span class="badge bg-warning text-dark">Pending</span>
+  </div>
+  <p class="text-muted small mb-4">You can change quantities, remove items, or update your delivery address while the order is pending.</p>
+
+  <!-- Items -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-semibold">Order Items</div>
+    <div class="card-body p-0">
+      {% for item in order.items.all %}
+      <div class="d-flex align-items-center gap-3 p-3 border-bottom">
+        <div class="flex-fill">
+          <div class="fw-semibold small">{{ item.product.name|default:"(deleted)" }}</div>
+          <div class="text-muted small">{{ item.variant_label }} · ₹{{ item.price }} each</div>
+        </div>
+        <!-- Qty update -->
+        <form method="post" class="d-flex align-items-center gap-1">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_qty">
+          <input type="hidden" name="item_id" value="{{ item.pk }}">
+          <button type="button" class="btn btn-outline-secondary btn-sm px-2"
+                  onclick="this.nextElementSibling.stepDown(); this.closest('form').submit()">−</button>
+          <input type="number" name="quantity" value="{{ item.quantity }}" min="1" max="99"
+                 class="form-control form-control-sm text-center" style="width:55px"
+                 onchange="this.closest('form').submit()">
+          <button type="button" class="btn btn-outline-secondary btn-sm px-2"
+                  onclick="this.previousElementSibling.stepUp(); this.closest('form').submit()">+</button>
+        </form>
+        <!-- Remove -->
+        <form method="post"
+              data-confirm="Remove {{ item.product.name }} from this order?"
+              data-confirm-title="Remove Item" data-confirm-type="warning">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="remove_item">
+          <input type="hidden" name="item_id" value="{{ item.pk }}">
+          <button type="submit" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="card-footer d-flex justify-content-end gap-4 small">
+      <span class="text-muted">Subtotal: ₹{{ order.subtotal }}</span>
+      <span class="text-muted">Delivery: ₹{{ order.delivery_charge }}</span>
+      <span class="fw-bold">Total: ₹{{ order.total_amount }}</span>
+    </div>
+  </div>
+
+  <!-- Address -->
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-header fw-semibold">Delivery Address</div>
+    <div class="card-body">
+      <p class="small text-muted mb-3">Current: {{ order.address }} · {{ order.phone }}</p>
+
+      {% if saved_addresses %}
+      <form method="post" class="mb-3">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_address">
+        <label class="form-label small fw-semibold">Choose a saved address</label>
+        <select name="address_id" class="form-select form-select-sm mb-2" onchange="this.form.submit()">
+          {% for addr in saved_addresses %}
+            <option value="{{ addr.pk }}" {% if addr.pk == selected_address_id %}selected{% endif %}>{{ addr.label }}: {{ addr.get_full_address }}</option>
+          {% endfor %}
+        </select>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{% url 'accounts:addresses' %}?next={{ request.path|urlencode }}" class="btn btn-outline-success btn-sm">Add New Address</a>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="toggleManualAddressBtn">Edit Address</button>
+        </div>
+        <div class="form-text">Address updates automatically when you select one.</div>
+      </form>
+      <hr>
+      {% endif %}
+
+      <div id="manualAddressSection" class="d-none">
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="update_address">
+          <label class="form-label small fw-semibold">Or enter a new address</label>
+          <textarea name="address" rows="2" class="form-control form-control-sm mb-2"
+                    placeholder="Full address">{{ order.address }}</textarea>
+          <input type="text" name="phone" value="{{ order.phone }}"
+                 class="form-control form-control-sm mb-2" placeholder="Phone">
+          <div class="d-flex gap-2 flex-wrap">
+            <button type="submit" class="btn btn-success btn-sm">Update Address</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="cancelManualAddressBtn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <a href="{% url 'orders:order_detail' order.pk %}" class="btn btn-outline-secondary">Back to Order Details</a>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function () {
+    const toggleBtn = document.getElementById('toggleManualAddressBtn');
+    const cancelBtn = document.getElementById('cancelManualAddressBtn');
+    const section = document.getElementById('manualAddressSection');
+    if (!section || !toggleBtn) return;
+
+    toggleBtn.addEventListener('click', function () {
+      section.classList.remove('d-none');
+      const firstInput = section.querySelector('textarea, input');
+      if (firstInput) firstInput.focus();
+    });
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener('click', function () {
+        section.classList.add('d-none');
+      });
+    }
+  })();
+</script>
+{% endblock %}

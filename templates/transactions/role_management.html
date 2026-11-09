@@ -1,0 +1,169 @@
+{% extends 'base_dashboard.html' %}
+{% load static %}
+
+{% block title %}Role Management Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h1 class="h2">👥 Role Management Dashboard</h1>
+            <hr>
+        </div>
+    </div>
+
+    <!-- Role Statistics -->
+    <div class="row mb-4">
+        <div class="col-md-2">
+            <div class="card border-primary">
+                <div class="card-body text-center">
+                    <h6>Admins</h6>
+                    <p class="display-6">{{ role_stats.admin }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-success">
+                <div class="card-body text-center">
+                    <h6>Suppliers</h6>
+                    <p class="display-6">{{ role_stats.supplier }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-info">
+                <div class="card-body text-center">
+                    <h6>Marketplaces</h6>
+                    <p class="display-6">{{ role_stats.distributor }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-warning">
+                <div class="card-body text-center">
+                    <h6>Stockists</h6>
+                    <p class="display-6">{{ role_stats.stockist }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-secondary">
+                <div class="card-body text-center">
+                    <h6>Customers</h6>
+                    <p class="display-6">{{ role_stats.customer }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <div class="card border-dark">
+                <div class="card-body text-center">
+                    <h6>Total Users</h6>
+                    <p class="display-6">{{ users.count }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Users Table -->
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">All Users</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>Roles</th>
+                                    <th>Status</th>
+                                    <th>Joined</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td><strong>{{ user.username }}</strong></td>
+                                    <td>{{ user.email }}</td>
+                                    <td>
+                                        {% for role in user.get_roles_list %}
+                                            <span class="badge bg-secondary">{{ role }}</span>
+                                        {% endfor %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_active %}
+                                            <span class="badge bg-success">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Suspended</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.date_joined|date:"Y-m-d" }}</td>
+                                    <td>
+                                        <a href="{% url 'transactions:user_detail' user.id %}" class="btn btn-info btn-sm">
+                                            View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-4">No users found</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Recent Role Transactions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-sm table-striped">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>User</th>
+                                    <th>Event</th>
+                                    <th>Role</th>
+                                    <th>Old Value</th>
+                                    <th>New Value</th>
+                                    <th>Initiated By</th>
+                                    <th>Timestamp</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for txn in transactions %}
+                                <tr>
+                                    <td><strong>{{ txn.user.username }}</strong></td>
+                                    <td><span class="badge bg-info">{{ txn.get_event_display }}</span></td>
+                                    <td>{{ txn.role_affected }}</td>
+                                    <td>{{ txn.old_value }}</td>
+                                    <td>{{ txn.new_value }}</td>
+                                    <td>{{ txn.initiated_by.username }}</td>
+                                    <td>{{ txn.created_at|date:"Y-m-d H:i" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="7" class="text-center py-3">No transactions yet</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

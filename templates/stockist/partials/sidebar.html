@@ -1,0 +1,11 @@
+<a class="nav-link {% if active_nav == 'dashboard' %}active{% endif %}" href="{% url 'stockist:dashboard' %}"><i class="bi bi-speedometer2"></i> Dashboard</a>
+<a class="nav-link {% if active_nav == 'orders' %}active{% endif %}" href="{% url 'stockist:order_list' %}"><i class="bi bi-bag-check"></i> Orders</a>
+<a class="nav-link {% if active_nav == 'inventory' %}active{% endif %}" href="{% url 'stockist:inventory' %}"><i class="bi bi-boxes"></i> Inventory</a>
+<a class="nav-link {% if active_nav == 'processing_charges' %}active{% endif %}" href="{% url 'stockist:processing_charges' %}">
+  <i class="bi bi-tags"></i> Processing Charges
+  {% if pending_release %}<span class="badge bg-warning text-dark ms-1">{{ pending_release }}</span>{% endif %}
+</a>
+<a class="nav-link {% if active_nav == 'charges_overview' %}active{% endif %}" href="{% url 'stockist:charges_overview' %}"><i class="bi bi-table"></i> Charges Overview</a>
+<a class="nav-link {% if active_nav == 'restock_requests' %}active{% endif %}" href="{% url 'stockist:restock_requests' %}"><i class="bi bi-arrow-repeat"></i> Restock Requests</a>
+<a class="nav-link {% if active_nav == 'distributor_restock' %}active{% endif %}" href="{% url 'stockist:distributor_restock' %}"><i class="bi bi-truck"></i> Marketplace Requests</a>
+<a class="nav-link {% if active_nav == 'direct_supply' %}active{% endif %}" href="{% url 'stockist:direct_supply' %}"><i class="bi bi-lightning-charge"></i> Direct Supply</a>

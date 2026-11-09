@@ -1,0 +1,125 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Reward Points{% endblock %}
+{% block page_title %}🎁 Reward Points Program{% endblock %}
+{% block active_nav %}reward_settings{% endblock %}
+{% block content %}
+
+<div class="row g-4">
+  <!-- Config -->
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header  fw-semibold d-flex justify-content-between align-items-center">
+        <span>Settings</span>
+        <span class="badge {% if config.is_enabled %}bg-success{% else %}bg-secondary{% endif %}">
+          {% if config.is_enabled %}Active{% else %}Inactive{% endif %}
+        </span>
+      </div>
+      <div class="card-body p-4">
+        <form method="post">
+          {% csrf_token %}
+
+          <div class="form-check form-switch mb-4">
+            <input class="form-check-input" type="checkbox" name="is_enabled" value="1"
+                   id="enableRewards" {% if config.is_enabled %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="enableRewards">
+              Enable Reward Points
+            </label>
+          </div>
+
+          <div class="alert alert-info small py-2">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>1 point = ₹1 discount.</strong> Points are auto-given to customers on delivery, from your margin.
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Auto-earn on delivery (%)</label>
+            <input type="number" name="points_earn_percent" class="form-control"
+                   value="{{ config.points_earn_percent }}" min="0" max="100">
+            <div class="form-text">% of <strong>your profit margin</strong> on the order given as points. e.g. if your margin is ₹100 and earn % is 20 → customer gets 20 points (₹20 discount next order).</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-semibold">Minimum points to redeem</label>
+            <input type="number" name="min_points_to_redeem" class="form-control"
+                   value="{{ config.min_points_to_redeem }}" min="1">
+            <div class="form-text">Customer needs at least this many points to use them</div>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Max redemption per order (%)</label>
+            <input type="number" name="max_redeem_percent" class="form-control"
+                   value="{{ config.max_redeem_percent }}" min="1" max="100">
+            <div class="form-text">Max % of order value payable with points</div>
+          </div>
+
+          <hr>
+          <div class="fw-semibold mb-3">🎁 New Customer Welcome Bonus</div>
+
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" name="welcome_bonus_enabled" value="1"
+                   id="welcomeBonus" {% if config.welcome_bonus_enabled %}checked{% endif %}>
+            <label class="form-check-label fw-semibold" for="welcomeBonus">
+              Auto-give points on registration
+            </label>
+          </div>
+
+          <div class="mb-4">
+            <label class="form-label fw-semibold">Welcome bonus points</label>
+            <input type="number" name="welcome_bonus_points" class="form-control"
+                   value="{{ config.welcome_bonus_points }}" min="0">
+            <div class="form-text">Points given to every new customer when they register under your store. 1 point = ₹1 discount.</div>
+          </div>
+
+          <button type="submit" class="btn btn-success w-100">Save</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="card border-0 shadow-sm mt-3 p-3">
+      <div class="small text-muted">Total Points Issued</div>
+      <div class="fs-3 fw-bold text-success">₹{{ total_points_issued }}</div>
+      <div class="small text-muted">across all customers</div>
+    </div>
+  </div>
+
+  <!-- Customer leaderboard -->
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header  fw-semibold">Customer Points Balance</div>
+      <div class="table-wrap">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr><th>Customer</th><th>Balance (₹)</th><th>Total Given</th><th>Total Used</th><th>Manual Adjust</th></tr>
+          </thead>
+          <tbody>
+            {% for rp in top_customers %}
+            <tr>
+              <td>
+                <div class="fw-semibold small">{{ rp.customer.get_full_name|default:rp.customer.username }}</div>
+                <div class="text-muted" style="font-size:.7rem">{{ rp.customer.phone }}</div>
+              </td>
+              <td><span class="badge bg-success fs-6">₹{{ rp.balance }}</span></td>
+              <td class="small text-muted">₹{{ rp.total_earned }}</td>
+              <td class="small text-muted">₹{{ rp.total_redeemed }}</td>
+              <td>
+                <form method="post" action="{% url 'distributors:reward_adjust' %}" class="d-flex gap-1">
+                  {% csrf_token %}
+                  <input type="hidden" name="customer_id" value="{{ rp.customer.pk }}">
+                  <div class="input-group input-group-sm" style="width:130px">
+                    <span class="input-group-text">₹</span>
+                    <input type="number" name="points" class="form-control" placeholder="±amount">
+                  </div>
+                  <button type="submit" class="btn btn-sm btn-outline-success">Apply</button>
+                </form>
+              </td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center text-muted py-3">No customers have points yet. Give points from delivered orders.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,228 @@
+{% comment %}
+Per-line supplier shipment actions.
+
+Lifecycle:  Awaiting -> Ready (packed) -> Dispatched   (send mode)
+            Awaiting -> Ready (packed, waiting for pickup) (collect mode)
+Side paths: Delayed (still to pack, with reason + expected date)
+            Unavailable (cannot supply - flagged for the shop/admin)
+
+Confirmations use the app's styled modal (data-confirm on the <form>, wired in
+base_dashboard.html). Expects: item, ship, delay_reasons, unavailable_reasons,
+today, and sfx (keeps element ids unique between the desktop table and the
+mobile list, which both render this partial).
+{% endcomment %}
+
+{% if ship.status == 'awaiting' or ship.status == 'delayed' %}
+  <form method="post" class="d-inline"
+        data-confirm="Mark &quot;{{ item.product.name }}&quot; (Order #{{ item.order_id }}) as packed and ready? {% if ship.mode == 'collect' %}The {{ ship.get_target_display }} can then collect it.{% else %}You can then enter the dispatch details.{% endif %} You can undo this afterwards."
+        data-confirm-title="Mark as ready?" data-confirm-type="success">
+    {% csrf_token %}
+    <input type="hidden" name="item_id" value="{{ item.pk }}">
+    <input type="hidden" name="action" value="ready">
+    <button type="submit" class="btn btn-sm btn-success">
+      <i class="bi bi-box-seam me-1"></i>Mark ready
+    </button>
+  </form>
+  <div class="mt-1 small d-flex flex-wrap gap-2 justify-content-end">
+    <button type="button" class="btn btn-link btn-sm p-0 link-secondary"
+            data-bs-toggle="collapse" data-bs-target="#delay{{ item.pk }}{{ sfx }}">
+      {% if ship.status == 'delayed' %}Update delay{% else %}Report delay{% endif %}
+    </button>
+    {% if ship.status == 'delayed' %}
+    <form method="post" class="d-inline">
+      {% csrf_token %}
+      <input type="hidden" name="item_id" value="{{ item.pk }}">
+      <input type="hidden" name="action" value="available">
+      <button type="submit" class="btn btn-link btn-sm p-0 link-secondary">Clear delay</button>
+    </form>
+    {% endif %}
+    <button type="button" class="btn btn-link btn-sm p-0 link-danger"
+            data-bs-toggle="collapse" data-bs-target="#unavail{{ item.pk }}{{ sfx }}">
+      Can't supply
+    </button>
+  </div>
+
+{% elif ship.status == 'confirmed' %}
+  {% if ship.mode == 'send' %}
+    <button type="button" class="btn btn-sm btn-primary"
+            data-bs-toggle="collapse" data-bs-target="#dispatch{{ item.pk }}{{ sfx }}">
+      <i class="bi bi-truck me-1"></i>Dispatch…
+    </button>
+  {% else %}
+    <span class="text-success small"><i class="bi bi-check-circle me-1"></i>Ready for pickup</span>
+  {% endif %}
+  <div class="mt-1 small d-flex flex-wrap gap-2 justify-content-end">
+    <form method="post" class="d-inline"
+          data-confirm="Move &quot;{{ item.product.name }}&quot; back to awaiting? Use this if you marked it ready by mistake."
+          data-confirm-title="Undo ready?" data-confirm-type="warning">
+      {% csrf_token %}
+      <input type="hidden" name="item_id" value="{{ item.pk }}">
+      <input type="hidden" name="action" value="unready">
+      <button type="submit" class="btn btn-link btn-sm p-0 link-secondary">Undo ready</button>
+    </form>
+    <button type="button" class="btn btn-link btn-sm p-0 link-danger"
+            data-bs-toggle="collapse" data-bs-target="#unavail{{ item.pk }}{{ sfx }}">
+      Can't supply
+    </button>
+  </div>
+
+{% elif ship.status == 'dispatched' %}
+  <div class="d-inline-flex align-items-center gap-2 flex-wrap justify-content-end">
+    <span class="text-primary small">
+      <i class="bi bi-truck me-1"></i>Dispatched
+      {% if ship.tracking_reference %}· {{ ship.tracking_reference }}{% endif %}
+    </span>
+    <form method="post" class="d-inline"
+          data-confirm="Revert the dispatch of &quot;{{ item.product.name }}&quot;? This clears the docket details and sets it back to ready."
+          data-confirm-title="Revert dispatch?" data-confirm-type="warning">
+      {% csrf_token %}
+      <input type="hidden" name="item_id" value="{{ item.pk }}">
+      <input type="hidden" name="action" value="undispatch">
+      <button type="submit" class="btn btn-sm btn-outline-secondary" title="Undo dispatch">
+        <i class="bi bi-arrow-counterclockwise"></i> Revert
+      </button>
+    </form>
+  </div>
+
+{% elif ship.status == 'unavailable' %}
+  {% if ship.resume_requested_at %}
+    <div class="small text-info-emphasis"><i class="bi bi-hourglass-split me-1"></i>Waiting for the shop to confirm</div>
+    <form method="post" class="d-inline">
+      {% csrf_token %}
+      <input type="hidden" name="item_id" value="{{ item.pk }}">
+      <input type="hidden" name="action" value="withdraw_resume">
+      <button type="submit" class="btn btn-link btn-sm p-0 link-secondary">Withdraw request</button>
+    </form>
+  {% elif ship.within_undo_window %}
+    <form method="post" class="d-inline"
+          data-confirm="Undo &quot;{{ item.product.name }}&quot; being unavailable? It goes straight back to awaiting."
+          data-confirm-title="Available again?" data-confirm-type="success">
+      {% csrf_token %}
+      <input type="hidden" name="item_id" value="{{ item.pk }}">
+      <input type="hidden" name="action" value="available">
+      <button type="submit" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Available again
+      </button>
+    </form>
+  {% else %}
+    <form method="post" class="d-inline"
+          data-confirm="This was flagged unavailable {{ ship.issue_at|timesince }} ago, so the customer may no longer want it. This sends a request to the shop; &quot;{{ item.product.name }}&quot; returns to your list only if the shop confirms."
+          data-confirm-title="Ask the shop to resume?" data-confirm-type="warning">
+      {% csrf_token %}
+      <input type="hidden" name="item_id" value="{{ item.pk }}">
+      <input type="hidden" name="action" value="available">
+      <button type="submit" class="btn btn-sm btn-outline-success">
+        <i class="bi bi-send me-1"></i>Request to resume
+      </button>
+    </form>
+  {% endif %}
+
+{% else %}
+  <span class="text-muted small">{{ ship.get_status_display }}</span>
+{% endif %}
+
+{# ── Dispatch details (send mode, only once the line is READY) ───────────── #}
+{% if ship.mode == 'send' and ship.status == 'confirmed' %}
+<div class="collapse mt-2 text-start" id="dispatch{{ item.pk }}{{ sfx }}">
+  <form method="post" class="border rounded p-2 bg-light"
+        data-confirm="Dispatch &quot;{{ item.product.name }}&quot; with these details? You can revert it afterwards if something is wrong."
+        data-confirm-title="Dispatch this line?" data-confirm-type="success">
+    {% csrf_token %}
+    <input type="hidden" name="item_id" value="{{ item.pk }}">
+    <input type="hidden" name="action" value="dispatch">
+    <div class="mb-2">
+      <label class="form-label small mb-1">Dispatched to (contact / address)</label>
+      <input type="text" name="dispatched_to_name" class="form-control form-control-sm"
+             value="{{ ship.dispatched_to_name|default:ship.dest }}"
+             placeholder="e.g. {{ ship.get_target_display }} - name / place">
+    </div>
+    <div class="row g-2">
+      <div class="col-6">
+        <label class="form-label small mb-1">Carrier / vehicle</label>
+        <input type="text" name="carrier" class="form-control form-control-sm"
+               value="{{ ship.carrier }}" placeholder="Courier / transport">
+      </div>
+      <div class="col-6">
+        <label class="form-label small mb-1">Tracking / LR / docket</label>
+        <input type="text" name="tracking_reference" class="form-control form-control-sm"
+               value="{{ ship.tracking_reference }}" placeholder="Reference no.">
+      </div>
+    </div>
+    <div class="mt-2">
+      <label class="form-label small mb-1">Note (optional)</label>
+      <textarea name="transhipment_note" class="form-control form-control-sm" rows="2"
+                placeholder="Any handover note">{{ ship.transhipment_note }}</textarea>
+    </div>
+    <button type="submit" class="btn btn-sm btn-primary mt-2">
+      <i class="bi bi-send me-1"></i>Confirm Dispatch
+    </button>
+  </form>
+</div>
+{% endif %}
+
+{# ── Report / update a delay ─────────────────────────────────────────────── #}
+{% if ship.status == 'awaiting' or ship.status == 'delayed' %}
+<div class="collapse mt-2 text-start" id="delay{{ item.pk }}{{ sfx }}">
+  <form method="post" class="border rounded p-2 bg-light">
+    {% csrf_token %}
+    <input type="hidden" name="item_id" value="{{ item.pk }}">
+    <input type="hidden" name="action" value="delay">
+    <div class="mb-2">
+      <label class="form-label small mb-1">Why is it delayed?</label>
+      <select name="reason" class="form-select form-select-sm" required>
+        <option value="">Choose a reason…</option>
+        {% for val, lbl in delay_reasons %}
+        <option value="{{ val }}" {% if ship.issue_reason == val %}selected{% endif %}>{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-2">
+      <label class="form-label small mb-1">Expected ready date</label>
+      <input type="date" name="expected_ready_on" class="form-control form-control-sm"
+             min="{{ today|date:'Y-m-d' }}"
+             value="{% if ship.expected_ready_on %}{{ ship.expected_ready_on|date:'Y-m-d' }}{% endif %}">
+    </div>
+    <div class="mb-2">
+      <label class="form-label small mb-1">Private note (optional)</label>
+      <textarea name="issue_note" class="form-control form-control-sm" rows="2" maxlength="1000"
+                placeholder="Only you and admin can read this">{{ ship.issue_note }}</textarea>
+    </div>
+    <div class="form-text mb-2" style="font-size:11px">
+      The customer and receiver see the reason and expected date, not your note.
+    </div>
+    <button type="submit" class="btn btn-sm btn-warning">
+      <i class="bi bi-clock-history me-1"></i>Save delay
+    </button>
+  </form>
+</div>
+{% endif %}
+
+{# ── Cannot supply ───────────────────────────────────────────────────────── #}
+{% if ship.status == 'awaiting' or ship.status == 'delayed' or ship.status == 'confirmed' %}
+<div class="collapse mt-2 text-start" id="unavail{{ item.pk }}{{ sfx }}">
+  <form method="post" class="border border-danger rounded p-2 bg-light"
+        data-confirm="Tell the shop, receiver and customer that &quot;{{ item.product.name }}&quot; (Order #{{ item.order_id }}) cannot be supplied? Nothing is cancelled or refunded automatically; the shop and admin decide what happens next. You can undo this."
+        data-confirm-title="Can't supply this line?" data-confirm-type="warning">
+    {% csrf_token %}
+    <input type="hidden" name="item_id" value="{{ item.pk }}">
+    <input type="hidden" name="action" value="unavailable">
+    <div class="mb-2">
+      <label class="form-label small mb-1">Reason</label>
+      <select name="reason" class="form-select form-select-sm" required>
+        <option value="">Choose a reason…</option>
+        {% for val, lbl in unavailable_reasons %}
+        <option value="{{ val }}">{{ lbl }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="mb-2">
+      <label class="form-label small mb-1">Private note (optional)</label>
+      <textarea name="issue_note" class="form-control form-control-sm" rows="2" maxlength="1000"
+                placeholder="Only you and admin can read this"></textarea>
+    </div>
+    <button type="submit" class="btn btn-sm btn-danger">
+      <i class="bi bi-x-circle me-1"></i>Mark unavailable
+    </button>
+  </form>
+</div>
+{% endif %}

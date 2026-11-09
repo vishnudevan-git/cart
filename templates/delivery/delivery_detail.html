@@ -1,0 +1,263 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Delivery — Order #{{ order.id }}{% endblock %}
+{% block page_title %}Delivery — Order #{{ order.id }}{% endblock %}
+{% block sidebar %}{% include 'distributors/sidebar.html' %}{% endblock %}
+{% block content %}
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  <a href="{% url 'delivery:delivery_list' %}" class="btn btn-sm btn-outline-secondary">← All Deliveries</a>
+  <span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'partially_delivered' %}bg-warning text-dark{% elif order.status == 'cancelled' %}bg-danger{% else %}bg-secondary{% endif %} fs-6">
+    {{ order.get_status_display }}
+  </span>
+  {% if order.is_partial_shipment %}<span class="badge bg-info text-dark">Partial Shipment</span>{% endif %}
+</div>
+
+{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} py-2 small">{{ message }}</div>{% endfor %}
+
+<div class="row g-3">
+  <!-- Left: order info + actions -->
+  <div class="col-12 col-md-7">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header fw-semibold">Order Details</div>
+      <div class="card-body small">
+        <div class="row g-2">
+          <div class="col-6"><span class="text-muted">Customer:</span><br><strong>{{ order.customer.get_full_name|default:order.customer.username }}</strong></div>
+          <div class="col-6"><span class="text-muted">Phone:</span><br>{{ order.phone }}</div>
+          <div class="col-12"><span class="text-muted">Address:</span><br>{{ order.address }}</div>
+          <div class="col-6"><span class="text-muted">Total:</span><br><strong>₹{{ order.total_amount }}</strong></div>
+          <div class="col-6"><span class="text-muted">Payment:</span><br>
+            {% with p=order.payment %}
+            {% if p %}
+              {{ p.get_payment_method_display }}
+              <span class="badge {% if p.status == 'paid' %}bg-success{% else %}bg-secondary{% endif %}">{{ p.get_status_display }}</span>
+              {% if p.amount_collected and p.amount_collected > 0 %}
+                <br><span class="text-success small">₹{{ p.amount_collected }} collected</span>
+                {% if p.amount_outstanding > 0 %}<span class="text-warning small"> · ₹{{ p.amount_outstanding }} pending</span>{% endif %}
+              {% endif %}
+            {% else %}—{% endif %}
+            {% endwith %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Items table with per-item status -->
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header fw-semibold d-flex justify-content-between">
+        <span>Items</span>
+        {% if order.status == 'out_for_delivery' or order.status == 'partially_delivered' %}
+        <span class="text-muted small fw-normal">Select items delivered in this trip</span>
+        {% endif %}
+      </div>
+
+      {% if order.status == 'out_for_delivery' or order.status == 'partially_delivered' %}
+      <!-- Partial delivery form -->
+      <form method="post" action="{% url 'delivery:mark_partial_delivery' order.id %}" id="partialForm">
+        {% csrf_token %}
+        <div class="table-wrap">
+          <table class="table align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th style="width:36px">
+                  <input type="checkbox" class="form-check-input" id="selectAll" title="Select all pending">
+                </th>
+                <th>Product</th><th>Size</th><th>Qty</th><th>Amount</th><th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for it in order.items.all %}
+              <tr class="{% if it.fulfillment_status == 'delivered' %}table-success{% elif it.fulfillment_status == 'backordered' %}table-warning{% endif %}">
+                <td>
+                  {% if it.fulfillment_status != 'delivered' %}
+                  <input type="checkbox" class="form-check-input item-check" name="item_ids" value="{{ it.id }}">
+                  {% else %}
+                  <i class="bi bi-check2-circle text-success"></i>
+                  {% endif %}
+                </td>
+                <td class="fw-semibold small">{{ it.product.name|default:"(deleted)" }}</td>
+                <td class="text-muted small">{{ it.variant_label }}</td>
+                <td>{{ it.quantity }}</td>
+                <td>₹{{ it.price }}</td>
+                <td>
+                  {% if it.fulfillment_status == 'delivered' %}
+                    <span class="badge bg-success">Delivered</span>
+                  {% elif it.fulfillment_status == 'shipped' %}
+                    <span class="badge bg-info text-dark">Shipped</span>
+                  {% elif it.fulfillment_status == 'backordered' %}
+                    <span class="badge bg-warning text-dark">Backordered</span>
+                  {% else %}
+                    <span class="badge bg-secondary">Pending</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+            <tfoot class="table-light">
+              <tr>
+                <td colspan="4" class="text-end fw-semibold small">Total Order:</td>
+                <td colspan="2" class="fw-bold">₹{{ order.total_amount }}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <div class="card-body pt-2 border-top">
+          <input type="text" name="notes" class="form-control form-control-sm mb-2" placeholder="Delivery notes (optional)">
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <button type="submit" class="btn btn-success" id="deliverBtn" disabled>
+              <i class="bi bi-check2-all me-1"></i>Mark selected as delivered &amp; collect COD
+            </button>
+            <span class="text-muted small" id="selAmt">Select items to see amount</span>
+          </div>
+        </div>
+      </form>
+
+      {% else %}
+      <!-- Read-only items view -->
+      <div class="table-wrap">
+        <table class="table align-middle mb-0">
+          <thead class="table-light">
+            <tr><th>Product</th><th>Size</th><th>Qty</th><th>Amount</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for it in order.items.all %}
+            <tr class="{% if it.fulfillment_status == 'delivered' %}table-success{% elif it.fulfillment_status == 'backordered' %}table-warning{% endif %}">
+              <td class="fw-semibold small">{{ it.product.name|default:"(deleted)" }}</td>
+              <td class="text-muted small">{{ it.variant_label }}</td>
+              <td>{{ it.quantity }}</td>
+              <td>₹{{ it.price }}</td>
+              <td>
+                {% if it.fulfillment_status == 'delivered' %}
+                  <span class="badge bg-success">Delivered</span>
+                {% elif it.fulfillment_status == 'shipped' %}
+                  <span class="badge bg-info text-dark">Shipped</span>
+                {% elif it.fulfillment_status == 'backordered' %}
+                  <span class="badge bg-warning text-dark">Backordered</span>
+                {% else %}
+                  <span class="badge bg-secondary">Pending</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- Payment instalments history -->
+    {% with instalments=order.payment.instalments.all %}
+    {% if instalments %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header fw-semibold">COD Collection History</div>
+      <div class="table-wrap">
+        <table class="table align-middle mb-0 small">
+          <thead class="table-light">
+            <tr><th>Batch</th><th>Amount Collected</th><th>When</th><th>By</th><th>Note</th></tr>
+          </thead>
+          <tbody>
+            {% for ins in instalments %}
+            <tr>
+              <td>#{{ forloop.counter }}</td>
+              <td class="fw-semibold text-success">₹{{ ins.amount }}</td>
+              <td>{{ ins.collected_at|date:"d M Y, H:i" }}</td>
+              <td>{{ ins.collected_by }}</td>
+              <td class="text-muted">{{ ins.note }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+    {% endwith %}
+  </div>
+
+  <!-- Right: delivery actions -->
+  <div class="col-12 col-md-5">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header fw-semibold">Delivery Actions</div>
+      <div class="card-body">
+        {% if delivery %}
+        <div class="small mb-3">
+          <div class="mb-1"><span class="text-muted">Picked at:</span> {{ delivery.picked_at|date:"d M Y, H:i"|default:"—" }}</div>
+          <div class="mb-1"><span class="text-muted">Delivered at:</span> {{ delivery.delivered_at|date:"d M Y, H:i"|default:"—" }}</div>
+          {% if delivery.notes %}<div class="text-muted">Notes: {{ delivery.notes }}</div>{% endif %}
+        </div>
+        {% endif %}
+
+        {% if order.status != 'out_for_delivery' and order.status != 'delivered' and order.status != 'partially_delivered' and order.status != 'cancelled' %}
+        <form method="post" action="{% url 'delivery:mark_out_for_delivery' order.id %}">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-primary w-100 mb-2">
+            <i class="bi bi-truck me-1"></i>Mark Out for Delivery
+          </button>
+        </form>
+        {% endif %}
+
+        {% if order.status == 'out_for_delivery' or order.status == 'partially_delivered' %}
+        <div class="alert alert-info py-2 small">
+          <i class="bi bi-info-circle me-1"></i>
+          Select items in the table on the left to record a partial delivery,
+          or use the button below to mark the <strong>entire order</strong> as delivered at once.
+        </div>
+        <form method="post" action="{% url 'delivery:mark_delivered' order.id %}"
+              data-confirm="Mark the entire order as fully delivered and collect the full amount?"
+              data-confirm-title="Full Delivery?"
+              data-confirm-type="success">
+          {% csrf_token %}
+          <input type="text" name="notes" class="form-control form-control-sm mb-2" placeholder="Notes (optional)">
+          <button type="submit" class="btn btn-outline-success w-100">
+            <i class="bi bi-check2-all me-1"></i>Mark ALL as delivered (full COD)
+          </button>
+        </form>
+        {% endif %}
+
+        {% if order.status == 'delivered' %}
+        <div class="alert alert-success py-2 small mb-0">
+          <i class="bi bi-check-circle-fill me-1"></i>
+          Order fully delivered. COD collected: ₹{{ order.payment.amount_collected|default:order.payment.amount }}.
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const checks = Array.from(document.querySelectorAll('.item-check'));
+  const btn = document.getElementById('deliverBtn');
+  const amt = document.getElementById('selAmt');
+  const allCheck = document.getElementById('selectAll');
+  // map item pk -> price*qty from the table cells
+  const rows = Array.from(document.querySelectorAll('#partialForm tbody tr'));
+
+  function rowAmount(row) {
+    const cells = row.querySelectorAll('td');
+    if (cells.length < 5) return 0;
+    const qty  = parseInt(cells[3].textContent) || 1;
+    const price = parseFloat(cells[4].textContent.replace('₹','')) || 0;
+    return qty * price;
+  }
+
+  function update() {
+    const selected = checks.filter(c => c.checked);
+    const total = selected.reduce((sum, c) => {
+      const row = c.closest('tr');
+      return sum + rowAmount(row);
+    }, 0);
+    if (btn) btn.disabled = selected.length === 0;
+    if (amt) amt.textContent = selected.length
+      ? selected.length + ' item(s) — ₹' + total.toFixed(2) + ' to collect'
+      : 'Select items to see amount';
+  }
+
+  checks.forEach(c => c.addEventListener('change', update));
+  if (allCheck) {
+    allCheck.addEventListener('change', function () {
+      checks.forEach(c => { c.checked = this.checked; });
+      update();
+    });
+  }
+})();
+</script>
+{% endblock %}

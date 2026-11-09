@@ -1,0 +1,58 @@
+AUDIT REPORT
+Passed: 39 | Warnings: 5 | Errors: 3 | Fixes: 1
+
+ERRORS:
+  [order:39] out_for_delivery failed, status=confirmed (HTTP 302)
+  [order:39] delivered failed, status=confirmed
+  [order:39] COD close-out failed: payment still pending
+
+WARNINGS:
+  [audit_integrity] [WARN] Delivered orders with COD payment still pending (not collected) — 1
+  [audit_integrity] [WARN] Active shops linked to a SUSPENDED wholesale Distributor (margin silently lost) — 2
+  [shop:Anna Nagar Organics] Distributor 'Chennai Wholesale Distributors' is SUSPENDED — margin not applied to cost floor
+  [shop:Velachery Fresh Store] Distributor 'Chennai Wholesale Distributors' is SUSPENDED — margin not applied to cost floor
+  [payments] 1 delivered orders still have COD pending (need backfill)
+
+FIXES APPLIED:
+  [payments] Backfilled 1 delivered-order COD payments to 'paid'
+
+PASSED:
+  [audit_integrity] clean
+  [shop:Anna Nagar Organics] all checked prices ≥ floor
+  [shop:Velachery Fresh Store] all checked prices ≥ floor
+  [shop:E2E Fresh Store] all checked prices ≥ floor
+  [shop:North Chennai Daily Needs] all checked prices ≥ floor
+  [customer_reg] User 9400233257 registered and linked to North Chennai Daily Needs
+  [customer_login] Login OK → http://127.0.0.1:8000/
+  [checkout] Order #39 created | status=at_distributor | total=Rs.466.00
+  [order:39] Payment row: cod / pending Rs.466.00
+  [order:39] confirmed
+  [partial:order:40] partially_delivered | item1=delivered item2=pending
+  [partial:order:40] collected Rs.98.00 outstanding Rs.232.00
+  [partial:order:40] fully delivered | payment paid Rs.330.00
+  [admin:admin dashboard] HTTP 200 len=29KB
+  [admin:users list] HTTP 200 len=297KB
+  [admin:customers list] HTTP 200 len=70KB
+  [admin:suppliers list] HTTP 200 len=110KB
+  [admin:stockist list] HTTP 200 len=35KB
+  [admin:distributors list] HTTP 200 len=24KB
+  [admin:marketplaces list] HTTP 200 len=43KB
+  [admin:products list] HTTP 200 len=172KB
+  [admin:orders list] HTTP 200 len=55KB
+  [admin:reports] HTTP 200 len=45KB
+  [admin:price trace] HTTP 200 len=21KB
+  [shop:shop dashboard] HTTP 200
+  [shop:shop catalogue] HTTP 200
+  [shop:shop customers] HTTP 200
+  [shop:shop orders] HTTP 200
+  [shop:shop own products] HTTP 200
+  [shop:product library] HTTP 200
+  [supplier:supplier dashboard] HTTP 200
+  [supplier:supplier products] HTTP 200
+  [supplier:supplier stock] HTTP 200
+  [logging] Log file: requests_2026-10-31_20-49-35.log | 94 request lines
+  [logging] 302 redirects logged (login/checkout flows confirmed)
+  [logging] Customer sessions logged correctly
+  [template_library] 19 templates in library
+  [template_library] Search 'soap' returned 1 result(s)
+  [payments] All payments are COD

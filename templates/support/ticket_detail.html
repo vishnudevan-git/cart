@@ -1,0 +1,87 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Ticket #{{ ticket.pk }}{% endblock %}
+{% block page_title %}Ticket #{{ ticket.pk }}{% endblock %}
+
+{% block sidebar %}
+  {% include 'partials/role_support_sidebar.html' %}
+{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'support:my_tickets' %}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left me-1"></i>Back to My Tickets
+  </a>
+</div>
+
+<div class="row g-3">
+  <div class="col-lg-8">
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span class="fw-semibold">{{ ticket.subject }}</span>
+        <span class="badge {{ ticket.status_badge_class }}">{{ ticket.get_status_display }}</span>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-3 small text-muted">
+          <div class="col-6 col-md-3"><strong>Type:</strong> {{ ticket.get_ticket_type_display }}</div>
+          <div class="col-6 col-md-3"><strong>Priority:</strong>
+            <span class="badge {{ ticket.priority_badge_class }}">{{ ticket.get_priority_display }}</span>
+          </div>
+          <div class="col-6 col-md-3"><strong>Submitted:</strong> {{ ticket.created_at|date:"d M Y, H:i" }}</div>
+          <div class="col-6 col-md-3"><strong>Updated:</strong> {{ ticket.updated_at|date:"d M Y, H:i" }}</div>
+        </div>
+        <hr>
+        <p class="mb-0" style="white-space: pre-wrap;">{{ ticket.description }}</p>
+      </div>
+    </div>
+
+    {% if ticket.image %}
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header fw-semibold small">Attached Screenshot</div>
+      <div class="card-body text-center">
+        <img src="{{ ticket.image.url }}" class="img-fluid rounded" style="max-height:400px;" alt="Ticket screenshot">
+      </div>
+    </div>
+    {% endif %}
+
+    {% if ticket.admin_response %}
+    <div class="card border-0 shadow-sm border-start border-success border-3">
+      <div class="card-header fw-semibold text-success">
+        <i class="bi bi-chat-left-text me-2"></i>Admin Response
+      </div>
+      <div class="card-body">
+        <p class="mb-0" style="white-space: pre-wrap;">{{ ticket.admin_response }}</p>
+      </div>
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+      <i class="bi bi-clock me-2"></i>No response yet. Our team will get back to you soon.
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card border-0 shadow-sm">
+      <div class="card-header fw-semibold small">Ticket Info</div>
+      <ul class="list-group list-group-flush small">
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Ticket #</span><strong>{{ ticket.pk }}</strong>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Status</span>
+          <span class="badge {{ ticket.status_badge_class }}">{{ ticket.get_status_display }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Priority</span>
+          <span class="badge {{ ticket.priority_badge_class }}">{{ ticket.get_priority_display }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Type</span><span>{{ ticket.get_ticket_type_display }}</span>
+        </li>
+        <li class="list-group-item d-flex justify-content-between">
+          <span class="text-muted">Role</span><span>{{ ticket.get_role_display }}</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

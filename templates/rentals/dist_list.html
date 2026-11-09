@@ -1,0 +1,27 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Rentals{% endblock %}
+{% block page_title %}🛠️ Rentals in your shops{% endblock %}
+{% block content %}
+{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+<div class="d-flex gap-2 mb-3">
+  <a href="{% url 'rentals:dist_publish' %}" class="btn btn-sm btn-outline-success">List an item into a shop</a>
+  <a href="{% url 'rentals:dist_bookings' %}" class="btn btn-sm btn-outline-primary">My rental bookings</a>
+</div>
+<div class="row g-3">
+  {% for i in items %}
+  <div class="col-6 col-md-4">
+    <a href="{% url 'rentals:dist_item' i.pk %}" class="text-decoration-none text-dark">
+      <div class="card border-0 shadow-sm h-100">
+        {% if i.image %}<img src="{{ i.image.url }}" class="card-img-top" style="height:120px;object-fit:cover" alt="{{ i.name }}">
+        {% else %}<div class="d-flex align-items-center justify-content-center" style="height:120px;background:#f1f3f1;font-size:2rem">🛠️</div>{% endif %}
+        <div class="card-body p-2">
+          <div class="fw-semibold small">{{ i.name }}</div>
+          <div class="text-success fw-bold">₹{{ i.rent_per_day }}<span class="text-muted fw-normal small">/day</span></div>
+          <div class="text-muted" style="font-size:.72rem">{{ i.distributor.company_name }}</div>
+        </div>
+      </div>
+    </a>
+  </div>
+  {% empty %}<div class="col-12"><p class="text-muted text-center py-5">No rental items in your shops yet.</p></div>{% endfor %}
+</div>
+{% endblock %}

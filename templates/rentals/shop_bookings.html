@@ -1,0 +1,34 @@
+{% extends 'distributors/base_dist.html' %}
+{% block title %}Rental bookings{% endblock %}
+{% block page_title %}🛠️ Rental bookings{% endblock %}
+{% block active_nav %}rentals{% endblock %}
+{% block content %}
+{% for m in messages %}<div class="alert alert-{{ m.tags|default:'info' }} py-2 small">{{ m }}</div>{% endfor %}
+<div class="alert alert-light border small mb-3"><i class="bi bi-info-circle me-1"></i>
+Approve to let the renter take it. You’re paid automatically once the rental period ends.</div>
+<div class="card border-0 shadow-sm">
+  <div class="table-wrap"><table class="table table-sm align-middle mb-0">
+    <thead class="table-light"><tr><th>#</th><th>Item</th><th>Renter</th><th>Contact</th><th>Dates</th><th>₹</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for b in bookings %}
+      <tr>
+        <td class="text-muted">#{{ b.pk }}</td>
+        <td class="fw-semibold">{{ b.item.name }}</td>
+        <td>{{ b.renter.get_full_name|default:b.renter.username }}</td>
+        <td>{% if b.status == 'confirmed' %}<a href="tel:{{ b.renter_phone }}">{{ b.renter_phone|default:'—' }}</a>{% else %}<span class="text-muted">on approve</span>{% endif %}</td>
+        <td class="small">{{ b.start_day|date:"d M" }} → {{ b.end_day|date:"d M" }} <span class="text-muted">({{ b.days }}d)</span></td>
+        <td>₹{{ b.amount }}</td>
+        <td><span class="badge {% if b.status == 'completed' %}bg-success{% elif b.status == 'confirmed' %}bg-primary{% elif b.status == 'requested' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ b.get_status_display }}</span></td>
+        <td class="text-end">
+          {% if b.status == 'requested' %}
+          <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="booking_id" value="{{ b.pk }}">
+            <button name="action" value="confirm" class="btn btn-sm btn-success">Approve</button>
+            <button name="action" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+      {% empty %}<tr><td colspan="8" class="text-center text-muted py-4">No bookings yet.</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% endblock %}

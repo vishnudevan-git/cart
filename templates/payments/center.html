@@ -1,0 +1,411 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Payments Center{% endblock %}
+{% block page_title %}Payments Center{% endblock %}
+{% block sidebar %}
+  {% if sidebar_template %}
+    {% include sidebar_template with active_nav='payments' %}
+  {% endif %}
+{% endblock %}
+{% block extra_css %}
+<style>
+  .payments-filter-form .form-control,
+  .payments-filter-form .form-select {
+    min-width: 220px;
+  }
+  @media (max-width: 767.98px) {
+    .payments-top-actions {
+      display: block !important;
+    }
+    .payments-top-actions .btn {
+      width: 100%;
+    }
+    .payments-filter-form > * {
+      width: 100%;
+      min-width: 100% !important;
+      max-width: 100% !important;
+    }
+    .payments-inline-form {
+      flex-direction: column;
+    }
+    .payments-inline-form .btn {
+      width: 100%;
+    }
+    .payments-table td,
+    .payments-table th {
+      white-space: nowrap;
+    }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-end mb-3 payments-top-actions">
+  <a href="#completedSettlements" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-clock-history me-1"></i>Completed settlements
+  </a>
+</div>
+
+<div class="card border-0 shadow-sm p-3 mb-3">
+  <form method="get" id="paymentsFilterForm" class="d-flex flex-wrap gap-2 align-items-center payments-filter-form">
+    <input type="text" name="q" class="form-control form-control-sm" style="min-width:260px; max-width:300px"
+           placeholder="Search order / party / ref / note" value="{{ search }}"
+           onchange="document.getElementById('paymentsFilterForm').submit()">
+    {% if customer_payments %}
+    <select name="payment_status" class="form-select form-select-sm" style="min-width:210px; max-width:230px"
+            onchange="document.getElementById('paymentsFilterForm').submit()">
+      <option value="">All Payment Status</option>
+      {% for value, label in payment_status_choices %}
+      <option value="{{ value }}" {% if payment_status_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% endif %}
+    <select name="settlement_status" class="form-select form-select-sm" style="min-width:220px; max-width:240px"
+            onchange="document.getElementById('paymentsFilterForm').submit()">
+      <option value="">All Settlement Status</option>
+      {% for value, label in settlement_status_choices %}
+      <option value="{{ value }}" {% if settlement_status_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="stage" class="form-select form-select-sm" style="min-width:220px; max-width:240px"
+            onchange="document.getElementById('paymentsFilterForm').submit()">
+      <option value="">All Stages</option>
+      {% for value, label in settlement_stage_choices %}
+      <option value="{{ value }}" {% if stage_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% if search or payment_status_filter or settlement_status_filter or stage_filter %}
+    <a href="{% url 'payments:center' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    {% endif %}
+    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+  </form>
+</div>
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
+    <div class="card border-0 shadow-sm p-3 h-100">
+      <div class="small text-muted">Pending Finance Actions</div>
+      <div class="fs-3 fw-bold text-warning">{{ pending_count }}</div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card border-0 shadow-sm p-3 h-100">
+      <div class="small text-muted mb-2">Settlement Summary</div>
+      <div class="d-flex flex-wrap gap-2">
+        {% for row in settlement_summary %}
+        <span class="badge bg-light text-dark border">{{ row.status|title }}: {{ row.count }}</span>
+        {% empty %}
+        <span class="text-muted small">No settlement records yet.</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if customer_payments %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header fw-semibold">Customer Payment Receipt</div>
+  <div class="table-wrap table-responsive d-none d-md-block">
+    <table class="table table-sm align-middle mb-0 payments-table">
+      <thead class="table-light">
+        <tr><th>Order</th><th>Customer</th><th>Amount</th><th>Status</th><th class="d-none d-lg-table-cell">Reference</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for payment in customer_payments %}
+        <tr>
+          <td>#{{ payment.order_id }}</td>
+          <td>{{ payment.order.customer.get_full_name|default:payment.order.customer.username }}</td>
+          <td>₹{{ payment.amount|floatformat:2 }}</td>
+          <td><span class="badge {% if payment.status == 'paid' %}bg-success{% elif payment.status == 'refunded' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ payment.get_status_display }}</span></td>
+          <td class="d-none d-lg-table-cell">{{ payment.transaction_reference|default:'-' }}</td>
+          <td>
+            <form method="post" class="row g-2 align-items-center">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="update_customer_payment">
+              <input type="hidden" name="payment_id" value="{{ payment.id }}">
+              <div class="col-12 col-xl-3"><select name="status" class="form-select form-select-sm">
+                <option value="pending" {% if payment.status == 'pending' %}selected{% endif %}>Pending</option>
+                <option value="paid" {% if payment.status == 'paid' %}selected{% endif %}>Paid</option>
+                <option value="failed" {% if payment.status == 'failed' %}selected{% endif %}>Failed</option>
+                <option value="refunded" {% if payment.status == 'refunded' %}selected{% endif %}>Refunded</option>
+              </select></div>
+              <div class="col-12 col-xl-3"><input type="text" name="transaction_reference" value="{{ payment.transaction_reference }}" class="form-control form-control-sm" placeholder="Reference"></div>
+              <div class="col-12 col-xl-4"><input type="text" name="received_note" value="{{ payment.received_note }}" class="form-control form-control-sm" placeholder="Note"></div>
+              <div class="col-12 col-xl-2"><button class="btn btn-sm btn-primary w-100">Save</button></div>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-3">No customer payments.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="d-md-none p-2">
+    {% for payment in customer_payments %}
+    <div class="border rounded p-2 mb-2">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="fw-semibold">Order #{{ payment.order_id }}</div>
+        <span class="badge {% if payment.status == 'paid' %}bg-success{% elif payment.status == 'refunded' %}bg-danger{% else %}bg-warning text-dark{% endif %}">{{ payment.get_status_display }}</span>
+      </div>
+      <div class="small text-muted mb-1">{{ payment.order.customer.get_full_name|default:payment.order.customer.username }}</div>
+      <div class="small mb-1">Amount: <strong>₹{{ payment.amount|floatformat:2 }}</strong></div>
+      {% if payment.transaction_reference %}
+      <div class="small text-muted mb-2">Ref: {{ payment.transaction_reference }}</div>
+      {% endif %}
+
+      <form method="post" class="row g-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_customer_payment">
+        <input type="hidden" name="payment_id" value="{{ payment.id }}">
+        <div class="col-12">
+          <select name="status" class="form-select form-select-sm">
+            <option value="pending" {% if payment.status == 'pending' %}selected{% endif %}>Pending</option>
+            <option value="paid" {% if payment.status == 'paid' %}selected{% endif %}>Paid</option>
+            <option value="failed" {% if payment.status == 'failed' %}selected{% endif %}>Failed</option>
+            <option value="refunded" {% if payment.status == 'refunded' %}selected{% endif %}>Refunded</option>
+          </select>
+        </div>
+        <div class="col-12"><input type="text" name="transaction_reference" value="{{ payment.transaction_reference }}" class="form-control form-control-sm" placeholder="Reference"></div>
+        <div class="col-12"><input type="text" name="received_note" value="{{ payment.received_note }}" class="form-control form-control-sm" placeholder="Note"></div>
+        <div class="col-12"><button class="btn btn-sm btn-primary w-100">Save</button></div>
+      </form>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-2">No customer payments.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if outgoing_settlements %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header fw-semibold">Outgoing Settlements</div>
+  <div class="table-wrap table-responsive d-none d-md-block">
+    <table class="table table-sm align-middle mb-0 payments-table">
+      <thead class="table-light">
+        <tr><th>Order</th><th>Receiver</th><th>Due</th><th>Status</th><th class="d-none d-lg-table-cell">Reference</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for settlement in outgoing_settlements %}
+        <tr>
+          <td>#{{ settlement.order_id }}</td>
+          <td>{{ settlement.payee_name }}</td>
+          <td>₹{{ settlement.amount_due|floatformat:2 }}</td>
+          <td>
+            <span class="badge {% if settlement.status == 'confirmed' %}bg-success{% elif settlement.status == 'disputed' %}bg-danger{% elif settlement.status == 'submitted' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">{{ settlement.get_status_display }}</span>
+            {% if settlement.query_note %}<div class="small text-danger mt-1">{{ settlement.query_note }}</div>{% endif %}
+          </td>
+          <td class="d-none d-lg-table-cell">{{ settlement.transfer_reference|default:'-' }}</td>
+          <td>
+            <form method="post" class="row g-2 align-items-center mb-2">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="submit_settlement">
+              <input type="hidden" name="settlement_id" value="{{ settlement.id }}">
+              <div class="col-12 col-xl-2"><input type="number" step="0.01" min="0" max="{{ settlement.amount_due }}" name="amount_paid" value="{{ settlement.amount_paid|default:settlement.amount_due }}" class="form-control form-control-sm"></div>
+              <div class="col-12 col-xl-3"><input type="text" name="transfer_reference" value="{{ settlement.transfer_reference }}" class="form-control form-control-sm" placeholder="Transfer ref"></div>
+              <div class="col-12 col-xl-5"><input type="text" name="transfer_note" value="{{ settlement.transfer_note }}" class="form-control form-control-sm" placeholder="Transaction note"></div>
+              <div class="col-12 col-xl-2"><button class="btn btn-sm btn-primary w-100">Submit</button></div>
+            </form>
+            <form method="post" class="d-flex gap-2 payments-inline-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="raise_query">
+              <input type="hidden" name="settlement_id" value="{{ settlement.id }}">
+              <input type="text" name="query_note" class="form-control form-control-sm" placeholder="Raise query / note">
+              <button class="btn btn-sm btn-outline-danger">Query</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-3">No outgoing settlements.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="d-md-none p-2">
+    {% for settlement in outgoing_settlements %}
+    <div class="border rounded p-2 mb-2">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="fw-semibold">Order #{{ settlement.order_id }}</div>
+        <span class="badge {% if settlement.status == 'confirmed' %}bg-success{% elif settlement.status == 'disputed' %}bg-danger{% elif settlement.status == 'submitted' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">{{ settlement.get_status_display }}</span>
+      </div>
+      <div class="small text-muted mb-1">Receiver: {{ settlement.payee_name }}</div>
+      <div class="small mb-1">Due: <strong>₹{{ settlement.amount_due|floatformat:2 }}</strong></div>
+      {% if settlement.transfer_reference %}
+      <div class="small text-muted mb-1">Ref: {{ settlement.transfer_reference }}</div>
+      {% endif %}
+      {% if settlement.query_note %}
+      <div class="small text-danger mb-2">{{ settlement.query_note }}</div>
+      {% endif %}
+
+      <form method="post" class="row g-2 mb-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="submit_settlement">
+        <input type="hidden" name="settlement_id" value="{{ settlement.id }}">
+        <div class="col-12"><input type="number" step="0.01" min="0" max="{{ settlement.amount_due }}" name="amount_paid" value="{{ settlement.amount_paid|default:settlement.amount_due }}" class="form-control form-control-sm" placeholder="Amount"></div>
+        <div class="col-12"><input type="text" name="transfer_reference" value="{{ settlement.transfer_reference }}" class="form-control form-control-sm" placeholder="Transfer ref"></div>
+        <div class="col-12"><input type="text" name="transfer_note" value="{{ settlement.transfer_note }}" class="form-control form-control-sm" placeholder="Transaction note"></div>
+        <div class="col-12"><button class="btn btn-sm btn-primary w-100">Submit</button></div>
+      </form>
+
+      <form method="post" class="row g-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="raise_query">
+        <input type="hidden" name="settlement_id" value="{{ settlement.id }}">
+        <div class="col-12"><input type="text" name="query_note" class="form-control form-control-sm" placeholder="Raise query / note"></div>
+        <div class="col-12"><button class="btn btn-sm btn-outline-danger w-100">Query</button></div>
+      </form>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-2">No outgoing settlements.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if incoming_settlements %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header fw-semibold">Incoming Settlements</div>
+  <div class="table-wrap table-responsive d-none d-md-block">
+    <table class="table table-sm align-middle mb-0 payments-table">
+      <thead class="table-light">
+        <tr><th>Order</th><th>Sender</th><th>Due</th><th>Paid</th><th>Status</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for settlement in incoming_settlements %}
+        <tr>
+          <td>#{{ settlement.order_id }}</td>
+          <td>{{ settlement.payer_name }}</td>
+          <td>₹{{ settlement.amount_due|floatformat:2 }}</td>
+          <td>₹{{ settlement.amount_paid|floatformat:2 }}</td>
+          <td>
+            <span class="badge {% if settlement.status == 'confirmed' %}bg-success{% elif settlement.status == 'disputed' %}bg-danger{% elif settlement.status == 'submitted' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">{{ settlement.get_status_display }}</span>
+            {% if settlement.query_note %}<div class="small text-danger mt-1">{{ settlement.query_note }}</div>{% endif %}
+          </td>
+          <td>
+            <form method="post" class="d-flex gap-2 mb-2 payments-inline-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="confirm_settlement">
+              <input type="hidden" name="settlement_id" value="{{ settlement.id }}">
+              <button class="btn btn-sm btn-success">Confirm Receipt</button>
+            </form>
+            <form method="post" class="d-flex gap-2 payments-inline-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="raise_query">
+              <input type="hidden" name="settlement_id" value="{{ settlement.id }}">
+              <input type="text" name="query_note" class="form-control form-control-sm" placeholder="Mismatch / pending / query">
+              <button class="btn btn-sm btn-outline-danger">Raise Query</button>
+            </form>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-3">No incoming settlements.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="d-md-none p-2">
+    {% for settlement in incoming_settlements %}
+    <div class="border rounded p-2 mb-2">
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <div class="fw-semibold">Order #{{ settlement.order_id }}</div>
+        <span class="badge {% if settlement.status == 'confirmed' %}bg-success{% elif settlement.status == 'disputed' %}bg-danger{% elif settlement.status == 'submitted' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">{{ settlement.get_status_display }}</span>
+      </div>
+      <div class="small text-muted mb-1">Sender: {{ settlement.payer_name }}</div>
+      <div class="small mb-1">Due: <strong>₹{{ settlement.amount_due|floatformat:2 }}</strong></div>
+      <div class="small mb-1">Paid: <strong>₹{{ settlement.amount_paid|floatformat:2 }}</strong></div>
+      {% if settlement.query_note %}
+      <div class="small text-danger mb-2">{{ settlement.query_note }}</div>
+      {% endif %}
+
+      <form method="post" class="row g-2 mb-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="confirm_settlement">
+        <input type="hidden" name="settlement_id" value="{{ settlement.id }}">
+        <div class="col-12"><button class="btn btn-sm btn-success w-100">Confirm Receipt</button></div>
+      </form>
+
+      <form method="post" class="row g-2">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="raise_query">
+        <input type="hidden" name="settlement_id" value="{{ settlement.id }}">
+        <div class="col-12"><input type="text" name="query_note" class="form-control form-control-sm" placeholder="Mismatch / pending / query"></div>
+        <div class="col-12"><button class="btn btn-sm btn-outline-danger w-100">Raise Query</button></div>
+      </form>
+    </div>
+    {% empty %}
+    <div class="text-center text-muted py-2">No incoming settlements.</div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if global_settlements %}
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header fw-semibold">All Settlements</div>
+  <div class="table-wrap table-responsive">
+    <table class="table table-sm align-middle mb-0 payments-table">
+      <thead class="table-light">
+        <tr><th>Order</th><th>Stage</th><th>Payer</th><th>Receiver</th><th>Due</th><th>Paid</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for settlement in global_settlements %}
+        <tr>
+          <td>#{{ settlement.order_id }}</td>
+          <td>{{ settlement.get_stage_display }}</td>
+          <td>{{ settlement.payer_name }}</td>
+          <td>{{ settlement.payee_name }}</td>
+          <td>₹{{ settlement.amount_due|floatformat:2 }}</td>
+          <td>₹{{ settlement.amount_paid|floatformat:2 }}</td>
+          <td>{{ settlement.get_status_display }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center text-muted py-3">No settlements.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}The old separate "Settlement History" page, merged in here —
+completed (confirmed/cancelled) settlements, read-only.{% endcomment %}
+<div class="card border-0 shadow-sm mt-4" id="completedSettlements">
+  <div class="card-header fw-semibold">
+    <i class="bi bi-clock-history me-1"></i>Completed Settlements
+  </div>
+  <div class="table-wrap">
+    <table class="table table-sm align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>Order</th>
+          <th class="d-none d-lg-table-cell">Stage</th>
+          <th>Sender</th>
+          <th>Receiver</th>
+          <th>Due</th>
+          <th>Paid</th>
+          <th class="d-none d-lg-table-cell">Reference</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for settlement in completed_settlements %}
+        <tr>
+          <td>#{{ settlement.order_id }}</td>
+          <td class="d-none d-lg-table-cell">{{ settlement.get_stage_display }}</td>
+          <td>{{ settlement.payer_name }}</td>
+          <td>{{ settlement.payee_name }}</td>
+          <td>₹{{ settlement.amount_due|floatformat:2 }}</td>
+          <td>₹{{ settlement.amount_paid|floatformat:2 }}</td>
+          <td class="d-none d-lg-table-cell">{{ settlement.transfer_reference|default:'-' }}</td>
+          <td>
+            <span class="badge {% if settlement.status == 'confirmed' %}bg-success{% else %}bg-secondary{% endif %}">
+              {{ settlement.get_status_display }}
+            </span>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="8" class="text-center text-muted py-3">No completed settlements yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

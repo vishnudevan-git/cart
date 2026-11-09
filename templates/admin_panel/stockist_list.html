@@ -1,0 +1,90 @@
+{% extends 'admin_panel/partner_list_base.html' %}
+{% comment %}
+Stockists list. Uses the common partner-list layout. Adds a "Restock Requests"
+button next to Create via the extra_tab_buttons block. Config passed by
+stockist_list view.
+{% endcomment %}
+
+{% block colspan %}6{% endblock %}
+
+{% block extra_tab_buttons %}
+  <a href="{% url 'admin_panel:stockist_restock' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-arrow-repeat me-1"></i>Restock Requests</a>
+{% endblock %}
+
+{% block table_head %}
+  <th data-col="name">Company</th>
+  <th data-col="username">Username</th>
+  <th data-col="area">Area</th>
+  <th data-col="status">Status</th>
+  <th data-col="actions">Actions</th>
+{% endblock %}
+
+{% block rows %}
+  {% for s in stockists %}
+  <tr>
+    <td><input type="checkbox" class="form-check-input row-check" name="stockist_ids" value="{{ s.pk }}"></td>
+    <td class="fw-semibold" data-col="name"><a href="{% url 'admin_panel:user_detail' s.user.pk %}" class="text-decoration-none">{{ s.company_name }}</a></td>
+    <td data-col="username">
+      <div>{{ s.user.get_full_name|default:s.user.username }}</div>
+      <div class="text-muted small">{{ s.user.username }}</div>
+    </td>
+    <td data-col="area">{{ s.area|default:"—" }}</td>
+    <td data-col="status"><span class="badge {% if s.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">{{ s.get_status_display }}</span></td>
+    <td data-col="actions">
+      <div class="d-flex gap-1">
+        {% if status_filter == 'deleted' %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_restore' 'stockist' s.pk %}"
+                  class="btn btn-sm btn-success"
+                  data-confirm="Restore {{ s.company_name }}?" data-confirm-title="Restore Stockist?" data-confirm-type="success" data-confirm-icon="✅">Restore</button>
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_purge' 'stockist' s.pk %}"
+                  class="btn btn-sm btn-outline-danger"
+                  data-confirm="Permanently archive {{ s.company_name }}? This cannot be undone."
+                  data-confirm-title="Delete permanently?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete permanently</button>
+        {% else %}
+          <a href="{% url 'admin_panel:user_detail' s.user.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:stockist_toggle' s.pk %}"
+                class="btn btn-sm {% if s.status == 'active' %}btn-warning{% else %}btn-success{% endif %}"
+                data-confirm="{% if s.status == 'active' %}Suspend {{ s.company_name }}? They won't be able to access their portal.{% else %}Activate {{ s.company_name }}?{% endif %}"
+                data-confirm-title="{% if s.status == 'active' %}Suspend Stockist?{% else %}Activate Stockist?{% endif %}"
+                data-confirm-type="{% if s.status == 'active' %}warning{% else %}success{% endif %}"
+                data-confirm-icon="{% if s.status == 'active' %}⚠️{% else %}✅{% endif %}">{% if s.status == 'active' %}Suspend{% else %}Activate{% endif %}</button>
+          {% if s.status == 'suspended' %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_soft_delete' 'stockist' s.pk %}"
+                  class="btn btn-sm btn-outline-danger"
+                  data-confirm="Delete {{ s.company_name }}? It moves to the Deleted tab and stays recoverable until the grace period ends."
+                  data-confirm-title="Delete Stockist?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete</button>
+          {% endif %}
+        {% endif %}
+      </div>
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="6" class="text-center text-muted py-4">No stockists found.</td></tr>
+  {% endfor %}
+{% endblock %}
+
+{% block empty_row %}{% endblock %}
+
+{% block mobile_cards %}
+  {% for s in stockists %}
+  <div class="card border-0 shadow-sm mb-2 p-3">
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <div>
+        <div class="fw-semibold"><a href="{% url 'admin_panel:user_detail' s.user.pk %}" class="text-decoration-none text-dark">{{ s.company_name }}</a></div>
+        <div class="text-muted small">{{ s.area|default:"—" }} · {{ s.user.get_full_name|default:s.user.username }}</div>
+      </div>
+      <span class="badge {% if s.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">{{ s.get_status_display }}</span>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" formmethod="post" formaction="{% url 'admin_panel:stockist_toggle' s.pk %}"
+            class="btn btn-sm {% if s.status == 'active' %}btn-warning{% else %}btn-success{% endif %} w-100"
+            data-confirm="{% if s.status == 'active' %}Suspend {{ s.company_name }}?{% else %}Activate {{ s.company_name }}?{% endif %}"
+            data-confirm-title="{% if s.status == 'active' %}Suspend?{% else %}Activate?{% endif %}"
+            data-confirm-type="{% if s.status == 'active' %}warning{% else %}success{% endif %}"
+            data-confirm-icon="{% if s.status == 'active' %}⚠️{% else %}✅{% endif %}">{% if s.status == 'active' %}Suspend{% else %}Activate{% endif %}</button>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">No stockists found.</p>
+  {% endfor %}
+{% endblock %}

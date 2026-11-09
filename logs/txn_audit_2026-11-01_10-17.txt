@@ -1,0 +1,25 @@
+TXN AUDIT
+Passed:11 Warnings:0 Errors:3 Fixes:3
+
+ERRORS:
+  [T1.registration] Failed (landed: http://127.0.0.1:8000/accounts/register/)
+  [T2.login] Login failed — stayed on login page
+  [T4.checkout] Order not created
+
+FIXES:
+  [T1.registration] Using fallback customer 9100000030
+  [cleanup] Soft-deleted test product 'TxnTest Pepper 101717'
+  [cleanup] Deleted test customer 9600101717 and their orders
+
+PASSED:
+  [T3.add_to_cart] Added Organic Turmeric Powder to cart
+  [T10.partial_batch1] partially_delivered | item1=pending | collected Rs.98.00
+  [T10.partial_batch2] fully delivered | Rs.330.00/330.00 paid ✓
+  [T11.supplier_add] Product 'TxnTest Pepper 101717' sku=GFSP0001 status=pending variants=2
+  [T12.admin_approve] Product approved ✓ (HTTP 302)
+  [request_log] requests_2026-11-01_09-44-50.log | 15 request lines | roles: set()
+  [request_log] No 5xx errors in request log ✓
+  [activity_log] 20 total events | 2 events for this run
+  [db:payments] All delivered orders have paid COD ✓
+  [db:customers] All ordering customers are linked to a shop ✓
+  [db:order_total] No orders with zero total ✓

@@ -1,0 +1,16 @@
+{% comment %}
+Usage: {% include 'partials/sort_header.html' with field="name" label="Name" current_sort=sort %}
+{% endcomment %}
+{% if current_sort == field %}
+  <a href="?{% for k,v in request.GET.items %}{% if k != 'sort' %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort=-{{ field }}" class="text-decoration-none text-dark">
+    {{ label }} <i class="bi bi-sort-up"></i>
+  </a>
+{% elif current_sort == '-'|add:field %}
+  <a href="?{% for k,v in request.GET.items %}{% if k != 'sort' %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort={{ field }}" class="text-decoration-none text-dark">
+    {{ label }} <i class="bi bi-sort-down"></i>
+  </a>
+{% else %}
+  <a href="?{% for k,v in request.GET.items %}{% if k != 'sort' %}{{ k }}={{ v }}&{% endif %}{% endfor %}sort={{ field }}" class="text-decoration-none text-muted">
+    {{ label }} <i class="bi bi-arrow-down-up opacity-50"></i>
+  </a>
+{% endif %}

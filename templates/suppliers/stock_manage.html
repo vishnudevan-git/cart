@@ -1,0 +1,336 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% block title %}Manage Stock{% endblock %}
+{% block page_title %}Manage Stock{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='stock_manage' %}{% endblock %}
+{% block content %}
+
+<style>
+  .stock-prod-card { border:1px solid #e5e7eb; border-radius:12px; }
+  .stock-prod-head { background:#f8faf9; border-bottom:1px solid #eef0ef; border-radius:12px 12px 0 0; }
+  .pack-line { border-bottom:1px solid #f1f3f2; }
+  .pack-line:last-child { border-bottom:0; }
+  .pool-wrap { background:#f3f8f4; border:1px dashed #bfe0c7; border-radius:10px; }
+  .stock-pill { min-width:42px; display:inline-block; text-align:center; }
+  .bundle-chip { background:#eef4ff; border:1px solid #cfe0ff; }
+</style>
+
+{% comment %}Category filter + live search — a GET form, kept OUTSIDE the
+stock-save POST form (nesting would break both).{% endcomment %}
+<form method="get" class="card border-0 shadow-sm p-3 mb-3">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <input type="search" id="stockSearch" class="form-control form-control-sm"
+           style="max-width:260px" placeholder="🔍 Search product…" autocomplete="off">
+    <select name="category" class="form-select form-select-sm" style="max-width:220px" onchange="this.form.submit()">
+      <option value="">All Categories</option>
+      {% for c in categories %}
+        <option value="{{ c.pk }}" {% if category_filter == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="btn btn-success btn-sm">Apply</button>
+    {% if category_filter %}
+      <a href="{% url 'suppliers:stock_manage' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    {% endif %}
+    <span class="text-muted small ms-auto">
+      <span id="stockCount">{{ products_ctx|length }}</span> product(s)
+    </span>
+  </div>
+</form>
+
+<!-- Quick-filter status bar: isolate items needing a restock in one click -->
+<div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="stockQuickFilter">
+  <span class="small text-muted me-1">Show:</span>
+  <button type="button" class="btn btn-sm btn-success quick-filter active" data-filter="all">
+    All <span class="badge bg-light text-dark ms-1">{{ products_ctx|length }}</span>
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-danger quick-filter" data-filter="out">
+    <i class="bi bi-x-octagon me-1"></i>Out of Stock <span class="badge bg-danger ms-1">{{ out_count }}</span>
+  </button>
+  <button type="button" class="btn btn-sm btn-outline-warning quick-filter" data-filter="low">
+    <i class="bi bi-exclamation-triangle me-1"></i>Low Stock <span class="badge bg-warning text-dark ms-1">{{ low_count }}</span>
+  </button>
+  <span class="text-muted ms-2" style="font-size:11px">
+    Low = &le;10 units (packs) or &le;5 kg/L (loose pools)
+  </span>
+</div>
+
+<div class="d-flex justify-content-between align-items-center mb-2">
+  <div class="small text-muted">
+    <span class="badge bg-info text-dark">Loose</span> = sold by weight (one shared pool).
+    <span class="ms-2"><i class="bi bi-box-seam"></i> Bundles are wholesale-only.</span>
+  </div>
+  <span id="changedBadge" class="badge bg-warning text-dark d-none">0 unsaved</span>
+</div>
+
+<form method="post" id="stockForm">
+  {% csrf_token %}
+
+  {% for p in products_ctx %}
+  <div class="stock-prod-card shadow-sm mb-3 stock-row" data-name="{{ p.product.name|lower }}"
+       data-out="{{ p.has_out|yesno:'1,0' }}" data-low="{{ p.has_low|yesno:'1,0' }}">
+
+    <!-- Product header -->
+    <div class="stock-prod-head px-3 py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="fw-semibold">
+        {{ p.product.name }}
+        {% if p.product.category %}<span class="text-muted small ms-1">· {{ p.product.category.name }}</span>{% endif %}
+        {% if p.product.allow_loose_distribution %}
+          <span class="badge bg-info text-dark ms-1" title="Sold loose — stock is one shared pool">Loose</span>
+        {% endif %}
+        {% if p.has_out %}
+          <span class="badge bg-danger ms-1" title="One or more packs/variants are out of stock"><i class="bi bi-x-octagon me-1"></i>Out of stock</span>
+        {% elif p.has_low %}
+          <span class="badge bg-warning text-dark ms-1" title="One or more packs/variants are running low"><i class="bi bi-exclamation-triangle me-1"></i>Low stock</span>
+        {% endif %}
+      </div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        {% if p.is_pool %}
+          <span class="badge bg-light text-success border">Pool-based stock</span>
+        {% else %}
+          <span class="badge bg-light text-secondary border">Per-pack stock</span>
+        {% endif %}
+        <span class="d-flex align-items-center gap-1" style="font-size:.68rem" title="Units of this product currently held downstream (after it left you)">
+          <span class="text-muted">Downstream:</span>
+          <span class="badge bg-primary-subtle text-primary border" title="At the stockist">S {{ p.ds_stockist }}</span>
+          <span class="badge bg-info-subtle text-info border" title="At the wholesale distributor">D {{ p.ds_distributor }}</span>
+          <span class="badge bg-success-subtle text-success border" title="At shops / marketplaces">Shop {{ p.ds_shop }}</span>
+          <span class="text-muted">= {{ p.ds_total }}</span>
+        </span>
+      </div>
+    </div>
+
+    <div class="p-3">
+      {% if p.is_pool %}
+      {# ── LOOSE product: ONE editable pool PER VARIANT; packs read-only ── #}
+      {% for grp in p.variant_groups %}
+      {% if p.has_variants %}
+      <div class="small fw-semibold mt-2 mb-1">
+        <i class="bi bi-diagram-3 me-1 text-success"></i>{{ grp.name|default:"(unnamed variant)" }}
+      </div>
+      {% endif %}
+      <div class="row g-3 align-items-center {% if p.has_variants %}ms-2 ps-2 border-start mb-2{% endif %}">
+        <div class="col-12 col-md-5">
+          <div class="pool-wrap p-3">
+            <label class="form-label small fw-semibold mb-1">Loose stock pool</label>
+            <div class="input-group input-group-sm">
+              <input type="number" name="pool_vt_{{ grp.vt_id }}" value="{{ grp.pool_display }}"
+                     min="0" step="any" inputmode="decimal"
+                     data-original="{{ grp.pool_display }}" data-pool="1"
+                     data-label="{{ p.product.name }}{% if p.has_variants %} · {{ grp.name }}{% endif %}"
+                     class="form-control stock-input">
+              <span class="input-group-text">{{ p.pool_unit }}</span>
+            </div>
+            <div class="form-text" style="font-size:11px">
+              Edit this one value — each pack size below auto-populates from it.
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-7">
+          <div class="small text-muted mb-1">Auto-populated pack stock</div>
+          {% for v in grp.packs %}
+          <div class="pack-line d-flex justify-content-between align-items-center py-1">
+            <span><span class="badge bg-secondary me-2">{{ v.label }}</span>₹{{ v.selling_price }}</span>
+            <span class="badge stock-pill {% if v.stock > 10 %}bg-success{% elif v.stock > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ v.stock }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+
+      {% else %}
+      {# ── Manual product: each pack editable, grouped by variant ── #}
+      {% for grp in p.variant_groups %}
+      {% if p.has_variants %}
+      <div class="small fw-semibold mt-2 mb-1">
+        <i class="bi bi-diagram-3 me-1 text-success"></i>{{ grp.name|default:"(unnamed variant)" }}
+      </div>
+      {% endif %}
+      <div class="table-responsive {% if p.has_variants %}ms-2 ps-2 border-start{% endif %}">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="small text-muted">
+            <tr>
+              <th style="width:28%">Pack</th>
+              <th style="width:22%">Price</th>
+              <th style="width:22%">Current</th>
+              <th style="width:28%">Update stock</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for v in grp.packs %}
+            <tr>
+              <td><span class="badge bg-secondary">{{ v.label }}</span></td>
+              <td>₹{{ v.selling_price }}</td>
+              <td>
+                <span class="badge stock-pill {% if v.stock > 10 %}bg-success{% elif v.stock > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ v.stock }}</span>
+              </td>
+              <td>
+                <input type="number" name="stock_{{ v.pk }}" value="{{ v.stock }}"
+                       min="0" max="1000000" step="1" inputmode="numeric"
+                       data-original="{{ v.stock }}"
+                       data-label="{{ p.product.name }}{% if p.has_variants %} · {{ grp.name }}{% endif %} ({{ v.label }})"
+                       class="form-control form-control-sm stock-input" style="max-width:140px">
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endfor %}
+      {% endif %}
+
+      {# ── Bundles (wholesale-only) — read-only; price & stock computed ── #}
+      {% if p.bundles %}
+      <div class="mt-3 pt-2 border-top">
+        <div class="small fw-semibold mb-2">
+          <i class="bi bi-box-seam me-1"></i>Bundle options
+          <span class="text-muted">(Marketplace / Distributor only · auto from pack stock)</span>
+        </div>
+        {% for b in p.bundles %}
+        <div class="bundle-chip rounded px-2 py-2 mb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <div class="small">
+            <span class="fw-semibold">{{ b.name }}</span>
+            <span class="text-muted">· {{ b.pack_quantity }} × {{ b.variant.label }} · ₹{{ b.price }}</span>
+          </div>
+          <span class="badge {% if b.available > 0 %}bg-success{% else %}bg-danger{% endif %}">
+            makes {{ b.available }}
+          </span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% empty %}
+  <div class="card border-0 shadow-sm">
+    <p class="text-center text-muted py-4 mb-0">No products found.</p>
+  </div>
+  {% endfor %}
+
+  <p id="stockNoMatch" class="text-muted text-center py-3 d-none">No products match your search.</p>
+
+  {% if products_ctx %}
+  <div class="d-flex justify-content-end sticky-bottom py-2" style="bottom:0">
+    <button type="submit" class="btn btn-success px-4 shadow-sm">Save All Changes</button>
+  </div>
+  {% endif %}
+</form>
+
+<script>
+/* --- Live search + quick-filter (All / Out of Stock / Low Stock) ------- */
+(function () {
+  var box = document.getElementById('stockSearch');
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.stock-row'));
+  var count = document.getElementById('stockCount');
+  var noMatch = document.getElementById('stockNoMatch');
+  var total = rows.length;
+  var activeFilter = 'all';   // 'all' | 'out' | 'low'
+
+  function matchesFilter(r) {
+    if (activeFilter === 'out') return r.getAttribute('data-out') === '1';
+    if (activeFilter === 'low') return r.getAttribute('data-low') === '1';
+    return true;  // 'all'
+  }
+
+  function apply() {
+    var q = box ? box.value.trim().toLowerCase() : '';
+    var shown = 0;
+    rows.forEach(function (r) {
+      var nameHit = !q || (r.getAttribute('data-name') || '').indexOf(q) !== -1;
+      var visible = nameHit && matchesFilter(r);
+      r.classList.toggle('d-none', !visible);
+      if (visible) shown++;
+    });
+    if (count) count.textContent = shown;
+    if (noMatch) noMatch.classList.toggle('d-none', shown !== 0);
+  }
+
+  if (box) box.addEventListener('input', apply);
+
+  /* Quick-filter buttons */
+  var qfBar = document.getElementById('stockQuickFilter');
+  if (qfBar) {
+    qfBar.addEventListener('click', function (e) {
+      var btn = e.target.closest('.quick-filter');
+      if (!btn) return;
+      activeFilter = btn.dataset.filter;
+      // Toggle active styling: the clicked one becomes solid, others outline.
+      qfBar.querySelectorAll('.quick-filter').forEach(function (b) {
+        var f = b.dataset.filter;
+        b.classList.remove('active', 'btn-success', 'btn-danger', 'btn-warning',
+                           'btn-outline-success', 'btn-outline-danger', 'btn-outline-warning');
+        var on = (b === btn);
+        if (f === 'all')  b.classList.add(on ? 'btn-success' : 'btn-outline-success');
+        if (f === 'out')  b.classList.add(on ? 'btn-danger'  : 'btn-outline-danger');
+        if (f === 'low')  b.classList.add(on ? 'btn-warning' : 'btn-outline-warning');
+        if (on) b.classList.add('active');
+      });
+      apply();
+    });
+  }
+
+  apply();
+})();
+
+/* --- Typo guard + change tracking -------------------------------------- */
+(function () {
+  var form = document.getElementById('stockForm');
+  if (!form) return;
+  var inputs = Array.prototype.slice.call(form.querySelectorAll('.stock-input'));
+  var badge = document.getElementById('changedBadge');
+
+  function isChanged(inp) {
+    return String(inp.value).trim() !== String(inp.dataset.original);
+  }
+
+  function refreshBadge() {
+    var names = {};
+    inputs.forEach(function (inp) {
+      if (isChanged(inp)) names[inp.name] = true;
+      var card = inp.closest('.stock-prod-card');
+      if (card) card.classList.toggle('border-warning', cardHasChange(card));
+    });
+    var n = Object.keys(names).length;
+    if (badge) {
+      badge.textContent = n + ' unsaved';
+      badge.classList.toggle('d-none', n === 0);
+    }
+  }
+
+  function cardHasChange(card) {
+    return Array.prototype.slice
+      .call(card.querySelectorAll('.stock-input'))
+      .some(isChanged);
+  }
+
+  inputs.forEach(function (inp) { inp.addEventListener('input', refreshBadge); });
+
+  form.addEventListener('submit', function (e) {
+    var suspicious = [];
+    inputs.forEach(function (inp) {
+      if (!isChanged(inp)) return;
+      var val = parseFloat(inp.value);
+      var orig = parseFloat(inp.dataset.original) || 0;
+      var label = inp.dataset.label || inp.name;
+      var unit = inp.dataset.pool ? ' (pool)' : '';
+      if (isNaN(val) || val < 0) {
+        suspicious.push('• ' + label + unit + ': "' + inp.value + '" is not valid');
+        return;
+      }
+      if (orig > 0 && val >= orig * 10 && (val - orig) >= 500) {
+        suspicious.push('• ' + label + unit + ': ' + orig + ' → ' + val + ' (large jump)');
+      } else if (orig === 0 && val >= 1000) {
+        suspicious.push('• ' + label + unit + ': 0 → ' + val + ' (large value)');
+      }
+    });
+    if (suspicious.length) {
+      var ok = window.confirm(
+        'Please double-check these values before saving:\n\n' +
+        suspicious.join('\n') + '\n\nSave anyway?'
+      );
+      if (!ok) e.preventDefault();
+    }
+  });
+
+  refreshBadge();
+})();
+</script>
+{% endblock %}

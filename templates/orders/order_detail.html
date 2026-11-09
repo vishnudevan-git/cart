@@ -1,0 +1,329 @@
+{% extends 'base.html' %}
+{% block title %}Order #{{ order.id }} — LaKrish Mart{% endblock %}
+
+{% block extra_css %}
+<style>
+/* ── Timeline ── */
+.order-timeline { display: flex; align-items: flex-start; justify-content: space-between; position: relative; padding: 1.5rem 0 0.5rem; overflow-x: auto; }
+.tl-track {
+  position: absolute;
+  top: 2.4rem;
+  left: 5%;
+  right: 5%;
+  height: 4px;
+  background: #dee2e6;
+  z-index: 0;
+}
+.tl-progress {
+  position: absolute;
+  top: 2.4rem;
+  left: 5%;
+  width: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #198754, #20c997);
+  z-index: 1;
+  transition: width .5s ease;
+}
+.tl-step {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  min-width: 70px;
+}
+.tl-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  border: 4px solid #fff;
+  background: #e9ecef;
+  color: #adb5bd;
+  box-shadow: 0 0 0 2px #dee2e6;
+  transition: all .3s;
+}
+.tl-step.done .tl-icon   { background: #198754; color: #fff; box-shadow: 0 0 0 2px #198754; }
+.tl-step.current .tl-icon { background: #fff; color: #198754; box-shadow: 0 0 0 3px #198754; animation: pulse 1.5s infinite; }
+.tl-step.cancelled .tl-icon { background: #dc3545; color: #fff; box-shadow: 0 0 0 2px #dc3545; }
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 3px rgba(25,135,84,.4)} 50%{box-shadow:0 0 0 6px rgba(25,135,84,.1)} }
+.tl-label { font-size: .72rem; text-align: center; color: #6c757d; font-weight: 600; margin-top: 6px; line-height: 1.3; }
+.tl-step.done .tl-label    { color: #198754; }
+.tl-step.current .tl-label { color: #198754; font-weight: 700; }
+.tl-step.cancelled .tl-label { color: #dc3545; }
+.tl-time { font-size: .65rem; color: #adb5bd; text-align: center; margin-top: 2px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-3 mb-5">
+  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap">
+    <a href="{% url 'orders:order_list' %}" class="btn btn-sm btn-outline-secondary">← Orders</a>
+    <h4 class="fw-semibold mb-0">Order #{{ order.id }}</h4>
+    <span class="badge {% if order.status == 'delivered' %}bg-success{% elif order.status == 'cancelled' %}bg-danger{% else %}bg-warning text-dark{% endif %}">
+      {{ order.get_status_display }}
+    </span>
+    {% if order.fulfillment_source == 'distributor_stock' %}
+      <span class="badge bg-info text-dark"><i class="bi bi-boxes me-1"></i>Express Delivery</span>
+    {% endif %}
+    {% if order.status == 'pending' %}
+      <a href="{% url 'orders:order_edit' order.pk %}" class="btn btn-sm btn-warning ms-auto">
+        <i class="bi bi-pencil me-1"></i>Edit Order
+      </a>
+    {% endif %}
+  </div>
+
+  <div class="row g-3">
+    <!-- Timeline + Items -->
+    <div class="col-12 col-md-8">
+
+      <!-- Timeline card -->
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body py-3 px-3">
+          {% if order.status == 'cancelled' %}
+            <div class="text-center text-danger py-3">
+              <i class="bi bi-x-octagon-fill display-4 mb-2 d-block"></i>
+              <h5 class="fw-bold m-0">Order Cancelled</h5>
+            </div>
+          {% else %}
+            {% if order.fulfillment_source == 'distributor_stock' %}
+            <!-- Express flow: placed → at_distributor → out_for_delivery → delivered -->
+            <div class="position-relative">
+              <div class="tl-progress" id="tlProgress"></div>
+              <div class="order-timeline">
+
+                <div class="tl-step done">
+                  <div class="tl-icon"><i class="bi bi-clipboard-check"></i></div>
+                  <div class="tl-label">Order<br>Placed</div>
+                  <div class="tl-time">{{ order.created_at|date:"d M, H:i" }}</div>
+                </div>
+
+                <div class="tl-step {% if order.status == 'at_distributor' or order.status == 'out_for_delivery' or order.status == 'partially_delivered' or order.status == 'delivered' %}done{% elif order.status == 'confirmed' %}current{% endif %}">
+                  <div class="tl-icon"><i class="bi bi-boxes"></i></div>
+                  <div class="tl-label">Ready at<br>Local Store</div>
+                  <div class="tl-time">{% if order.distributor %}({{ order.distributor.company_name }}){% else %}Express{% endif %}</div>
+                </div>
+
+                <div class="tl-step {% if order.status == 'out_for_delivery' or order.status == 'partially_delivered' or order.status == 'delivered' %}done{% elif order.status == 'at_distributor' %}current{% endif %}">
+                  <div class="tl-icon"><i class="bi bi-truck"></i></div>
+                  <div class="tl-label">Out for<br>Delivery</div>
+                  <div class="tl-time">&nbsp;</div>
+                </div>
+
+                <div class="tl-step {% if order.status == 'delivered' %}done{% elif order.status == 'out_for_delivery' or order.status == 'partially_delivered' %}current{% endif %}">
+                  <div class="tl-icon"><i class="bi bi-house-check"></i></div>
+                  <div class="tl-label">Delivered</div>
+                  <div class="tl-time">&nbsp;</div>
+                </div>
+
+              </div>
+            </div>
+            {% else %}
+            <!-- Normal flow: placed → confirmed → picked → at_dist → out → delivered -->
+            <div class="position-relative">
+              <div class="tl-progress" id="tlProgress"></div>
+              <div class="order-timeline">
+
+                <div class="tl-step done">
+                  <div class="tl-icon"><i class="bi bi-clipboard-check"></i></div>
+                  <div class="tl-label">Order<br>Placed</div>
+                  <div class="tl-time">{{ order.created_at|date:"d M, H:i" }}</div>
+                </div>
+
+                <div class="tl-step {% if order.status == 'confirmed' or order.status == 'stockist_picked' or order.status == 'at_distributor' or order.status == 'out_for_delivery' or order.status == 'partially_delivered' or order.status == 'delivered' %}done{% elif order.status == 'pending' %}current{% endif %}">
+                  <div class="tl-icon"><i class="bi bi-gear"></i></div>
+                  <div class="tl-label">Confirmed</div>
+                  <div class="tl-time">&nbsp;</div>
+                </div>
+
+                <div class="tl-step {% if order.status == 'stockist_picked' or order.status == 'at_distributor' or order.status == 'out_for_delivery' or order.status == 'partially_delivered' or order.status == 'delivered' %}done{% elif order.status == 'confirmed' %}current{% endif %}">
+                  <div class="tl-icon"><i class="bi bi-shop"></i></div>
+                  <div class="tl-label">Picked from<br>Supplier</div>
+                  <div class="tl-time">&nbsp;</div>
+                </div>
+
+                <div class="tl-step {% if order.status == 'at_distributor' or order.status == 'out_for_delivery' or order.status == 'partially_delivered' or order.status == 'delivered' %}done{% elif order.status == 'stockist_picked' %}current{% endif %}">
+                  <div class="tl-icon"><i class="bi bi-box-seam"></i></div>
+                  <div class="tl-label">At<br>Local Store</div>
+                  <div class="tl-time">{% if order.distributor %}({{ order.distributor.company_name }}){% else %}&nbsp;{% endif %}</div>
+                </div>
+
+                <div class="tl-step {% if order.status == 'out_for_delivery' or order.status == 'partially_delivered' or order.status == 'delivered' %}done{% elif order.status == 'at_distributor' %}current{% endif %}">
+                  <div class="tl-icon"><i class="bi bi-truck"></i></div>
+                  <div class="tl-label">Out for<br>Delivery</div>
+                  <div class="tl-time">&nbsp;</div>
+                </div>
+
+                <div class="tl-step {% if order.status == 'delivered' %}done{% elif order.status == 'out_for_delivery' or order.status == 'partially_delivered' %}current{% endif %}">
+                  <div class="tl-icon"><i class="bi bi-house-check"></i></div>
+                  <div class="tl-label">Delivered</div>
+                  <div class="tl-time">&nbsp;</div>
+                </div>
+
+              </div>
+            </div>
+            {% endif %}
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Items -->
+      <div class="card border-0 shadow-sm">
+        <div class="card-header fw-semibold">Items Ordered</div>
+        <div class="table-wrap d-none d-sm-block">
+          <table class="table align-middle mb-0">
+            <thead class="table-light"><tr><th>Product</th><th>Size</th><th>Qty</th><th>Price</th><th>Subtotal</th><th>Status</th></tr></thead>
+            <tbody>
+              {% for item in order.items.all %}
+              <tr class="{% if item.fulfillment_status == 'delivered' %}table-success{% elif item.fulfillment_status == 'backordered' %}table-warning{% endif %}">
+                <td>{{ item.product.name|default:"(deleted)" }}</td>
+                <td class="text-muted small">{{ item.variant_label }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>₹{{ item.price }}</td>
+                <td class="fw-semibold">₹{{ item.subtotal }}</td>
+                <td>
+                  {% if item.fulfillment_status == 'delivered' %}
+                    <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Delivered</span>
+                  {% elif item.fulfillment_status == 'shipped' %}
+                    <span class="badge bg-info text-dark"><i class="bi bi-truck me-1"></i>On the way</span>
+                  {% elif item.fulfillment_status == 'backordered' %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Coming soon</span>
+                  {% elif show_supplier_stage and item.supplier_shipment %}
+                    {% include 'partials/supplier_stage.html' with ship=item.supplier_shipment audience='customer' %}
+                  {% else %}
+                    <span class="badge bg-secondary"><i class="bi bi-hourglass me-1"></i>Preparing</span>
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="d-sm-none p-2">
+          {% for item in order.items.all %}
+          <div class="d-flex justify-content-between align-items-center py-2 border-bottom small">
+            <div>
+              <div class="fw-semibold">{{ item.product.name|default:"(deleted)" }}</div>
+              <div class="text-muted">{{ item.variant_label }} · ₹{{ item.price }} × {{ item.quantity }}</div>
+              <div class="mt-1">
+                {% if item.fulfillment_status == 'delivered' %}
+                  <span class="badge bg-success"><i class="bi bi-check2 me-1"></i>Delivered</span>
+                {% elif item.fulfillment_status == 'shipped' %}
+                  <span class="badge bg-info text-dark"><i class="bi bi-truck me-1"></i>On the way</span>
+                {% elif item.fulfillment_status == 'backordered' %}
+                  <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Coming soon</span>
+                {% elif show_supplier_stage and item.supplier_shipment %}
+                  {% include 'partials/supplier_stage.html' with ship=item.supplier_shipment audience='customer' %}
+                {% else %}
+                  <span class="badge bg-secondary"><i class="bi bi-hourglass me-1"></i>Preparing</span>
+                {% endif %}
+              </div>
+            </div>
+            <span class="fw-bold">₹{{ item.subtotal }}</span>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="card-footer">
+          <div class="d-flex justify-content-end gap-4 small">
+            <span class="text-muted">Subtotal: ₹{{ order.subtotal }}</span>
+            <span class="text-muted">Delivery: ₹{{ order.delivery_charge }}</span>
+            <span class="fw-bold">Total: ₹{{ order.total_amount }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="col-12 col-md-4">
+      <div class="card border-0 shadow-sm p-3 mb-3">
+        <h6 class="fw-semibold mb-3">Order Info</h6>
+        <div class="small">
+          <div class="mb-2"><span class="text-muted">Order #:</span> {{ order.id }}</div>
+          <div class="mb-2"><span class="text-muted">Date:</span> {{ order.created_at|date:"d M Y, H:i" }}</div>
+          <div class="mb-2"><span class="text-muted">Phone:</span> {{ order.phone }}</div>
+          <div class="mb-3"><span class="text-muted">Address:</span><br>{{ order.address }}</div>
+          {% if order.payment %}
+          <div class="mb-2">
+            <span class="text-muted">Payment:</span>
+            {{ order.payment.get_payment_method_display }}
+            <span class="badge {% if order.payment.status == 'paid' %}bg-success{% else %}bg-secondary{% endif %} ms-1">
+              {{ order.payment.get_status_display }}
+            </span>
+            {% if order.payment.amount_collected and order.payment.amount_collected > 0 and order.payment.status != 'paid' %}
+            <div class="small mt-1 text-muted">
+              ₹{{ order.payment.amount_collected }} collected · ₹{{ order.payment.amount_outstanding }} pending
+            </div>
+            {% endif %}
+          </div>
+          {% endif %}
+          {% if order.distributor %}
+          <div class="mb-2"><span class="text-muted">Store:</span> {{ order.distributor.company_name }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if order.status != 'delivered' and order.status != 'cancelled' %}
+      <div class="card border-0 shadow-sm p-3 bg-light">
+        <div class="small text-muted">
+          <i class="bi bi-info-circle me-1"></i>
+          {% if order.fulfillment_source == 'distributor_stock' %}
+            Your order is ready at your local store — faster delivery!
+          {% else %}
+            Your order will be arranged from the supplier and delivered through your local store.
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+{% block extra_js %}
+<script>
+// Align the timeline connector + green progress to the icon centres so the
+// green line stops exactly at the last completed step (never overflows).
+document.addEventListener('DOMContentLoaded', function() {
+  const bar = document.getElementById('tlProgress');
+  if (!bar) return;
+  const wrap  = bar.parentElement;            // .position-relative
+  const icons = wrap.querySelectorAll('.tl-icon');
+  const steps = wrap.querySelectorAll('.tl-step');
+  if (icons.length < 2) return;
+
+  function layout() {
+    const wrapLeft = wrap.getBoundingClientRect().left;
+    const cx = el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2 - wrapLeft; };
+
+    const firstC = cx(icons[0]);
+    const lastC  = cx(icons[icons.length - 1]);
+
+    // Grey track spans first icon centre → last icon centre.
+    let track = wrap.querySelector('.tl-track');
+    if (!track) {
+      track = document.createElement('div');
+      track.className = 'tl-track';
+      wrap.insertBefore(track, bar);
+    }
+    track.style.left  = firstC + 'px';
+    track.style.right = 'auto';
+    track.style.width = (lastC - firstC) + 'px';
+
+    // Green progress runs to the centre of the last completed step.
+    let lastDone = 0;
+    steps.forEach((s, i) => { if (s.classList.contains('done')) lastDone = i; });
+    const doneC = cx(icons[lastDone]);
+    bar.style.left  = firstC + 'px';
+    bar.style.width = Math.max(0, doneC - firstC) + 'px';
+  }
+
+  layout();
+  window.addEventListener('resize', layout);
+});
+</script>
+{% endblock %}
+{% endblock %}
+

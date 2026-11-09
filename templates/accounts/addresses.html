@@ -1,0 +1,181 @@
+{% extends 'base.html' %}
+{% block title %}Delivery Addresses{% endblock %}
+{% block content %}
+<div class="container mt-4 mb-5">
+  <div class="row">
+    <!-- Sidebar -->
+    <div class="col-md-3 mb-4">
+      {% include 'accounts/partials/account_sidebar.html' with active='addresses' %}
+    </div>
+    
+    <!-- Content -->
+    <div class="col-md-9">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h4 class="mb-0 fw-bold">Addresses</h4>
+        {% if next_url %}
+          <a href="{{ next_url }}" class="btn btn-outline-success btn-sm">
+            <i class="bi bi-arrow-left me-1"></i>Back to Previous Page
+          </a>
+        {% endif %}
+      </div>
+      
+      <div class="row g-3">
+        <!-- Add New Address Card -->
+        <div class="col-md-6 mb-3">
+          <div class="card h-100 border-danger border-2 shadow-sm text-center" style="border-style: dashed !important; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#addressModal">
+            <div class="card-body d-flex flex-column justify-content-center align-items-center text-danger py-5">
+              <i class="bi bi-geo-alt fs-1 mb-2"></i>
+              <span class="fw-bold">+ Add New Address</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Saved Addresses -->
+        {% for addr in addresses %}
+        <div class="col-md-6 mb-3">
+          <div class="card h-100 shadow-sm {% if addr.label == 'Home' %}bg-dark text-white border-0{% else %}border-0{% endif %}" {% if addr.label != 'Home' %}style="background-color: #f8f9fa;"{% endif %}>
+            <div class="card-body position-relative pb-5">
+              <h6 class="fw-bold pb-1 {% if addr.label == 'Home' %}text-white{% else %}text-dark{% endif %}" style="display:inline-block; border-bottom: 2px solid {% if addr.label == 'Home' %}#f26422{% else %}#f26422{% endif %} !important;">{{ addr.label }}</h6>
+              {% if addr.is_default %}
+              <i class="bi bi-check2 position-absolute top-0 end-0 m-3 fs-5 {% if addr.label == 'Home' %}text-white{% endif %}"></i>
+              {% endif %}
+              
+              <div class="mt-2 {% if addr.label != 'Home' %}text-muted{% else %}text-white{% endif %}">
+                <div class="fw-bold fs-6 mb-1">{{ addr.name }}</div>
+                <div class="small">{{ addr.door_number }}, {{ addr.street_details }}</div>
+                <div class="small">{{ addr.locality }}</div>
+                <div class="small">{{ addr.city }}, {{ addr.pincode }}</div>
+                <div class="small mt-1">Ph: {{ addr.phone }}</div>
+                {% if addr.google_map_link %}
+                  <div class="mt-2"><a href="{{ addr.google_map_link }}" target="_blank" class="{% if addr.label == 'Home' %}text-info{% else %}text-primary{% endif %} text-decoration-none small"><i class="bi bi-map me-1"></i>View on Map</a></div>
+                {% endif %}
+              </div>
+              
+              <!-- Action Buttons -->
+              <div class="position-absolute bottom-0 end-0 m-3">
+                <form action="{% url 'accounts:delete_address' addr.pk %}" method="post" class="d-inline">
+                  {% csrf_token %}
+                  {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+                  <button type="submit" class="btn btn-sm {% if addr.label == 'Home' %}btn-outline-light{% else %}btn-outline-secondary{% endif %}"><i class="bi bi-trash"></i></button>
+                </form>
+              </div>
+              {% if addr.is_default and addr.label != 'Home' %}
+              <span class="badge bg-secondary position-absolute bottom-0 start-0 m-3">DEFAULT</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal for New Address -->
+<div class="modal fade" id="addressModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <form method="post" action="{% if next_url %}{% url 'accounts:addresses' %}?next={{ next_url|urlencode }}{% else %}{% url 'accounts:addresses' %}{% endif %}">
+        {% csrf_token %}
+        {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+        <div class="modal-header border-bottom-0 pb-0">
+          <h5 class="modal-title fw-bold fs-4">Add New Address</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body pt-3">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small text-muted">LABEL *</label>
+              <select name="label" class="form-select" required>
+                <option value="Home">Home</option>
+                <option value="Work">Work</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div class="col-md-6"></div>
+
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small text-muted">CONTACT NAME *</label>
+              <input type="text" name="name" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-semibold small text-muted">PHONE NUMBER *</label>
+              <input type="tel" name="phone" class="form-control" placeholder="10-digit mobile number" required inputmode="numeric">
+            </div>
+
+            <div class="col-md-3">
+              <label class="form-label fw-semibold small text-muted">DOOR / FLAT NO. *</label>
+              <input type="text" name="door_number" class="form-control" required placeholder="e.g. No:161/2">
+            </div>
+            <div class="col-md-9">
+              <label class="form-label fw-semibold small text-muted">STREET / APARTMENT NAME *</label>
+              <input type="text" name="street_details" class="form-control" required placeholder="e.g. Desingu Nagar">
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label fw-semibold small text-muted">LOCALITY / LANDMARK *</label>
+              <input type="text" name="locality" class="form-control" required placeholder="e.g. Mookandapalli, Near Kovil">
+            </div>
+
+            <!-- PINCODE first — auto-fills below fields -->
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">PINCODE *</label>
+              <div class="input-group">
+                <input type="text" name="pincode" id="addrPincode" class="form-control" required
+                       placeholder="6-digit pincode" inputmode="numeric" maxlength="6">
+                <span class="input-group-text" id="addrSpinner" style="display:none">
+                  <span class="spinner-border spinner-border-sm text-success"></span>
+                </span>
+              </div>
+              <div id="addrPincodeInfo" class="mt-1"></div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">VILLAGE / POST OFFICE</label>
+              <input type="text" name="post_office" id="addrPostOffice" class="form-control" placeholder="Auto-filled">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">TALUK</label>
+              <input type="text" name="taluk" id="addrTaluk" class="form-control" placeholder="Auto-filled">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">DISTRICT</label>
+              <input type="text" name="district" id="addrDistrict" class="form-control" placeholder="Auto-filled">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">CITY *</label>
+              <input type="text" name="city" id="addrCity" class="form-control" required placeholder="e.g. Hosur">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold small text-muted">STATE</label>
+              <input type="text" name="state" id="addrState" class="form-control" placeholder="Auto-filled">
+            </div>
+
+            <div class="col-md-12">
+              <label class="form-label fw-semibold text-danger small"><i class="bi bi-geo-alt-fill me-1"></i>GOOGLE MAP LOCATION (OPTIONAL)</label>
+              <input type="url" name="google_map_link" class="form-control" placeholder="Paste Google Maps link here...">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer border-top-0 pt-0 mt-3">
+          <button type="submit" class="btn btn-danger w-100 py-2 fw-bold">SAVE ADDRESS</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/js/pincode_lookup.js?v=3"></script>
+<script>
+initPincodeLookup('addrPincode', {
+  postOffice: 'addrPostOffice',
+  taluk:      'addrTaluk',
+  district:   'addrDistrict',
+  city:       'addrCity',
+  state:      'addrState',
+  infoDiv:    'addrPincodeInfo',
+  spinner:    'addrSpinner',
+});
+</script>
+{% endblock %}

@@ -1,0 +1,2185 @@
+{% extends 'suppliers/base_supplier.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block page_title %}{{ title }}{% endblock %}
+{% block sidebar %}{% include 'suppliers/partials/sidebar.html' with active_nav='product_add' %}{% endblock %}
+{% block content %}
+<form method="post" enctype="multipart/form-data" id="productForm">
+  {% csrf_token %}
+  {{ formset.management_form }}
+
+  {% comment %}── COMMON SETTINGS — one frame shared by all variants ──────────
+  Product info, the toggles, and shipment routing. Collapsed on every load so
+  the per-variant pack area gets the room. The per-variant Pack Sizes section
+  sits in its own frame below.{% endcomment %}
+  <div class="card border-0 shadow-sm p-3 mb-3">
+    <h6 class="fw-semibold mb-0 d-flex justify-content-between align-items-center"
+        role="button" id="commonHeader"
+        data-bs-toggle="collapse" data-bs-target="#commonBody"
+        aria-expanded="false" aria-controls="commonBody"
+        style="cursor:pointer; user-select:none">
+      <span><i class="bi bi-gear me-1"></i>Common settings
+        <small class="text-muted fw-normal">(name, options &amp; shipping — shared by all variants)</small>
+      </span>
+      <span class="d-flex align-items-center gap-2">
+        <small class="text-muted fw-normal d-none" id="commonSummary"></small>
+        <i class="bi bi-chevron-down" id="commonChevron"></i>
+      </span>
+    </h6>
+    <div class="collapse mt-3" id="commonBody">
+
+  {% comment %}Balanced 2-column grid. On lg+ both halves are 50/50; they stack
+  on small screens. Left = Product Info + Shipment Routing; Right = Image +
+  Options.{% endcomment %}
+  <div class="row g-3">
+
+    <!-- LEFT COLUMN: Product Info (top) + Shipment Routing (bottom) -->
+    <div class="col-12 col-lg-6">
+      <div class="d-flex flex-column gap-3 h-100">
+
+        {# ── Card 1: Product Info ────────────────────────────────────── #}
+        <div class="card border shadow-sm p-3">
+          <h6 class="fw-semibold mb-3"><i class="bi bi-box-seam me-1"></i>Product Info</h6>
+          <div id="productInfoBody">
+            <div class="mb-2">
+              <label class="form-label small fw-semibold mb-1">Product Name *</label>
+              {{ form.name }}
+              {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
+            </div>
+            <div class="row g-2 mb-2">
+              <div class="col-7">
+                <label class="form-label small fw-semibold mb-1">Category *</label>
+                {{ form.category }}
+              </div>
+              <div class="col-5">
+                <label class="form-label small fw-semibold mb-1" data-bs-toggle="tooltip"
+                       title="Measurement unit for this product — shared by every variant.">
+                  Unit <i class="bi bi-info-circle text-muted"></i>
+                </label>
+                {{ form.stock_unit }}
+              </div>
+            </div>
+            <div class="mb-0">
+              <label class="form-label small fw-semibold mb-1">Description</label>
+              {{ form.description }}
+            </div>
+          </div><!-- /#productInfoBody -->
+        </div>
+
+        {# ── Card 2: Shipment routing — side-by-side dropdowns ────────── #}
+        <div class="card border shadow-sm p-3">
+          <h6 class="fw-semibold small mb-2" data-bs-toggle="tooltip"
+              title="Admin can override this at approval time.">
+            <i class="bi bi-truck me-1"></i>Shipment routing <i class="bi bi-info-circle text-muted"></i>
+          </h6>
+          <div class="row g-2 align-items-end">
+            <div class="col-12 col-sm-6">
+              <label class="form-label small fw-semibold mb-1" for="deliveryTarget" data-bs-toggle="tooltip"
+                     title="Levels before your target are skipped — they won't see or be told about the order.">
+                You ship this to <i class="bi bi-info-circle text-muted"></i>
+              </label>
+              <select name="delivery_target" id="deliveryTarget" class="form-select form-select-sm">
+                {% for val, lbl in delivery_target_choices %}
+                <option value="{{ val }}" {% if product.delivery_target == val %}selected{% endif %}>{{ lbl }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-12 col-sm-6">
+              <label class="form-label small fw-semibold mb-1" for="shipmentMode" data-bs-toggle="tooltip"
+                     title="Collect = they pick up after you confirm. Send = you dispatch & record transhipment.">
+                Handover <i class="bi bi-info-circle text-muted"></i>
+              </label>
+              <select name="shipment_mode" id="shipmentMode" class="form-select form-select-sm">
+                {% for val, lbl in shipment_mode_choices %}
+                <option value="{{ val }}" {% if product.shipment_mode == val %}selected{% endif %}>{{ lbl }}</option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>{# /left column #}
+
+    <!-- RIGHT COLUMN: Product Image (top) + Options (bottom) -->
+    <div class="col-12 col-lg-6">
+      <div class="d-flex flex-column gap-3 h-100">
+
+        {# ── Card 1: Product Image — upload + clipboard paste ────────── #}
+        <div class="card border shadow-sm p-3">
+          <h6 class="fw-semibold small mb-2"><i class="bi bi-image me-1"></i>Product Image</h6>
+          {{ form.image }}
+          <input type="hidden" name="image_url" id="imageUrlField">
+          <!-- Clipboard paste zone -->
+          <div id="pasteZone" tabindex="0"
+               style="margin-top:8px; border:2px dashed #ccc; border-radius:8px; padding:10px; cursor:pointer; text-align:center; color:#888; font-size:12px; outline:none; transition:border-color 0.2s, background 0.2s;"
+               title="Click here and press Ctrl+V to paste an image">
+            <i class="bi bi-clipboard-image me-1"></i>Click &amp; press <kbd>Ctrl+V</kbd> to paste
+          </div>
+          <div id="pastePreview" style="display:none; margin-top:8px; position:relative;">
+            <img id="pastePreviewImg" src="" alt="Pasted image preview"
+                 style="max-width:100%; max-height:140px; border-radius:8px; border:1px solid #ddd; object-fit:contain;">
+            <button type="button" id="clearPasteBtn"
+                    style="position:absolute;top:4px;right:4px;background:#f44336;color:white;border:none;border-radius:50%;width:22px;height:22px;font-size:12px;cursor:pointer;line-height:1;">✕</button>
+          </div>
+          <input type="file" name="pasted_image" id="pastedImageInput" style="display:none" accept="image/*">
+        </div>
+
+        {# ── Card 2: Options — 2-column inline toggle grid ───────────── #}
+        <div class="card border shadow-sm p-3">
+          <h6 class="fw-semibold small mb-2">
+            <i class="bi bi-sliders me-1"></i>Options
+            <span class="text-muted fw-normal" style="font-size:11px">— hover <i class="bi bi-info-circle"></i> for details</span>
+          </h6>
+          <div class="row g-1">
+            <div class="col-6">
+              <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
+                   title="Set each pack's price by hand instead of auto-calculating from the per-kg price.">
+                <input class="form-check-input" type="checkbox" id="manualPriceToggle">
+                <label class="form-check-label small text-nowrap" for="manualPriceToggle">Manual price <i class="bi bi-info-circle text-muted"></i></label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
+                   title="Show MRP as a strikethrough to customers. MRP is the hard price ceiling the shop cannot exceed.">
+                <input class="form-check-input" type="checkbox" id="mrpToggle" {% if product.show_mrp %}checked{% endif %}>
+                <label class="form-check-label small text-nowrap" for="mrpToggle">Show MRP <i class="bi bi-info-circle text-muted"></i></label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
+                   title="Guidance that cautions the shop to set a reasonable price. Not a hard cap — can be used together with MRP.">
+                <input class="form-check-input" type="checkbox" id="suggestToggle" {% if product.show_suggested_price %}checked{% endif %}>
+                <label class="form-check-label small text-nowrap" for="suggestToggle">Suggested price <i class="bi bi-info-circle text-muted"></i></label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
+                   title="Marketplaces can buy &amp; sell this product by weight (loose/bulk) without fixed packing.">
+                <input class="form-check-input" type="checkbox" name="allow_loose_distribution"
+                       id="looseToggle" value="1" {% if product.allow_loose_distribution %}checked{% endif %}>
+                <label class="form-check-label small text-nowrap" for="looseToggle">Allow Loose <i class="bi bi-info-circle text-muted"></i></label>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
+                   title="Adds a bundle box/bag column per pack (e.g. box of 12). Orderable by wholesale buyers only — hidden from customers.">
+                <input class="form-check-input" type="checkbox" name="allow_bundle"
+                       id="bundleToggle" value="1" {% if product.allow_bundle %}checked{% endif %}>
+                <label class="form-check-label small text-nowrap" for="bundleToggle">Allow Bundle <i class="bi bi-info-circle text-muted"></i></label>
+              </div>
+            </div>
+          </div>
+          <!-- Hidden fields to submit pricing mode and MRP toggle -->
+          <input type="hidden" name="pricing_mode_field" id="pricingModeField" value="auto">
+          <input type="hidden" name="show_mrp_field" id="showMrpField" value="{{ product.show_mrp|yesno:'true,false' }}">
+          <input type="hidden" name="show_suggested_field" id="showSuggestField" value="{{ product.show_suggested_price|yesno:'true,false' }}">
+        </div>
+
+      </div>
+    </div>{# /right column #}
+  </div>{# /row #}
+
+    </div><!-- /#commonBody -->
+  </div><!-- /Common settings card -->
+
+  {% comment %}── PER-VARIANT: Pack Sizes & Stock (its own frame, collapsible)
+  Starts expanded; the collapse control is wired only AFTER the variant UI has
+  finished initializing, so it never folds mid-render.{% endcomment %}
+  <div class="card border-0 shadow-sm p-3 mb-3">
+    <h6 class="fw-semibold mb-0 d-flex justify-content-between align-items-center"
+        role="button" id="packSizesHeader"
+        data-bs-toggle="collapse" data-bs-target="#packSizesBody"
+        aria-expanded="true" aria-controls="packSizesBody"
+        style="cursor:pointer; user-select:none">
+      <span>🎁 Pack Sizes &amp; Stock <small class="text-muted fw-normal">(per variant)</small></span>
+      <span class="d-flex align-items-center gap-2">
+        <small class="text-muted fw-normal d-none" id="packSizesSummary"></small>
+        <i class="bi bi-chevron-up" id="packSizesChevron"></i>
+      </span>
+    </h6>
+
+    <div class="collapse show mt-3" id="packSizesBody">
+
+      <input type="hidden" name="variants_json" id="variantsJson">
+
+      {% comment %}Two columns: Variants (left, wider) | Total Stock + Selling
+      Price stacked vertically (right). Stacking Stock over Price keeps each box
+      short, and the Variants frame stretches (h-100) to match the stacked
+      column so the whole row stays compact.{% endcomment %}
+      <div class="row g-3 mb-3 align-items-stretch">
+
+        <!-- COL 1: Variants switcher -->
+        <div class="col-12 col-lg-7">
+          <div class="h-100 p-3 rounded" style="background:#f3f8f4; border:1px dashed #bfe0c7">
+            <div class="d-flex flex-wrap align-items-center gap-2" id="variantBar">
+              <span class="small fw-semibold me-1"><i class="bi bi-diagram-3 me-1"></i>Variants:</span>
+              <div class="d-flex flex-wrap gap-1" id="variantTabs"></div>
+              <button type="button" class="btn btn-outline-success btn-sm" id="addVariantBtn"
+                      title="Add a variant (max 5). Its packs start as a copy of the current variant.">
+                <i class="bi bi-plus-lg"></i> Add variant
+              </button>
+            </div>
+            <div class="form-text mt-2 mb-2" style="font-size:11px">
+              Each variant has its own packs, prices &amp; stock. Leave a single variant
+              unnamed — customers then see no variant picker.
+            </div>
+
+            <!-- Pack size selector (moved inside the Variants frame to use the space) -->
+            <div class="pt-2 border-top">
+              <div class="d-flex flex-wrap gap-2" id="packBtns"></div>
+              <div class="form-text mt-1" style="font-size:11px">Click a size to select it and reveal smaller/larger options. <span class="text-muted">Shift+click to toggle without expanding.</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- COL 2: Total Stock stacked over Selling Price -->
+        <div class="col-12 col-lg-5">
+          <div class="d-flex flex-column gap-3 h-100">
+            <!-- Total Stock (this variant) -->
+            <div class="border rounded p-3" style="background:#fafcff">
+              <div class="fw-semibold small mb-2">📦 Total Stock
+                <span class="text-muted fw-normal" id="stockModeHint" style="font-size:11px"></span>
+              </div>
+              <div class="input-group input-group-sm" id="stockInputGroup">
+                {{ form.stock_amount }}
+              </div>
+            </div>
+            <!-- Selling Price (this variant) -->
+            <div class="border rounded p-3" style="background:#fafcff">
+              <div class="fw-semibold small mb-2">💰 Selling Price
+                <span class="text-muted fw-normal" id="priceLabel" style="font-size:11px">per kg / per litre / per 100 pcs</span>
+              </div>
+              <div class="input-group input-group-sm mb-1" id="priceInputGroup">
+                {{ form.price_per_kg }}
+              </div>
+              <div class="form-text mb-0" style="font-size:11px">e.g. if 1kg costs ₹200, enter 200</div>
+              <button type="button" class="btn btn-success w-100 d-none" id="generateBtn"></button>
+            </div>
+          </div>
+        </div>
+      </div>{# /row — Variants | (Stock over Price) #}
+
+        <!-- Generated variants preview -->
+        <div id="variantPreview" class="mb-1"></div>
+        <div id="suggestNote" class="form-text mb-3" aria-live="polite"></div>
+
+        <!-- Hidden formset fields -->
+        <div id="variantForms" style="display:none">
+          {% for vform in formset %}
+          <div class="variant-row" data-index="{{ forloop.counter0 }}">
+            {% for field in vform %}{{ field }}{% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+
+        <div class="form-text mt-2" id="bundleHint" style="font-size:11px; display:none">
+          <i class="bi bi-box-seam me-1"></i><strong>Bundle</strong> column is on: enter how many packs
+          go in one box/bag for each size (e.g. 12). Leave blank for no bundle. Price &amp; availability
+          compute automatically. Wholesale buyers only — hidden from customers.
+        </div>
+    </div><!-- /#packSizesBody -->
+  </div><!-- /Pack Sizes & Stock card -->
+
+  <div class="mt-3 d-flex gap-2 flex-column">
+    <div class="d-flex gap-2 align-items-center">
+      <button type="submit" class="btn btn-success px-4" id="saveBtn">Save Product</button>
+      <a href="{% url 'suppliers:product_list' %}" class="btn btn-outline-secondary">Cancel</a>
+      {% if product.pk %}
+      <a href="{% url 'suppliers:price_history' %}?product={{ product.pk }}"
+         class="btn btn-outline-secondary" target="_blank" rel="noopener"
+         title="See when this product's pack prices were changed (saved history only)">
+        <i class="bi bi-clock-history me-1"></i>View change history
+      </a>
+      {% endif %}
+    </div>
+  </div>
+</form>
+
+<!-- Price Change Confirmation Modal (Manual Mode) -->
+<div class="modal fade" id="priceChangeModal" tabindex="-1" aria-labelledby="priceChangeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header" style="background:#fff3cd;border-bottom:2px solid #ffc107">
+        <h5 class="modal-title fw-bold" id="priceChangeModalLabel">
+          <i class="bi bi-exclamation-triangle-fill text-warning me-2"></i>Selling Price Changed — Update Manual Pack Prices?
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pb-2">
+        <div class="d-flex align-items-center gap-3 mb-3 p-3 rounded bg-light border">
+          <div class="text-center">
+            <div class="text-muted small">Old Selling Price</div>
+            <div class="fw-bold fs-5 text-danger" id="priceOldVal"></div>
+          </div>
+          <div class="fs-4 text-muted">→</div>
+          <div class="text-center">
+            <div class="text-muted small">New Selling Price</div>
+            <div class="fw-bold fs-5 text-success" id="priceNewVal"></div>
+          </div>
+        </div>
+        <p class="mb-2 small text-muted">Here's how your <strong>manually set pack prices</strong> will change if you update:</p>
+        <table class="table table-sm table-bordered mb-0" id="pricePreviewTable">
+          <thead class="table-light">
+            <tr>
+              <th>Pack Size</th>
+              <th class="text-danger">Current Price (₹)</th>
+              <th class="text-success">New Price (₹)</th>
+              <th>Change</th>
+            </tr>
+          </thead>
+          <tbody id="pricePreviewBody"></tbody>
+        </table>
+      </div>
+      <div class="modal-footer pt-2">
+        <button type="button" class="btn btn-outline-secondary" id="priceChangeCancelBtn">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Revert — Keep old selling price
+        </button>
+        <button type="button" class="btn btn-success fw-semibold" id="priceChangeConfirmBtn">
+          <i class="bi bi-check-circle me-1"></i>Yes — Update manual prices to new values
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Save Confirmation Modal — review all changes before committing -->
+<div class="modal fade" id="saveConfirmModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header" style="background:#e8f5e9;border-bottom:2px solid #28a745">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-clipboard-check text-success me-2"></i>Review changes before saving
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body pb-2">
+        <p class="small text-muted mb-2">These are the changes you made on this page. Confirm to save them.</p>
+        <div id="saveConfirmBody"></div>
+      </div>
+      <div class="modal-footer pt-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Keep editing
+        </button>
+        <button type="button" class="btn btn-success fw-semibold" id="saveConfirmBtn">
+          <i class="bi bi-check-circle me-1"></i>Confirm &amp; Save
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Image Upload Toast -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="imgToast" class="toast align-items-center text-bg-success border-0" role="alert">
+    <div class="d-flex">
+      <div class="toast-body">✅ Image uploaded successfully!</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<style>
+/* Stock & Pricing Interactive UI */
+#stockInputGroup,
+#priceInputGroup {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+#stockInputGroup input[type="number"],
+#priceInputGroup input[type="number"] {
+  flex: 1;
+  text-align: center;
+  font-weight: 500;
+  font-size: 1.1rem;
+  border: 2px solid #dee2e6;
+  border-radius: 0.375rem;
+  transition: all 0.2s ease;
+}
+
+#stockInputGroup input[type="number"]:focus,
+#priceInputGroup input[type="number"]:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+}
+
+#stockInputGroup .btn-outline-secondary,
+#priceInputGroup .btn-outline-secondary {
+  min-width: 2.5rem;
+  padding: 0.375rem 0.5rem;
+  font-weight: 600;
+  transition: all 0.15s ease;
+}
+
+#stockInputGroup .btn-outline-secondary:hover,
+#priceInputGroup .btn-outline-secondary:hover {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: white;
+  transform: scale(1.05);
+}
+
+#stockInputGroup .btn-outline-secondary:active,
+#priceInputGroup .btn-outline-secondary:active {
+  transform: scale(0.95);
+}
+
+.quick-adjust-modal {
+  --bs-modal-bg: #1e1e2e;
+  --bs-modal-border-color: #2d2d3d;
+  --bs-border-radius: 0.5rem;
+}
+
+.quick-adjust-modal .modal-header {
+  background: linear-gradient(135deg, #0f766e 0%, #1f2937 100%);
+  border-bottom: 2px solid #0f766e;
+}
+
+.quick-adjust-modal .modal-title {
+  color: white;
+  font-weight: 700;
+}
+
+.quick-adjust-modal .modal-body {
+  background: #1e1e2e;
+  color: #e0e0e0;
+}
+
+.quick-adjust-modal .btn-close {
+  filter: invert(1);
+}
+
+.adjustment-group {
+  margin-bottom: 1.5rem;
+}
+
+.adjustment-group h6 {
+  color: #a0aec0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.adjustment-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.adjustment-buttons .btn {
+  font-weight: 600;
+  padding: 0.625rem 0.75rem;
+  font-size: 0.875rem;
+  border-radius: 0.375rem;
+  transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.adjustment-buttons .btn-positive {
+  background-color: #10b981;
+  border-color: #10b981;
+  color: white;
+}
+
+.adjustment-buttons .btn-positive:hover {
+  background-color: #059669;
+  border-color: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+.adjustment-buttons .btn-negative {
+  background-color: #ef4444;
+  border-color: #ef4444;
+  color: white;
+}
+
+.adjustment-buttons .btn-negative:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.adjustment-buttons .btn:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.quick-adjust-modal .modal-footer {
+  border-top: 1px solid #2d2d3d;
+  gap: 0.5rem;
+}
+
+.quick-adjust-modal .btn-secondary {
+  background-color: #4b5563;
+  border-color: #4b5563;
+}
+
+.quick-adjust-modal .btn-secondary:hover {
+  background-color: #5a6575;
+  border-color: #5a6575;
+}
+
+.quick-adjust-modal .btn-success {
+  background-color: #10b981;
+  border-color: #10b981;
+  font-weight: 600;
+}
+
+.quick-adjust-modal .btn-success:hover {
+  background-color: #059669;
+  border-color: #059669;
+}
+
+.adjustment-display {
+  background: #2d2d3d;
+  border: 1px solid #3d3d4d;
+  border-radius: 0.375rem;
+  padding: 0.75rem;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.adjustment-display .label {
+  font-size: 0.75rem;
+  color: #8b92a0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.25rem;
+}
+
+.adjustment-display .value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #10b981;
+}
+
+.adjustment-display .value.price {
+  color: #667eea;
+}
+
+.quick-adjust-modal input[type="number"],
+.quick-adjust-modal input[type="text"] {
+  background: #2d2d3d;
+  border: 1px solid #3d3d4d;
+  color: #e0e0e0;
+}
+
+.quick-adjust-modal input[type="number"]:focus,
+.quick-adjust-modal input[type="text"]:focus {
+  background: #3d3d4d;
+  border-color: #667eea;
+  color: #e0e0e0;
+}
+
+@media (max-width: 576px) {
+  .adjustment-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
+<script>
+// Bundle state — declared up-front so recalculate() can safely read it even
+// on the first pre-load call (the bundle IIFE at the bottom runs later).
+window.bundleQty = window.bundleQty || {};
+
+// ── Enable Bootstrap tooltips (opt-in) ───────────────────────────────────
+(function () {
+  if (!window.bootstrap || !bootstrap.Tooltip) return;
+  document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+    bootstrap.Tooltip.getOrCreateInstance(el);
+  });
+})();
+
+// ── Collapsible COMMON SETTINGS frame (collapsed on every load) ──────────
+(function () {
+  const body    = document.getElementById('commonBody');
+  const chevron = document.getElementById('commonChevron');
+  const summary = document.getElementById('commonSummary');
+  if (!body) return;
+
+  function buildSummary() {
+    const name = document.querySelector('[name="name"]')?.value?.trim();
+    const catSel = document.querySelector('[name="category"]');
+    const cat = catSel && catSel.selectedIndex >= 0 ? catSel.options[catSel.selectedIndex].text : '';
+    const parts = [];
+    if (name) parts.push(name);
+    if (cat)  parts.push(cat);
+    return parts.join(' · ') || 'name, options & shipping';
+  }
+  function onShow() {
+    chevron.className = 'bi bi-chevron-up';
+    summary.classList.add('d-none');
+  }
+  function onHide() {
+    chevron.className = 'bi bi-chevron-down';
+    summary.textContent = buildSummary();
+    summary.classList.remove('d-none');
+  }
+  body.addEventListener('shown.bs.collapse', onShow);
+  body.addEventListener('hidden.bs.collapse', onHide);
+
+  // Auto-collapse on every page load (the markup already starts collapsed —
+  // this just syncs the chevron + summary).
+  onHide();
+})();
+
+// ── Collapsible Pack Sizes & Stock (starts expanded; wired after init) ───
+(function () {
+  const body    = document.getElementById('packSizesBody');
+  const chevron = document.getElementById('packSizesChevron');
+  const summary = document.getElementById('packSizesSummary');
+  if (!body) return;
+
+  function activeVariantSummary() {
+    const tab = document.querySelector('#variantTabs .btn-success');
+    const name = tab ? tab.textContent.trim() : '';
+    const packs = document.querySelectorAll('#variantForms .variant-row').length;
+    const bits = [];
+    if (name) bits.push(name);
+    if (packs) bits.push(packs + ' pack' + (packs > 1 ? 's' : ''));
+    return bits.join(' · ') || 'per-variant packs';
+  }
+  body.addEventListener('shown.bs.collapse', function () {
+    chevron.className = 'bi bi-chevron-up';
+    summary.classList.add('d-none');
+  });
+  body.addEventListener('hidden.bs.collapse', function () {
+    chevron.className = 'bi bi-chevron-down';
+    summary.textContent = activeVariantSummary();
+    summary.classList.remove('d-none');
+  });
+  // No auto-collapse — the section stays OPEN after the page finishes its
+  // initial activity. The header chevron lets the user hide it on demand.
+})();
+
+// Full size hierarchy per unit type — min: 1g, max: 100kg | ml: 5ml→100L | qty: 1→100
+// unit_grams is a whole-number field, so every `unit` here MUST be an integer
+// (no fractional packs like 0.5g — they can't be stored and break the formset).
+const SIZE_TREE = {
+  g: [
+    {label:'1g',    unit:1},
+    {label:'2g',    unit:2},
+    {label:'5g',    unit:5},
+    {label:'10g',   unit:10},
+    {label:'20g',   unit:20},
+    {label:'25g',   unit:25},
+    {label:'50g',   unit:50},
+    {label:'100g',  unit:100},
+    {label:'250g',  unit:250},
+    {label:'500g',  unit:500},
+    {label:'1kg',   unit:1000},
+    {label:'2kg',   unit:2000},
+    {label:'5kg',   unit:5000},
+    {label:'10kg',  unit:10000},
+    {label:'25kg',  unit:25000},
+    {label:'50kg',  unit:50000},
+    {label:'100kg', unit:100000},
+  ],
+  ml: [
+    {label:'5ml',   unit:5},
+    {label:'10ml',  unit:10},
+    {label:'25ml',  unit:25},
+    {label:'50ml',  unit:50},
+    {label:'100ml', unit:100},
+    {label:'250ml', unit:250},
+    {label:'500ml', unit:500},
+    {label:'1L',    unit:1000},
+    {label:'2L',    unit:2000},
+    {label:'5L',    unit:5000},
+    {label:'10L',   unit:10000},
+    {label:'25L',   unit:25000},
+    {label:'50L',   unit:50000},
+    {label:'100L',  unit:100000},
+  ],
+  qty: [
+    {label:'1 pc',   unit:1},
+    {label:'2 pcs',  unit:2},
+    {label:'5 pcs',  unit:5},
+    {label:'10 pcs', unit:10},
+    {label:'25 pcs', unit:25},
+    {label:'50 pcs', unit:50},
+    {label:'100 pcs',unit:100},
+  ],
+};
+SIZE_TREE.kg    = SIZE_TREE.g;
+SIZE_TREE.litre = SIZE_TREE.ml;
+
+// Default visible sizes per unit (shown initially)
+const DEFAULT_VISIBLE = {
+  g:     [50, 100, 250, 500],
+  kg:    [50, 100, 250, 500],
+  ml:    [50, 100, 250, 500],
+  litre: [50, 100, 250, 500],
+  qty:   [1, 5, 10, 25],
+};
+
+const stockUnitEl    = document.getElementById('id_stock_unit');
+const stockAmtEl     = document.getElementById('id_stock_amount');
+const priceEl        = document.getElementById('id_price_per_kg');
+const packBtnsEl     = document.getElementById('packBtns');
+const priceLabel     = document.getElementById('priceLabel');
+const variantPreview = document.getElementById('variantPreview');
+const manualToggle   = document.getElementById('manualPriceToggle');
+const mrpToggle      = document.getElementById('mrpToggle');
+const suggestToggle  = document.getElementById('suggestToggle');
+const selected       = new Set();
+const manualPrices   = {};
+const manualMrps     = {};
+const manualSuggest  = {};
+// Suggested-price behaviour: editing one size spreads the same markup to the
+// sizes the supplier has not edited themselves, and a suggested price is never
+// allowed below the supplier price of that pack.
+const suggestTouched = new Set();   // sizes whose suggested price the supplier typed this session
+let   suggestRatio   = null;        // markup = suggested / supplier price, from the last edit
+
+function round2(x) { return Math.round(x * 100) / 100; }
+
+function suggestFor(unit, price) {
+  let s;
+  if (!suggestTouched.has(unit) && suggestRatio !== null) s = round2(price * suggestRatio);
+  else if (manualSuggest[unit] !== undefined)             s = manualSuggest[unit];
+  else                                                    s = price;
+  return Math.max(s, price);        // never below the supplier price
+}
+
+function flagSuggest(inp, price) {
+  const val = parseFloat(inp.value);
+  const bad = !isNaN(val) && val < price;
+  inp.classList.toggle('is-invalid', bad);
+  inp.title = bad ? `Must be at least ₹${price.toFixed(2)} (your price for this pack)` : '';
+}
+
+function showSuggestNote(msg, isWarning) {
+  const el = document.getElementById('suggestNote');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = 'form-text ' + (isWarning ? 'text-danger' : 'text-success');
+}
+
+// Track which sizes are currently visible
+let visibleUnits = new Set();
+let skipDOMReadOnNextRecalculate = false; // Flag to skip DOM read after modal price update
+const manualStocks = {}; // per-variant stock when loose distribution is OFF
+
+const looseToggle = document.getElementById('looseToggle');
+
+// ── Loose Distribution UI toggle ─────────────────────────────────────────────
+function applyLooseStockUI() {
+  const isLoose = looseToggle.checked;
+
+  // Total Stock section: enabled when loose is ON, greyed when OFF
+  // NOTE: stock_unit must NEVER be disabled — it's a required form field the
+  // backend needs even when loose is OFF. Only grey it visually.
+  stockAmtEl.disabled   = !isLoose;
+  // Visual-only dimming for the unit select (not disabled so it submits)
+  stockUnitEl.style.pointerEvents = isLoose ? '' : 'none';
+  stockUnitEl.style.opacity       = isLoose ? '' : '0.5';
+
+  const stockCard = stockAmtEl.closest('.row.g-2');
+  if (stockCard) {
+    stockCard.style.opacity = isLoose ? '' : '0.45';
+    stockCard.title = isLoose ? '' : 'Total Stock is managed per-pack-size when Loose Distribution is disabled';
+  }
+
+  const hint = document.getElementById('stockModeHint');
+  if (hint) {
+    hint.textContent = isLoose
+      ? '— single shared pool'
+      : '— greyed out: enter stock per pack size →';
+  }
+
+  // Re-render the pack size table so stock cells toggle correctly
+  recalculate();
+}
+
+// Existing variants from server (for edit page)
+const existingVariants = {{ existing_variants_json|default:"[]"|safe }};
+
+// Untouched snapshot of the server's variant groups — the "before" state used
+// to build the save-time "review your changes" popup. Kept separate because
+// VariantMgr mutates its own copy of the groups.
+const ORIGINAL_GROUPS = {{ variant_groups_json|default:"[]"|safe }};
+
+function toBaseUnits(amount, unit) {
+  return (unit === 'kg' || unit === 'litre') ? parseFloat(amount) * 1000 : parseFloat(amount);
+}
+
+function calcAutoPrice(unitSize) {
+  const p = parseFloat(priceEl.value) || 0;
+  const divisor = (stockUnitEl.value === 'qty') ? 100 : 1000;
+  return Math.round((p / divisor) * unitSize * 100) / 100;
+}
+
+function renderPackBtns() {
+  // Render buttons WITHOUT clearing selected — preserve existing selections
+  const unit = stockUnitEl.value;
+  const tree = SIZE_TREE[unit] || [];
+  const defaults = DEFAULT_VISIBLE[unit] || [];
+
+  // On first render, show default sizes; preserve visibleUnits if already set
+  if (visibleUnits.size === 0) {
+    defaults.forEach(u => visibleUnits.add(u));
+    // Also add any pre-selected sizes
+    selected.forEach(u => visibleUnits.add(u));
+  }
+
+  rebuildButtons(tree, unit);
+
+  const labels = {kg:'per kg', g:'per kg', litre:'per litre', ml:'per litre', qty:'per 100 pieces'};
+  priceLabel.textContent = labels[unit] || '';
+}
+
+function rebuildButtons(tree, unit) {
+  packBtnsEl.innerHTML = '';
+
+  // Always include selected sizes in visible set
+  selected.forEach(u => visibleUnits.add(u));
+
+  const visible = tree.filter(s => visibleUnits.has(s.unit));
+
+  visible.forEach(size => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.unit = size.unit;
+    btn.dataset.label = size.label;
+    btn.className = selected.has(size.unit) ? 'btn btn-success btn-sm' : 'btn btn-outline-success btn-sm';
+    btn.textContent = size.label;
+
+    btn.addEventListener('click', function(e) {
+      if (e.shiftKey || e.ctrlKey) {
+        toggleSelect(size.unit, btn);
+        recalculate();
+        return;
+      }
+      toggleSelect(size.unit, btn);
+      expandAround(tree, size.unit);
+      rebuildButtons(tree, unit);
+      recalculate();
+    });
+
+    packBtnsEl.appendChild(btn);
+  });
+
+  if (visible.length === 0) {
+    packBtnsEl.innerHTML = '<span class="text-muted small">Select unit type to see pack sizes.</span>';
+  }
+}
+
+function toggleSelect(unit, btn) {
+  if (selected.has(unit)) {
+    selected.delete(unit);
+    if (btn) btn.className = 'btn btn-outline-success btn-sm';
+  } else {
+    selected.add(unit);
+    if (btn) btn.className = 'btn btn-success btn-sm';
+  }
+}
+
+function expandAround(tree, clickedUnit) {
+  const idx = tree.findIndex(s => s.unit === clickedUnit);
+  if (idx === -1) return;
+
+  // Show 2 smaller sizes (stop at index 0 — don't go below minimum)
+  for (let i = idx - 1; i >= Math.max(0, idx - 2); i--) {
+    visibleUnits.add(tree[i].unit);
+  }
+  // Show 2 larger sizes (stop at last index — don't go above maximum)
+  for (let i = idx + 1; i <= Math.min(tree.length - 1, idx + 2); i++) {
+    visibleUnits.add(tree[i].unit);
+  }
+  // Always keep selected sizes visible (re-added in rebuildButtons)
+}
+
+function recalculate() {
+  if (selected.size === 0) {
+    variantPreview.innerHTML = '<p class="text-muted small">Select pack sizes above to see preview.</p>';
+    updateFormset([]);
+    return;
+  }
+
+  // Capture current DOM MRP and price values BEFORE rebuilding the table
+  // (UNLESS we just updated prices from the modal)
+  if (!skipDOMReadOnNextRecalculate) {
+    variantPreview.querySelectorAll('.manual-mrp').forEach(inp => {
+      const u = parseInt(inp.dataset.unit);
+      const val = parseFloat(inp.value);
+      if (!isNaN(val)) manualMrps[u] = val;
+    });
+    variantPreview.querySelectorAll('.manual-suggest').forEach(inp => {
+      const u = parseInt(inp.dataset.unit);
+      const val = parseFloat(inp.value);
+      if (!isNaN(val) && suggestTouched.has(u)) manualSuggest[u] = val;
+    });
+    variantPreview.querySelectorAll('.manual-price').forEach(inp => {
+      const u = parseInt(inp.dataset.unit);
+      const val = parseFloat(inp.value);
+      if (!isNaN(val)) manualPrices[u] = val;
+    });
+    // Capture per-pack stock when loose is OFF
+    variantPreview.querySelectorAll('.manual-stock').forEach(inp => {
+      const u = parseInt(inp.dataset.unit);
+      const val = parseInt(inp.value);
+      if (!isNaN(val)) manualStocks[u] = val;
+    });
+  } else {
+    skipDOMReadOnNextRecalculate = false; // Reset flag
+  }
+  const isLoose     = looseToggle ? looseToggle.checked : true;
+  const masterBase  = toBaseUnits(parseFloat(stockAmtEl.value) || 0, stockUnitEl.value);
+  const isManual    = manualToggle.checked;
+  const showMrp     = mrpToggle.checked;
+  const showSuggest = suggestToggle.checked;
+  const bundleOn    = (typeof window.bundleEnabled === 'function') ? window.bundleEnabled() : false;
+  const sorted      = [...selected].sort((a,b) => a - b);
+
+  const stockHeaderLabel = isLoose
+    ? 'Stock (units) <span class="text-muted small">from pool</span>'
+    : 'Stock (units) <span class="badge bg-success text-white ms-1">enter each</span>';
+
+  let html = `<table class="table table-sm table-bordered mb-0">
+    <thead class="table-light"><tr>
+      <th>Pack Size</th>
+      <th>Price (₹) ${isManual ? '<span class="badge bg-info text-dark ms-1">editable</span>' : '<span class="text-muted small">auto</span>'}</th>
+      ${showMrp ? `<th>MRP (₹) <span class="badge bg-warning text-dark ms-1">editable</span></th>` : ''}
+      ${showSuggest ? `<th>Suggested (₹) <span class="badge bg-info text-dark ms-1">guidance</span></th>` : ''}
+      <th>${stockHeaderLabel}</th>
+      ${bundleOn ? `<th>Bundle <span class="badge bg-info text-dark ms-1">wholesale</span></th>` : ''}
+    </tr></thead><tbody>`;
+
+  const variants = [];
+  sorted.forEach(unitSize => {
+    const btn   = packBtnsEl.querySelector(`button[data-unit="${unitSize}"]`);
+    const label = btn ? btn.dataset.label : unitSize + '';
+    const auto  = calcAutoPrice(unitSize);
+    const price = isManual ? (manualPrices[unitSize] !== undefined ? manualPrices[unitSize] : auto) : auto;
+    // MRP stays BLANK until the supplier enters one — no auto-fill to the
+    // selling price. A blank MRP means "no MRP" (no strikethrough to customers).
+    const hasMrp = manualMrps[unitSize] !== undefined;
+    const mrp = hasMrp ? manualMrps[unitSize] : '';
+    // Suggested price stays BLANK until the supplier actually enters one (or a
+    // markup ratio was set by editing another size). No silent auto-fill.
+    const hasSuggest = manualSuggest[unitSize] !== undefined
+                       || (!suggestTouched.has(unitSize) && suggestRatio !== null);
+    const suggest = hasSuggest ? suggestFor(unitSize, price) : '';
+    const autoStock = (masterBase && unitSize) ? Math.floor(masterBase / unitSize) : 0;
+    // Loose mode → single pool, stock is auto-computed (read-only per variant)
+    // Branded mode → supplier enters stock for each pack size independently
+    const stockVal = isLoose
+      ? autoStock
+      : (manualStocks[unitSize] !== undefined ? manualStocks[unitSize] : autoStock);
+
+    const stockCell = isLoose
+      ? `<td class="text-center bg-light text-muted">${autoStock}<br><span style="font-size:10px">(from pool)</span></td>`
+      : `<td><input type="number" class="form-control form-control-sm manual-stock" style="width:90px"
+             value="${stockVal}" step="1" min="0" data-unit="${unitSize}" placeholder="0"></td>`;
+
+    // Bundle column — packs-per-bundle for THIS pack. Price + "makes N" computed.
+    // (bundleQty may not be initialised yet on the very first pre-load call.)
+    window.bundleQty = window.bundleQty || {};
+    const bQty = window.bundleQty[unitSize] || '';
+    const bPrice = (bQty && price) ? '₹' + (parseFloat(price) * bQty).toFixed(2) : '—';
+    const bMakes = (bQty) ? Math.floor(stockVal / bQty) : 0;
+    const bundleCell = bundleOn
+      ? `<td>
+           <div class="input-group input-group-sm" style="width:120px">
+             <input type="number" class="form-control form-control-sm bundle-qty"
+                    value="${bQty}" step="1" min="0" data-unit="${unitSize}" placeholder="e.g. 12"
+                    title="Packs in one box/bag">
+           </div>
+           <div class="text-muted bundle-readout" data-unit="${unitSize}" style="font-size:10px;margin-top:2px">
+             ${bQty ? bPrice + ' · makes ' + bMakes : 'no bundle'}
+           </div>
+         </td>`
+      : '';
+
+    const mrpCell = showMrp
+      ? `<td><input type="number" class="form-control form-control-sm manual-mrp" style="width:110px"
+             value="${mrp === '' ? '' : parseFloat(mrp).toFixed(2)}" step="0.01" min="0" data-unit="${unitSize}" placeholder="optional"></td>` : '';
+    const suggestCell = showSuggest
+      ? `<td><input type="number" class="form-control form-control-sm manual-suggest" style="width:110px"
+             value="${suggest === '' ? '' : parseFloat(suggest).toFixed(2)}" step="0.01" min="${parseFloat(price).toFixed(2)}" data-unit="${unitSize}" placeholder="optional"></td>` : '';
+
+    if (isManual) {
+      html += `<tr>
+        <td><strong>${label}</strong></td>
+        <td>
+          <input type="number" class="form-control form-control-sm manual-price" style="width:110px"
+               value="${parseFloat(price).toFixed(2)}" step="1" min="1"
+               data-unit="${unitSize}" data-auto="${auto.toFixed(2)}">
+          <div class="text-muted" style="font-size:11px;margin-top:2px">
+            Auto: <span class="price-auto-hint">₹${auto.toFixed(2)}</span> — set higher or lower
+          </div>
+        </td>
+        ${mrpCell}${suggestCell}
+        ${stockCell}${bundleCell}</tr>`;
+    } else {
+      html += `<tr><td><strong>${label}</strong></td><td>₹${parseFloat(price).toFixed(2)}</td>
+        ${mrpCell}${suggestCell}
+        ${stockCell}${bundleCell}</tr>`;
+    }
+    variants.push({label, price, mrp: showMrp ? mrp : null,
+                   suggest: showSuggest ? suggest : null, stock: stockVal, unit: unitSize});
+  });
+
+  html += '</tbody></table>';
+  variantPreview.innerHTML = html;
+
+  // Bundle-column inputs: live price + "makes N" readout, stored in bundleQty.
+  variantPreview.querySelectorAll('.bundle-qty').forEach(inp => {
+    inp.addEventListener('input', function () {
+      const unit = parseInt(this.dataset.unit);
+      const qty  = parseInt(this.value) || 0;
+      if (qty > 0) window.bundleQty[unit] = qty;
+      else delete window.bundleQty[unit];
+
+      const row = this.closest('tr');
+      const priceInp = row.querySelector('.manual-price');
+      const packPrice = priceInp ? (parseFloat(priceInp.value) || 0)
+                                 : (parseFloat((row.children[1].textContent || '').replace(/[^\d.]/g, '')) || 0);
+      const stockInp = row.querySelector('.manual-stock');
+      const packStock = stockInp ? (parseInt(stockInp.value) || 0)
+                                 : parseInt((row.querySelector('td:nth-last-child(2)')?.textContent || '').replace(/[^\d]/g, '')) || 0;
+      const out = row.querySelector('.bundle-readout');
+      if (out) {
+        out.textContent = qty > 0
+          ? '₹' + (packPrice * qty).toFixed(2) + ' · makes ' + Math.floor(packStock / qty)
+          : 'no bundle';
+      }
+    });
+  });
+
+  if (isManual) {
+    variantPreview.querySelectorAll('.manual-price').forEach(inp => {
+      inp.addEventListener('input', function() {
+        const unit    = parseInt(this.dataset.unit);
+        const entered = parseFloat(this.value) || 0;
+        manualPrices[unit] = entered;
+        const v = variants.find(x => x.unit === unit);
+        if (v) v.price = entered;
+
+        // Keep this pack's suggested price in step with its new supplier price —
+        // but only when there is a real suggestion to follow. The Suggested box
+        // must stay BLANK until the supplier types one, or a markup ratio was
+        // set by editing another size. Otherwise it would just mirror the price.
+        const sInp = this.closest('tr').querySelector('.manual-suggest');
+        if (sInp) {
+          // Update the Suggested box only when there is a real suggestion to
+          // keep in step: a markup ratio set by editing another size, or a
+          // value the supplier already typed for THIS pack. With neither, the
+          // box stays blank instead of silently mirroring the price.
+          const followMarkup = !suggestTouched.has(unit) && suggestRatio !== null;
+          if (followMarkup || suggestTouched.has(unit)) {
+            const s = suggestFor(unit, entered);
+            sInp.value = s.toFixed(2);
+            if (v) v.suggest = s;
+          }
+          sInp.min = entered.toFixed(2);
+          flagSuggest(sInp, entered);
+        }
+
+        // Real-time warning: price must be > 0 AND not below the Auto price.
+        // The Auto price (data-auto) is the floor the supplier may not go under.
+        const auto = parseFloat(this.dataset.auto) || 0;
+        const row = this.closest('tr');
+        let warn = row.querySelector('.price-below-warn');
+        const showWarn = (msg) => {
+          this.style.borderColor = '#dc3545';
+          this.style.background  = '#fff5f5';
+          if (!warn) {
+            warn = document.createElement('div');
+            warn.className = 'price-below-warn text-danger';
+            warn.style.fontSize = '11px';
+            this.parentNode.appendChild(warn);
+          }
+          warn.textContent = msg;
+        };
+        const clearWarn = () => {
+          this.style.borderColor = '';
+          this.style.background  = '';
+          if (warn) warn.remove();
+        };
+        if (entered <= 0) {
+          showWarn('⚠ Price must be greater than 0');
+        } else if (auto > 0 && entered < auto) {
+          showWarn(`⚠ Price ₹${entered.toFixed(2)} is below the auto price ₹${auto.toFixed(2)}. Set it to ₹${auto.toFixed(2)} or higher.`);
+        } else {
+          clearWarn();
+        }
+        updateFormset(variants);
+      });
+
+      // On blur (leaving the box): keep the warning visible if the price is
+      // below the auto floor, so the supplier sees it the moment they tab out.
+      inp.addEventListener('blur', function() {
+        const entered = parseFloat(this.value) || 0;
+        const auto    = parseFloat(this.dataset.auto) || 0;
+        const row = this.closest('tr');
+        let warn = row.querySelector('.price-below-warn');
+        if (entered > 0 && auto > 0 && entered < auto) {
+          this.style.borderColor = '#dc3545';
+          this.style.background  = '#fff5f5';
+          if (!warn) {
+            warn = document.createElement('div');
+            warn.className = 'price-below-warn text-danger';
+            warn.style.fontSize = '11px';
+            this.parentNode.appendChild(warn);
+          }
+          warn.textContent = `⚠ Price ₹${entered.toFixed(2)} is below the auto price ₹${auto.toFixed(2)}. Set it to ₹${auto.toFixed(2)} or higher.`;
+        }
+      });
+    });
+  }
+  variantPreview.querySelectorAll('.manual-mrp').forEach(inp => {
+    inp.addEventListener('input', function() {
+      const u = parseInt(this.dataset.unit);
+      const rawStr = (this.value || '').trim();
+      const v = variants.find(x => x.unit === u);
+      if (rawStr === '') {
+        // Cleared → no MRP for this pack (no strikethrough shown to customers).
+        delete manualMrps[u];
+        if (v) v.mrp = null;
+      } else {
+        manualMrps[u] = parseFloat(rawStr) || 0;
+        if (v) v.mrp = parseFloat(rawStr) || null;
+      }
+      updateFormset(variants);
+    });
+  });
+  variantPreview.querySelectorAll('.manual-suggest').forEach(inp => {
+    // While typing: remember it, and warn at once if it is below the supplier price.
+    inp.addEventListener('input', function() {
+      const u = parseInt(this.dataset.unit);
+      const rawStr = (this.value || '').trim();
+      const val = parseFloat(rawStr);
+      const v = variants.find(x => x.unit === u);
+      if (rawStr === '') {
+        // Cleared while typing → no suggestion for this pack.
+        suggestTouched.delete(u);
+        delete manualSuggest[u];
+        if (v) v.suggest = null;
+        flagSuggest(this, v ? v.price : 0);
+        return;
+      }
+      suggestTouched.add(u);
+      manualSuggest[u] = isNaN(val) ? 0 : val;
+      if (v) v.suggest = isNaN(val) ? null : val;
+      flagSuggest(this, v ? v.price : 0);
+      updateFormset(variants);
+    });
+
+    // On commit (leave the box / Enter / Tab): lift it to the supplier price if
+    // it is lower, then spread the same markup to every size the supplier has
+    // not edited by hand. Cells are updated in place so keyboard focus is kept.
+    inp.addEventListener('change', function() {
+      const u = parseInt(this.dataset.unit);
+      const v = variants.find(x => x.unit === u);
+      if (!v) return;
+      const price = parseFloat(v.price) || 0;
+      const rawStr = (this.value || '').trim();
+
+      // BLANK is valid = "no suggested price for this pack". Clear it and stop.
+      if (rawStr === '') {
+        suggestTouched.delete(u);
+        delete manualSuggest[u];
+        v.suggest = null;
+        this.value = '';
+        flagSuggest(this, price);
+        suggestRatio = null;          // don't spread a markup from a cleared cell
+        updateFormset(variants);
+        showSuggestNote('', false);
+        return;
+      }
+
+      let val = parseFloat(rawStr);
+      let corrected = false;
+      // Only a NON-BLANK value below the price is corrected up to the price.
+      if (isNaN(val) || val < price) {
+        val = price;
+        corrected = true;
+      }
+      this.value = val.toFixed(2);
+      suggestTouched.add(u);
+      manualSuggest[u] = val;
+      v.suggest = val;
+      flagSuggest(this, price);
+
+      // A rejected (too low) entry only fixes its own row; it must not reset the
+      // markup the other sizes were given.
+      if (corrected) {
+        updateFormset(variants);
+        showSuggestNote(`Suggested price can't be below your price. Set to ₹${price.toFixed(2)} for this size.`, true);
+        return;
+      }
+      suggestRatio = price > 0 ? val / price : null;
+
+      let spread = 0;
+      variantPreview.querySelectorAll('.manual-suggest').forEach(other => {
+        const ou = parseInt(other.dataset.unit);
+        if (ou === u || suggestTouched.has(ou)) return;
+        const ov = variants.find(x => x.unit === ou);
+        if (!ov) return;
+        const s = suggestFor(ou, parseFloat(ov.price) || 0);
+        other.value = s.toFixed(2);
+        ov.suggest = s;
+        flagSuggest(other, parseFloat(ov.price) || 0);
+        spread++;
+      });
+      updateFormset(variants);
+
+      if (spread && suggestRatio !== null) {
+        const pct = ((suggestRatio - 1) * 100).toFixed(1);
+        showSuggestNote(`Applied the same markup (${pct}%) to ${spread} other size${spread > 1 ? 's' : ''}. Edit any size to override it.`, false);
+      } else {
+        showSuggestNote('', false);
+      }
+    });
+  });
+  // Per-pack stock inputs (branded / loose OFF mode)
+  variantPreview.querySelectorAll('.manual-stock').forEach(inp => {
+    inp.addEventListener('input', function() {
+      const u = parseInt(this.dataset.unit);
+      const val = parseInt(this.value) || 0;
+      manualStocks[u] = val;
+      const v = variants.find(x => x.unit === u);
+      if (v) v.stock = val;
+      updateFormset(variants);
+    });
+  });
+
+  updateFormset(variants);
+}
+
+function updateFormset(variants) {
+  const totalForms   = document.getElementById('id_variants-TOTAL_FORMS');
+  const initialForms = document.getElementById('id_variants-INITIAL_FORMS');
+  const container    = document.getElementById('variantForms');
+
+  // Remove ALL rows (saved + new) — we rebuild from scratch
+  container.querySelectorAll('.variant-row').forEach(r => r.remove());
+
+  // Reset initial forms to 0 so Django treats everything as new
+  if (initialForms) initialForms.value = '0';
+
+  // Read current MRP values from DOM inputs before rebuilding. A blank MRP box
+  // means "no MRP" → clear any stored value (so no strikethrough is shown).
+  variantPreview.querySelectorAll('.manual-mrp').forEach(inp => {
+    const u = parseInt(inp.dataset.unit);
+    const v = variants.find(x => x.unit === u);
+    if ((inp.value || '').trim() === '') {
+      delete manualMrps[u];
+      if (v) v.mrp = null;
+    } else {
+      const val = parseFloat(inp.value);
+      if (!isNaN(val)) { manualMrps[u] = val; if (v) v.mrp = val; }
+    }
+  });
+  // Same for suggested prices
+  variantPreview.querySelectorAll('.manual-suggest').forEach(inp => {
+    const u = parseInt(inp.dataset.unit);
+    const val = parseFloat(inp.value);
+    if (!isNaN(val) && suggestTouched.has(u)) manualSuggest[u] = val;
+    const v = variants.find(x => x.unit === u);
+    if (v) v.suggest = val || null;
+  });
+  // Per-pack stock inputs (branded mode)
+  variantPreview.querySelectorAll('.manual-stock').forEach(inp => {
+    const u = parseInt(inp.dataset.unit);
+    const val = parseInt(inp.value);
+    if (!isNaN(val)) {
+      manualStocks[u] = val;
+      const v = variants.find(x => x.unit === u);
+      if (v) v.stock = val;
+    }
+  });
+
+  let idx = 0;
+  variants.forEach(v => {
+    const row = document.createElement('div');
+    row.className = 'variant-row';
+    row.dataset.new = '1';
+    row.innerHTML = `
+      <input type="text"   name="variants-${idx}-label"        value="${v.label}">
+      <input type="number" name="variants-${idx}-selling_price" value="${parseFloat(v.price).toFixed(2)}">
+      <input type="number" name="variants-${idx}-mrp"           value="${v.mrp !== null && v.mrp !== undefined ? parseFloat(v.mrp).toFixed(2) : ''}">
+      <input type="number" name="variants-${idx}-suggested_price" value="${v.suggest !== null && v.suggest !== undefined ? parseFloat(v.suggest).toFixed(2) : ''}">
+      <input type="number" name="variants-${idx}-stock"         value="${v.stock}">
+      <input type="number" name="variants-${idx}-unit_grams"    value="${v.unit}">
+      <input type="checkbox" name="variants-${idx}-is_active" checked style="display:none">
+      <input type="hidden"  name="variants-${idx}-id" value="">`;
+    container.appendChild(row);
+    idx++;
+  });
+  totalForms.value = idx;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+
+// 1. Pre-load existing variants into selected + manualPrices BEFORE rendering buttons
+if (existingVariants.length > 0) {
+  existingVariants.forEach(v => {
+    const unit = parseFloat(v.unit_grams);
+    if (unit > 0) {
+      selected.add(unit);
+      visibleUnits.add(unit);
+      manualPrices[unit] = parseFloat(v.selling_price);
+      if (v.mrp) manualMrps[unit] = parseFloat(v.mrp);
+      if (v.suggested_price) manualSuggest[unit] = parseFloat(v.suggested_price);
+      if (v.stock !== undefined && v.stock !== null) manualStocks[unit] = parseInt(v.stock);
+    }
+  });
+}
+
+// 2. Pre-set manual toggle from server-side pricing_mode
+const serverPricingMode = '{{ product.pricing_mode|default:"auto" }}';
+if (serverPricingMode === 'manual') {
+  manualToggle.checked = true;
+  document.getElementById('pricingModeField').value = 'manual';
+}
+
+// 2. Render buttons (will highlight pre-selected ones)
+renderPackBtns();
+
+// 3. If existing variants, show them in preview
+recalculate();
+// 4. Apply loose/branded stock UI based on the initial toggle state
+applyLooseStockUI();
+
+// ════════════════════════════════════════════════════════════════════════
+// VARIANT MANAGER — Premium / Regular … each with its own pack table.
+// Reuses the single-table UI: switching a variant stashes the live state and
+// loads the chosen variant's state. On submit, all variants → variants_json.
+// ════════════════════════════════════════════════════════════════════════
+const VariantMgr = (function () {
+  const MAX = 5;
+  const groups = {{ variant_groups_json|default:"[]"|safe }};  // from server (edit)
+  let variants = [];   // [{id, name, state}]
+  let active = 0;
+  // Indices of variants whose shared-pool Total Stock the supplier actually
+  // edited this session. Only these get their loose-mode pack stocks
+  // recomputed from the pool on capture (see captureState).
+  const poolTouched = new Set();
+
+  const tabsEl = document.getElementById('variantTabs');
+  const addBtn = document.getElementById('addVariantBtn');
+  const jsonEl = document.getElementById('variantsJson');
+
+  // Snapshot the live pack UI into a plain state object (incl. this variant's
+  // own stock pool + price-per-unit, which are per-variant too).
+  function captureState() {
+    // Store a CONCRETE price for every selected pack. In manual mode that's the
+    // typed price; in AUTO mode there's no manual-price input, so fall back to
+    // the auto-computed price (else serialize() would wrongly save ₹0).
+    const prices = {...manualPrices};
+    [...selected].forEach(u => {
+      if (prices[u] == null || !(prices[u] > 0)) {
+        const auto = (typeof calcAutoPrice === 'function') ? calcAutoPrice(u) : 0;
+        if (auto > 0) prices[u] = auto;
+      }
+    });
+
+    // Capture a CONCRETE stock for every selected pack. In LOOSE mode the per-
+    // pack cells are read-only and derived from the shared pool, so manualStocks
+    // is never filled in — compute each pack's stock from the pool (pool /
+    // unit_grams), the same formula recalculate() shows on screen. BUT only do
+    // this for a variant whose pool the supplier actually edited this session
+    // (poolTouched). Otherwise an untouched variant would get its DB stock
+    // silently "corrected" to a pool-derived number and show a phantom change.
+    const stocks = {...manualStocks};
+    const isLooseNow = looseToggle ? looseToggle.checked : true;
+    if (isLooseNow && poolTouched.has(active) && stockAmtEl && stockUnitEl) {
+      const poolBase = toBaseUnits(parseFloat(stockAmtEl.value) || 0, stockUnitEl.value);
+      [...selected].forEach(u => {
+        stocks[u] = (poolBase && u) ? Math.floor(poolBase / u) : 0;
+      });
+    }
+
+    return {
+      selected: [...selected],
+      prices: prices,
+      mrps: {...manualMrps},
+      suggest: {...manualSuggest},
+      stocks: stocks,
+      bundles: {...window.bundleQty},
+      visible: [...visibleUnits],
+      // Unit is COMMON (product-level) — not stashed per variant.
+      stockAmount: stockAmtEl ? stockAmtEl.value : '',
+      pricePerKg:  priceEl ? priceEl.value : '',
+    };
+  }
+  // Apply a state object back into the live pack UI globals, then redraw.
+  function applyState(s) {
+    s = s || {selected:[], prices:{}, mrps:{}, suggest:{}, stocks:{}, bundles:{}, visible:[]};
+    selected.clear();          (s.selected || []).forEach(u => selected.add(u));
+    visibleUnits.clear();       (s.visible  || s.selected || []).forEach(u => visibleUnits.add(u));
+    Object.keys(manualPrices).forEach(k => delete manualPrices[k]);
+    Object.assign(manualPrices, s.prices || {});
+    Object.keys(manualMrps).forEach(k => delete manualMrps[k]);
+    Object.assign(manualMrps, s.mrps || {});
+    Object.keys(manualSuggest).forEach(k => delete manualSuggest[k]);
+    Object.assign(manualSuggest, s.suggest || {});
+    Object.keys(manualStocks).forEach(k => delete manualStocks[k]);
+    Object.assign(manualStocks, s.stocks || {});
+    window.bundleQty = {};
+    Object.assign(window.bundleQty, s.bundles || {});
+    // Restore this variant's own pool + price-per-unit fields. (Unit is common,
+    // so it is left untouched here — the same unit applies to every variant.)
+    if (stockAmtEl)  stockAmtEl.value = (s.stockAmount != null ? s.stockAmount : '');
+    if (priceEl)     priceEl.value = (s.pricePerKg != null ? s.pricePerKg : '');
+    renderPackBtns();
+    recalculate();
+  }
+
+  // Build a state object from a server variant group.
+  function stateFromGroup(g) {
+    const st = {selected:[], prices:{}, mrps:{}, suggest:{}, stocks:{}, bundles:{}, visible:[]};
+    (g.packs || []).forEach(p => {
+      const u = parseInt(p.unit_grams);
+      if (!u) return;
+      st.selected.push(u); st.visible.push(u);
+      st.prices[u] = parseFloat(p.selling_price);
+      if (p.mrp != null) st.mrps[u] = parseFloat(p.mrp);
+      if (p.suggested_price != null) st.suggest[u] = parseFloat(p.suggested_price);
+      if (p.stock != null) st.stocks[u] = parseInt(p.stock);
+      if (p.bundle_qty) st.bundles[u] = parseInt(p.bundle_qty);
+    });
+    // Repopulate the per-variant pool fields so Total Stock / Selling Price are
+    // NOT blank when the supplier reopens the page.
+    //  • Selling Price (per unit): reverse-computed from the largest pack.
+    //  • Total Stock (pool): use the server's authoritative pool_grams when
+    //    present. DO NOT sum per-pack grams — each pack is already pool ÷ size,
+    //    so summing N packs would multiply the pool by N (the old "90 → 270" bug).
+    const units = st.selected.slice().sort((a, b) => b - a);  // largest first
+    if (units.length) {
+      const big = units[0];
+      const perBig = st.prices[big] || 0;
+      const divisor = (stockUnitEl && stockUnitEl.value === 'qty') ? 100 : 1000;
+      // price-per-(kg/litre/100pcs) = pack price / pack units * divisor
+      st.pricePerKg = perBig && big ? round2(perBig / big * divisor) : '';
+
+      // Base units per display unit (qty 1:1, kg/litre 1000).
+      const stockDivisor = (stockUnitEl && stockUnitEl.value === 'qty') ? 1 : 1000;
+      const poolGrams = parseInt(g.pool_grams) || 0;
+      if (poolGrams > 0) {
+        // Authoritative pool from the server.
+        st.stockAmount = round2(poolGrams / stockDivisor);
+      } else {
+        // Fallback (legacy rows with no stored pool): derive from ONE pack —
+        // the largest pack's (stock × unit_grams). Never sum across packs.
+        const bigGrams = (st.stocks[big] || 0) * big;
+        st.stockAmount = bigGrams ? round2(bigGrams / stockDivisor) : '';
+      }
+    }
+    return st;
+  }
+
+  function renderTabs() {
+    tabsEl.innerHTML = '';
+    variants.forEach((v, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn btn-sm ' + (i === active ? 'btn-success' : 'btn-outline-success');
+      b.textContent = v.name || (variants.length === 1 ? 'Default' : 'Variant ' + (i + 1));
+      b.addEventListener('click', () => switchTo(i));
+      tabsEl.appendChild(b);
+    });
+    addBtn.disabled = variants.length >= MAX;
+    addBtn.classList.toggle('d-none', variants.length >= MAX);
+  }
+
+  // Move the active variant left/right to change its order. The array order IS
+  // the saved order (serialize writes `position` from the array index).
+  function moveVariant(dir) {
+    const j = active + dir;
+    if (j < 0 || j >= variants.length) return;
+    variants[active].state = captureState();          // keep current edits
+    const tmp = variants[active];
+    variants[active] = variants[j];
+    variants[j] = tmp;
+    active = j;
+    renderTabs();
+    renderNameField();
+  }
+
+  function switchTo(i) {
+    if (i === active) return;
+    variants[active].state = captureState();   // stash current edits
+    active = i;
+    applyState(variants[active].state);
+    renderTabs();
+    renderNameField();
+  }
+
+  // Inline name editor for the active variant (hidden when only one variant).
+  function renderNameField() {
+    let wrap = document.getElementById('variantNameWrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'variantNameWrap';
+      // mt-3 + pt-3 + border-top: clean separation from the variant tabs above.
+      wrap.className = 'd-flex align-items-center gap-2 mb-2 mt-3 pt-3 border-top';
+      document.getElementById('variantBar').after(wrap);
+    }
+    if (variants.length <= 1) { wrap.innerHTML = ''; wrap.classList.add('d-none'); return; }
+    wrap.classList.remove('d-none');
+    wrap.classList.add('flex-wrap');
+    wrap.innerHTML =
+      '<label class="small fw-semibold mb-0">This variant\'s name:</label>' +
+      '<input type="text" class="form-control form-control-sm" style="max-width:200px" ' +
+             'id="variantNameInput" placeholder="e.g. Premium" value="' +
+             (variants[active].name || '').replace(/"/g,'&quot;') + '">' +
+      '<div class="btn-group btn-group-sm" role="group" aria-label="Reorder variant">' +
+        '<button type="button" class="btn btn-outline-secondary" id="moveVariantLeft" ' +
+                'title="Move earlier"' + (active === 0 ? ' disabled' : '') + '>' +
+                '<i class="bi bi-arrow-left"></i></button>' +
+        '<button type="button" class="btn btn-outline-secondary" id="moveVariantRight" ' +
+                'title="Move later"' + (active === variants.length - 1 ? ' disabled' : '') + '>' +
+                '<i class="bi bi-arrow-right"></i></button>' +
+      '</div>' +
+      '<button type="button" class="btn btn-outline-danger btn-sm" id="removeVariantBtn">' +
+             '<i class="bi bi-trash"></i> Remove</button>';
+    document.getElementById('variantNameInput').addEventListener('input', function () {
+      variants[active].name = this.value;
+      renderTabs();
+    });
+    document.getElementById('moveVariantLeft').addEventListener('click', () => moveVariant(-1));
+    document.getElementById('moveVariantRight').addEventListener('click', () => moveVariant(1));
+    document.getElementById('removeVariantBtn').addEventListener('click', removeActive);
+  }
+
+  function addVariant() {
+    if (variants.length >= MAX) return;
+    variants[active].state = captureState();
+    // New variant copies the CURRENT variant's packs as a starting point.
+    const copy = JSON.parse(JSON.stringify(variants[active].state));
+    variants.push({ id: null, name: '', state: copy });
+    active = variants.length - 1;
+    applyState(variants[active].state);
+    renderTabs();
+    renderNameField();
+  }
+
+  function removeActive() {
+    if (variants.length <= 1) return;
+    // Only confirm when the variant has a name — an unnamed variant has nothing
+    // meaningful to lose, so remove it straight away without a popup.
+    const vName = (variants[active].name || '').trim();
+    if (vName && !confirm('Remove variant "' + vName + '" and its packs?')) return;
+    variants.splice(active, 1);
+    active = Math.max(0, active - 1);
+    applyState(variants[active].state);
+    renderTabs();
+    renderNameField();
+  }
+
+  // Serialize every variant into variants_json for the POST.
+  function serialize() {
+    variants[active].state = captureState();
+    const divisor = (stockUnitEl && stockUnitEl.value === 'qty') ? 100 : 1000;
+    // Grams-per-base-unit for the stock pool (qty is 1:1, kg/litre are 1000).
+    const stockDivisor = (stockUnitEl && stockUnitEl.value === 'qty') ? 1 : 1000;
+    const out = variants.map(v => {
+      const s = v.state;
+      // This variant's own per-unit (per kg / litre / 100pcs) selling price —
+      // the auto price for a pack = perUnit / divisor * unit_grams. Used as the
+      // minimum floor a manual pack price may not go below.
+      const perUnit = parseFloat(s.pricePerKg) || 0;
+      // This variant's own loose pool, in base units (grams/ml/qty), sent so
+      // the server stores it authoritatively on ProductVariantType. Only a
+      // pool the supplier actually edited is sent (else null → leave as is).
+      const poolGrams = poolTouched.has(variants.indexOf(v))
+        ? Math.round((parseFloat(s.stockAmount) || 0) * stockDivisor)
+        : null;
+      const packs = (s.selected || []).map(u => {
+        const btn = document.querySelector('#packBtns button[data-unit="' + u + '"]');
+        const auto = perUnit > 0 ? Math.round((perUnit / divisor) * u * 100) / 100 : 0;
+        return {
+          id: null,
+          label: btn ? btn.dataset.label : (u + ''),
+          unit_grams: u,
+          selling_price: (s.prices[u] != null ? s.prices[u] : 0),
+          auto_price: auto,
+          mrp: (s.mrps[u] != null ? s.mrps[u] : null),
+          suggested_price: (s.suggest[u] != null ? s.suggest[u] : null),
+          stock: (s.stocks[u] != null ? s.stocks[u] : 0),
+          bundle_qty: (s.bundles[u] != null ? s.bundles[u] : 0),
+        };
+      });
+      return { id: v.id, name: v.name || '', packs: packs, pool_grams: poolGrams };
+    });
+    jsonEl.value = JSON.stringify(out);
+  }
+
+  // Init: build variants from server groups, else one default from current UI.
+  function init() {
+    if (groups.length) {
+      variants = groups.map(g => ({ id: g.id, name: g.name || '', state: stateFromGroup(g) }));
+      active = 0;
+      applyState(variants[0].state);
+    } else {
+      // Add page (or legacy) — the current live UI is the single default variant.
+      variants = [{ id: null, name: '', state: captureState() }];
+      active = 0;
+    }
+    renderTabs();
+    renderNameField();
+    addBtn.addEventListener('click', addVariant);
+  }
+
+  init();
+  // markPoolTouched: called when the Total Stock pool field is edited, so the
+  // currently-active variant's loose pack stocks get recomputed on save.
+  return { serialize, markPoolTouched: () => poolTouched.add(active) };
+})();
+
+// ── Event listeners ───────────────────────────────────────────────────────────
+stockUnitEl.addEventListener('change', function() {
+  // Unit changed — clear selections and re-render
+  selected.clear();
+  visibleUnits.clear();
+  Object.keys(manualPrices).forEach(k => delete manualPrices[k]);
+  // Pack sizes mean something different in a new unit, so forget suggested prices too.
+  Object.keys(manualSuggest).forEach(k => delete manualSuggest[k]);
+  suggestTouched.clear();
+  suggestRatio = null;
+  showSuggestNote('', false);
+  renderPackBtns();
+  recalculate();
+});
+stockAmtEl.addEventListener('input', function() {
+  // Mark this variant's pool as edited so only its loose pack stocks recompute.
+  try { VariantMgr.markPoolTouched(); } catch (e) {}
+  recalculate();
+});
+
+// ── Selling price change guard (manual mode) ──────────────────────────────────
+let _lastConfirmedPrice = priceEl.value;
+
+priceEl.addEventListener('focus', function() {
+  _lastConfirmedPrice = this.value;
+});
+
+priceEl.addEventListener('change', function() {
+  const newPrice = this.value;
+  const isManual = manualToggle.checked;
+  const hasManualPrices = Object.keys(manualPrices).length > 0;
+
+  if (!isManual || !hasManualPrices || newPrice === _lastConfirmedPrice) {
+    _lastConfirmedPrice = newPrice;
+    recalculate();
+    return;
+  }
+
+  // Build before/after preview table
+  document.getElementById('priceOldVal').textContent = '₹' + parseFloat(_lastConfirmedPrice || 0).toFixed(2);
+  document.getElementById('priceNewVal').textContent = '₹' + parseFloat(newPrice).toFixed(2);
+
+  const divisor = (stockUnitEl.value === 'qty') ? 100 : 1000;
+  const newPriceNum = parseFloat(newPrice) || 0;
+  const newAutoByUnit = {};
+  const tbody = document.getElementById('pricePreviewBody');
+  tbody.innerHTML = '';
+  [...selected].sort((a, b) => a - b).forEach(unitSize => {
+    const btn = packBtnsEl.querySelector(`button[data-unit="${unitSize}"]`);
+    const label = btn ? btn.dataset.label : unitSize + '';
+    const oldPrice = manualPrices[unitSize] !== undefined ? manualPrices[unitSize] : 0;
+    const newAutoPrice = Math.round((newPriceNum / divisor) * unitSize * 100) / 100;
+    newAutoByUnit[unitSize] = newAutoPrice;
+    const diff = newAutoPrice - oldPrice;
+    const diffText = diff >= 0 ? `<span class="text-success">+₹${diff.toFixed(2)}</span>` : `<span class="text-danger">-₹${Math.abs(diff).toFixed(2)}</span>`;
+    tbody.innerHTML += `<tr>
+      <td><strong>${label}</strong></td>
+      <td class="text-danger">₹${parseFloat(oldPrice).toFixed(2)}</td>
+      <td class="text-success fw-semibold">₹${newAutoPrice.toFixed(2)}</td>
+      <td>${diffText}</td>
+    </tr>`;
+  });
+
+  const modal = new bootstrap.Modal(document.getElementById('priceChangeModal'));
+  modal.show();
+
+  document.getElementById('priceChangeCancelBtn').onclick = function() {
+    // Revert to the old price
+    priceEl.value = _lastConfirmedPrice;
+    modal.hide();
+  };
+
+  document.getElementById('priceChangeConfirmBtn').onclick = function() {
+    // Set manualPrices to the newly calculated auto values (keep manual mode ON)
+    Object.keys(newAutoByUnit).forEach(u => { manualPrices[parseInt(u)] = newAutoByUnit[u]; });
+    _lastConfirmedPrice = newPrice;
+    skipDOMReadOnNextRecalculate = true; // Tell recalculate() to use the new manual prices, not old DOM
+    recalculate();
+    modal.hide();
+
+    // Scroll to variant preview and highlight updated inputs
+    const preview = document.getElementById('variantPreview');
+    preview.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(() => {
+      preview.querySelectorAll('.manual-price').forEach(inp => {
+        inp.style.transition = 'background 0.3s';
+        inp.style.background = '#fff3cd';
+        inp.style.borderColor = '#ffc107';
+        inp.style.fontWeight  = '700';
+      });
+    }, 300);
+
+    // The advisory review banner was removed — the save-time "Review changes
+    // before saving" popup now covers reviewing before a save. The auto-updated
+    // pack prices are kept in manualPrices and shown highlighted above.
+  };
+});
+
+manualToggle.addEventListener('change', function() {
+  if (!this.checked) {
+    Object.keys(manualPrices).forEach(k => delete manualPrices[k]);
+  }
+  document.getElementById('pricingModeField').value = this.checked ? 'manual' : 'auto';
+  recalculate();
+});
+// MRP and Suggested price can now be ON together: MRP is the hard cap, the
+// suggested price is the "reasonable price" guidance that cautions the shop.
+mrpToggle.addEventListener('change', function() {
+  document.getElementById('showMrpField').value = this.checked ? 'true' : 'false';
+  recalculate();
+});
+suggestToggle.addEventListener('change', function() {
+  document.getElementById('showSuggestField').value = this.checked ? 'true' : 'false';
+  recalculate();
+});
+looseToggle.addEventListener('change', applyLooseStockUI);
+
+// On form submit — do a final DOM read of all MRP inputs before submitting
+document.getElementById('productForm').addEventListener('submit', function(e) {
+  // Validate against ALL variants (not just the live one). Serialize first so
+  // we inspect exactly what will be saved.
+  let allVariants = [];
+  try { VariantMgr.serialize(); allVariants = JSON.parse(document.getElementById('variantsJson').value || '[]'); }
+  catch (err) { allVariants = []; }
+
+  // A product must have at least one pack (with a price > 0) across its variants.
+  const totalPacks = allVariants.reduce((n, v) => n + ((v.packs || []).length), 0);
+  if (totalPacks === 0) {
+    e.preventDefault();
+    alert('Please select at least one pack size (and set its price) before saving.\n\n'
+        + 'Tip: entering only "Total Stock" is not enough — pick a pack size (e.g. 1kg) '
+        + 'and give it a price in the table below.');
+    return;
+  }
+
+  // Block any pack whose price is zero or negative — report with its variant.
+  const belowMin = [];
+  allVariants.forEach(v => {
+    (v.packs || []).forEach(p => {
+      if (!(parseFloat(p.selling_price) > 0)) {
+        belowMin.push((v.name || 'Variant') + ' · ' + p.label + ': price must be greater than ₹0');
+      }
+    });
+  });
+  if (belowMin.length > 0) {
+    e.preventDefault();
+    alert('❌ Pack prices cannot be zero or negative:\n\n' + belowMin.join('\n'));
+    return;
+  }
+
+  // Block any pack whose price is BELOW its auto price. The auto price is the
+  // minimum floor — the supplier may set it equal or higher, never lower.
+  const belowAuto = [];
+  allVariants.forEach(v => {
+    const vn = v.name || 'Variant';
+    (v.packs || []).forEach(p => {
+      const sell = parseFloat(p.selling_price);
+      const auto = parseFloat(p.auto_price) || 0;
+      if (auto > 0 && sell > 0 && sell < auto - 0.0001) {
+        belowAuto.push(vn + ' · ' + p.label + ': price ₹' + sell.toFixed(2)
+          + ' is below the auto price ₹' + auto.toFixed(2) + ' (set ₹' + auto.toFixed(2) + ' or higher)');
+      }
+    });
+  });
+  if (belowAuto.length > 0) {
+    e.preventDefault();
+    alert('⚠ Pack prices cannot be below the auto price:\n\n' + belowAuto.join('\n')
+      + '\n\nPlease edit the price(s) and try saving again.');
+    return;
+  }
+
+  // ── Price-order rules (checked across ALL variants) ──────────────────
+  //   • When MRP is on:  selling price must be STRICTLY LESS than MRP.
+  //   • When Suggested is on: selling < suggested, and (if MRP on) suggested ≤ MRP.
+  const EPS = 0.0001;
+  const mrpOn = mrpToggle.checked;
+  const suggestOn = suggestToggle.checked;
+  const priceErrors = [];
+  allVariants.forEach(v => {
+    const vn = v.name || 'Variant';
+    (v.packs || []).forEach(p => {
+      const sell = parseFloat(p.selling_price);
+      const mrp  = (p.mrp === '' || p.mrp == null) ? null : parseFloat(p.mrp);
+      const sug  = (p.suggested_price === '' || p.suggested_price == null) ? null : parseFloat(p.suggested_price);
+      const tag  = vn + ' · ' + p.label;
+
+      if (mrpOn && mrp != null && !(sell < mrp - EPS)) {
+        priceErrors.push(tag + ': selling ₹' + sell.toFixed(2) + ' must be LESS than MRP ₹' + mrp.toFixed(2) + ' (not equal).');
+      }
+      if (suggestOn && sug != null) {
+        if (!(sug > sell + EPS)) {
+          priceErrors.push(tag + ': suggested ₹' + sug.toFixed(2) + ' must be MORE than your price ₹' + sell.toFixed(2) + '.');
+        }
+        if (mrpOn && mrp != null && sug > mrp + EPS) {
+          priceErrors.push(tag + ': suggested ₹' + sug.toFixed(2) + ' cannot be more than MRP ₹' + mrp.toFixed(2) + '.');
+        }
+      }
+    });
+  });
+  if (priceErrors.length) {
+    e.preventDefault();
+    alert('❌ Please fix these price values:\n\n' + priceErrors.join('\n')
+        + '\n\nRule: selling price < suggested price ≤ MRP.');
+    return;
+  }
+
+  // Read ALL current MRP inputs directly from DOM (not from manualMrps cache)
+  variantPreview.querySelectorAll('.manual-mrp').forEach(inp => {
+    const u = parseInt(inp.dataset.unit);
+    const val = parseFloat(inp.value);
+    if (!isNaN(val)) manualMrps[u] = val;
+  });
+  variantPreview.querySelectorAll('.manual-suggest').forEach(inp => {
+    const u = parseInt(inp.dataset.unit);
+    const val = parseFloat(inp.value);
+    if (!isNaN(val) && suggestTouched.has(u)) manualSuggest[u] = val;
+  });
+
+  // Also read price inputs to keep them in sync
+  variantPreview.querySelectorAll('.manual-price').forEach(inp => {
+    const u = parseInt(inp.dataset.unit);
+    const val = parseFloat(inp.value);
+    if (!isNaN(val)) manualPrices[u] = val;
+  });
+  // Read per-pack stock inputs (branded / loose OFF mode)
+  variantPreview.querySelectorAll('.manual-stock').forEach(inp => {
+    const u = parseInt(inp.dataset.unit);
+    const val = parseInt(inp.value);
+    if (!isNaN(val)) manualStocks[u] = val;
+  });
+
+  // Rebuild formset with latest DOM values
+  const container = document.getElementById('variantForms');
+  const rows = container.querySelectorAll('.variant-row');
+  const currentVariants = [];
+  rows.forEach(row => {
+    const label = row.querySelector('[name$="-label"]')?.value;
+    const price = parseFloat(row.querySelector('[name$="-selling_price"]')?.value) || 0;
+    const unit  = parseInt(row.querySelector('[name$="-unit_grams"]')?.value) || 0;
+    const stock = parseInt(row.querySelector('[name$="-stock"]')?.value) || 0;
+    // Use DOM value directly — most up-to-date
+    const mrpInput = variantPreview.querySelector(`.manual-mrp[data-unit="${unit}"]`);
+    const mrp = mrpInput ? (parseFloat(mrpInput.value) || null) : (manualMrps[unit] !== undefined ? manualMrps[unit] : null);
+    const suggestInput = variantPreview.querySelector(`.manual-suggest[data-unit="${unit}"]`);
+    const suggest = suggestInput ? (parseFloat(suggestInput.value) || null) : (manualSuggest[unit] !== undefined ? manualSuggest[unit] : null);
+    // Stock: if loose OFF, prefer the manual-stock DOM input; else use hidden formset value
+    const stockInput = variantPreview.querySelector(`.manual-stock[data-unit="${unit}"]`);
+    const finalStock = stockInput ? (parseInt(stockInput.value) || 0) : stock;
+    if (label) currentVariants.push({label, price, mrp, suggest, stock: finalStock, unit});
+  });
+  if (currentVariants.length > 0) updateFormset(currentVariants);
+
+  // Variant-aware save: serialize ALL variants into variants_json. This is the
+  // authoritative payload the server reads (the legacy formset is ignored when
+  // variants_json is present).
+  try { VariantMgr.serialize(); } catch (err) { console.error('variant serialize', err); }
+
+  // ── Save confirmation gate ─────────────────────────────────────────
+  // Validation has passed and variants_json now holds the authoritative
+  // payload. Before actually saving, show a popup listing every change the
+  // supplier made (old → new), and only submit after they confirm. The
+  // confirm button sets window._saveConfirmed so this second pass falls through.
+  if (!window._saveConfirmed) {
+    e.preventDefault();
+    const changes = buildChangeSummary(ORIGINAL_GROUPS,
+      JSON.parse(document.getElementById('variantsJson').value || '[]'));
+    showSaveConfirmModal(changes);
+    return;
+  }
+  window._saveConfirmed = false;   // reset for any future submit
+});
+
+// ── Build a human-readable list of changes between the server's original
+// variant groups and the about-to-be-saved payload. Packs are matched by
+// unit_grams within each variant (the same key the backend reconciles on).
+function buildChangeSummary(originalGroups, newGroups) {
+  const fmt = (v) => (v === null || v === undefined || v === '' ) ? '—' : v;
+  const money = (v) => (v === null || v === undefined || v === '') ? '—' : ('₹' + parseFloat(v).toFixed(2));
+  const changes = [];   // [{variant, pack, field, from, to}]
+
+  const indexGroup = (g) => {
+    const m = {};
+    (g.packs || []).forEach(p => { m[parseInt(p.unit_grams)] = p; });
+    return m;
+  };
+  // Index original variants by id (fallback to name) for matching.
+  const origByKey = {};
+  (originalGroups || []).forEach((g, i) => { origByKey[g.id != null ? ('id' + g.id) : ('i' + i)] = g; });
+
+  (newGroups || []).forEach((ng, i) => {
+    const vname = ng.name || (newGroups.length === 1 ? 'Product' : ('Variant ' + (i + 1)));
+    const og = origByKey[ng.id != null ? ('id' + ng.id) : ('i' + i)]
+            || (originalGroups && originalGroups[i]) || {packs: []};
+    const oPacks = indexGroup(og);
+    const nPacks = indexGroup(ng);
+
+    // Changed / added packs
+    Object.keys(nPacks).forEach(ug => {
+      const np = nPacks[ug];
+      const op = oPacks[ug];
+      const plabel = np.label || (ug + 'g');
+      if (!op) {
+        changes.push({variant: vname, pack: plabel, field: 'Added pack', from: '—',
+          to: 'price ' + money(np.selling_price) + ', stock ' + fmt(np.stock)});
+        return;
+      }
+      const cmp = [
+        ['Price',     money(op.selling_price),    money(np.selling_price)],
+        ['MRP',       money(op.mrp),              money(np.mrp)],
+        ['Suggested', money(op.suggested_price),  money(np.suggested_price)],
+        ['Stock',     fmt(op.stock),              fmt(np.stock)],
+        ['Bundle qty',fmt(op.bundle_qty || 0),    fmt(np.bundle_qty || 0)],
+      ];
+      cmp.forEach(([field, a, b]) => {
+        if (String(a) !== String(b)) changes.push({variant: vname, pack: plabel, field, from: a, to: b});
+      });
+    });
+    // Removed packs (in original, not in new)
+    Object.keys(oPacks).forEach(ug => {
+      if (!nPacks[ug]) {
+        const op = oPacks[ug];
+        changes.push({variant: vname, pack: op.label || (ug + 'g'), field: 'Removed pack',
+          from: 'price ' + money(op.selling_price), to: '—'});
+      }
+    });
+  });
+
+  // Whole variants removed
+  (originalGroups || []).forEach((og, i) => {
+    const stillThere = (newGroups || []).some((ng, j) =>
+      (ng.id != null && ng.id === og.id) || (og.id == null && j === i));
+    if (!stillThere) {
+      changes.push({variant: og.name || ('Variant ' + (i + 1)), pack: '—',
+        field: 'Removed variant', from: (og.packs || []).length + ' pack(s)', to: '—'});
+    }
+  });
+  return changes;
+}
+
+// Render the change list into the save-confirm modal and show it.
+function showSaveConfirmModal(changes) {
+  const body = document.getElementById('saveConfirmBody');
+  if (!changes.length) {
+    body.innerHTML = '<div class="alert alert-info mb-0">No changes detected on this page. '
+      + 'You can still save to re-confirm the current values.</div>';
+  } else {
+    let rows = changes.map(c =>
+      `<tr>
+        <td class="small"><strong>${c.variant}</strong></td>
+        <td class="small">${c.pack}</td>
+        <td class="small">${c.field}</td>
+        <td class="small text-danger">${c.from}</td>
+        <td class="small text-success fw-semibold">${c.to}</td>
+      </tr>`).join('');
+    body.innerHTML =
+      `<div class="table-responsive"><table class="table table-sm table-bordered mb-0">
+        <thead class="table-light"><tr>
+          <th>Variant</th><th>Pack</th><th>What changed</th>
+          <th class="text-danger">From</th><th class="text-success">To</th>
+        </tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  const modal = new bootstrap.Modal(document.getElementById('saveConfirmModal'));
+  const confirmBtn = document.getElementById('saveConfirmBtn');
+  // Fresh handler each time so it never stacks.
+  confirmBtn.onclick = function() {
+    window._saveConfirmed = true;
+    modal.hide();
+    document.getElementById('productForm').requestSubmit();
+  };
+  modal.show();
+}
+
+// ── Image upload toast ────────────────────────────────────────────────────────
+document.querySelector('input[type="file"]')?.addEventListener('change', function() {
+  if (this.files && this.files[0]) {
+    new bootstrap.Toast(document.getElementById('imgToast'), {delay: 3000}).show();
+  }
+});
+
+// ── Clipboard Paste (Ctrl+V) for Product Image ──
+(function () {
+  const pasteZone    = document.getElementById('pasteZone');
+  const pastePreview = document.getElementById('pastePreview');
+  const previewImg   = document.getElementById('pastePreviewImg');
+  const clearBtn     = document.getElementById('clearPasteBtn');
+  const hiddenInput  = document.getElementById('pastedImageInput');
+
+  function applyPastedFile(file) {
+    if (!file || !file.type.startsWith('image/')) return;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onload = e => {
+      previewImg.src = e.target.result;
+      pastePreview.style.display = 'block';
+      pasteZone.style.borderColor = '#28a745';
+      pasteZone.style.background  = '#f0fff4';
+      pasteZone.innerHTML = '<i class="bi bi-check-circle-fill text-success me-1"></i><span class="text-success fw-semibold">Image pasted!</span> Press Ctrl+V again to replace.';
+    };
+    reader.readAsDataURL(file);
+
+    // Attach to a hidden file input so Django form picks it up
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    hiddenInput.files = dt.files;
+
+    // Also swap it into the visible file input so it gets submitted as the form's image field
+    const mainInput = document.getElementById('{{ form.image.id_for_label }}') ||
+                      document.querySelector('input[name="image"]');
+    if (mainInput) {
+      mainInput.files = dt.files;
+    }
+
+    new bootstrap.Toast(document.getElementById('imgToast'), {delay: 3000}).show();
+  }
+
+  // Paste event on the zone itself
+  pasteZone.addEventListener('paste', e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        applyPastedFile(item.getAsFile());
+        e.preventDefault();
+        return;
+      }
+    }
+  });
+
+  // Global Ctrl+V listener (works when anywhere on page is focused)
+  document.addEventListener('paste', e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        applyPastedFile(item.getAsFile());
+        e.preventDefault();
+        return;
+      }
+    }
+  });
+
+  // Visual hover feedback on paste zone
+  pasteZone.addEventListener('focus', () => pasteZone.style.borderColor = '#007bff');
+  pasteZone.addEventListener('blur',  () => {
+    if (!previewImg.src) pasteZone.style.borderColor = '#ccc';
+  });
+  pasteZone.addEventListener('mouseenter', () => pasteZone.style.borderColor = '#007bff');
+  pasteZone.addEventListener('mouseleave', () => {
+    if (!previewImg.src) pasteZone.style.borderColor = '#ccc';
+  });
+
+  // Clear button
+  clearBtn.addEventListener('click', () => {
+    previewImg.src = '';
+    pastePreview.style.display = 'none';
+    pasteZone.style.borderColor = '#ccc';
+    pasteZone.style.background  = '';
+    pasteZone.innerHTML = '<i class="bi bi-clipboard-image me-1"></i>Click here &amp; press <kbd>Ctrl+V</kbd> to paste image from clipboard';
+    hiddenInput.value = '';
+    const mainInput = document.getElementById('{{ form.image.id_for_label }}') ||
+                      document.querySelector('input[name="image"]');
+    if (mainInput) mainInput.value = '';
+  });
+})();
+
+// ============================================================================
+// STOCK & PRICING INTERACTIVE UI
+// The -/+ steppers and the "Quick Adjust" popups were removed. Stock and
+// Selling Price are now plain number inputs — type directly, or use the
+// native up/down arrows. All changes are reviewed in the save-confirm popup.
+// ============================================================================
+
+// ============================================================================
+// BUNDLE COLUMN  (integrated into the pack-size table; wholesale-only)
+// Each pack can define one bundle = a box/bag of N of that pack. Price and
+// availability are computed from the pack. Toggled by #bundleToggle.
+// ============================================================================
+window.bundleQty = window.bundleQty || {};   // { unit_grams: packsPerBundle }
+(function () {
+  'use strict';
+
+  // Seed from existing bundles on the edit page.
+  var existing = {{ existing_bundles_json|default:"[]"|safe }};
+  existing.forEach(function (b) {
+    if (b.unit_grams && b.pack_quantity) window.bundleQty[b.unit_grams] = b.pack_quantity;
+  });
+
+  var toggle = document.getElementById('bundleToggle');
+  var hint   = document.getElementById('bundleHint');
+
+  window.bundleEnabled = function () { return !!(toggle && toggle.checked); };
+
+  function syncHint() {
+    if (hint) hint.style.display = window.bundleEnabled() ? '' : 'none';
+  }
+
+  if (toggle) {
+    toggle.addEventListener('change', function () {
+      syncHint();
+      if (typeof recalculate === 'function') recalculate();  // redraw table w/ or w/o column
+    });
+  }
+  syncHint();
+
+  // Serialize bundle columns into hidden inputs right before submit.
+  var formEl = document.getElementById('productForm');
+  if (formEl) {
+    formEl.addEventListener('submit', function () {
+      formEl.querySelectorAll('.bundle-submit-field').forEach(function (n) { n.remove(); });
+      if (!window.bundleEnabled()) return;   // off → save no bundles (deactivates existing)
+
+      // Read the live bundle inputs in the table.
+      document.querySelectorAll('#variantPreview .bundle-qty').forEach(function (inp) {
+        var ug  = parseInt(inp.dataset.unit);
+        var qty = parseInt(inp.value) || 0;
+        if (ug > 0 && qty > 0) window.bundleQty[ug] = qty;
+        else delete window.bundleQty[ug];
+      });
+
+      Object.keys(window.bundleQty).forEach(function (ug) {
+        var qty = window.bundleQty[ug];
+        if (!qty) return;
+        var label = '';
+        var ugInput = document.querySelector('#variantForms [name$="-unit_grams"][value="' + ug + '"]');
+        if (ugInput) {
+          var lblInp = ugInput.closest('.variant-row').querySelector('[name$="-label"]');
+          label = lblInp ? lblInp.value : '';
+        }
+        var add = function (name, value) {
+          var h = document.createElement('input');
+          h.type = 'hidden'; h.name = name; h.value = value;
+          h.className = 'bundle-submit-field';
+          formEl.appendChild(h);
+        };
+        add('bundle_id[]', '');
+        add('bundle_name[]', 'Box of ' + qty + (label ? ' (' + label + ')' : ''));
+        add('bundle_unit_grams[]', ug);
+        add('bundle_qty[]', qty);
+      });
+    });
+  }
+})();
+</script>
+{% endblock %}

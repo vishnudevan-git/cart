@@ -1,0 +1,135 @@
+{% extends 'admin_panel/partner_list_base.html' %}
+{% comment %}
+Marketplaces (code: Distributor) list. Uses the common partner-list layout.
+This page keeps its own per-column instant-search (server side + JS) instead of
+the single search box, so show_search is False and the column-search header row
++ script are provided via block overrides. Config is passed by distributor_list.
+{% endcomment %}
+
+{% block colspan %}9{% endblock %}
+
+{% block table_head %}
+  <th data-col="name">{% include 'partials/sort_header.html' with field="name" label="Company" current_sort=sort %}</th>
+  <th data-col="area">{% include 'partials/sort_header.html' with field="area" label="Area" current_sort=sort %}</th>
+  <th data-col="username">Username</th>
+  <th data-col="customers">{% include 'partials/sort_header.html' with field="customers" label="Customers" current_sort=sort %}</th>
+  <th data-col="orders">{% include 'partials/sort_header.html' with field="orders" label="Orders" current_sort=sort %}</th>
+  <th data-col="delivery">{% include 'partials/sort_header.html' with field="delivery" label="Delivery ₹" current_sort=sort %}</th>
+  <th data-col="status">{% include 'partials/sort_header.html' with field="status" label="Status" current_sort=sort %}</th>
+  <th data-col="actions">Actions</th>
+  </tr>
+  <!-- per-column server-side search row -->
+  <tr>
+    <th></th>
+    <th><input type="text" class="form-control form-control-sm col-search-input" data-col="name" placeholder="Search..." id="srch_distTable_name" value="{{ request.GET.company }}"></th>
+    <th><input type="text" class="form-control form-control-sm col-search-input" data-col="area" placeholder="Search…" id="srch_distTable_area" value="{{ request.GET.area }}"></th>
+    <th><input type="text" class="form-control form-control-sm col-search-input" data-col="username" placeholder="Search…" id="srch_distTable_username" value="{{ request.GET.username }}"></th>
+    <th><input type="text" class="form-control form-control-sm col-search-input" data-col="customers" placeholder="Search…" id="srch_distTable_customers" value="{{ request.GET.customers }}"></th>
+    <th><input type="text" class="form-control form-control-sm col-search-input" data-col="orders" placeholder="Search…" id="srch_distTable_orders" value="{{ request.GET.orders }}"></th>
+    <th><input type="text" class="form-control form-control-sm col-search-input" data-col="delivery" placeholder="Search…" id="srch_distTable_delivery" value="{{ request.GET.delivery }}"></th>
+    <th><input type="text" class="form-control form-control-sm col-search-input" data-col="status" placeholder="Search…" id="srch_distTable_status" value="{{ request.GET.status_col }}"></th>
+    <th></th>
+{% endblock %}
+
+{% block rows %}
+  {% for d in distributors %}
+  <tr>
+    <td><input type="checkbox" class="form-check-input row-check" name="distributor_ids" value="{{ d.pk }}"></td>
+    <td class="fw-semibold" data-col="name"><a href="{% url 'admin_panel:distributor_detail' d.pk %}" class="text-decoration-none">{{ d.company_name }}</a></td>
+    <td data-col="area">{{ d.area|default:"—" }}</td>
+    <td data-col="username">{{ d.user.username }}</td>
+    <td data-col="customers">{{ d.customer_count }}</td>
+    <td data-col="orders">{{ d.order_count }}</td>
+    <td data-col="delivery">₹{{ d.delivery_charge }}</td>
+    <td data-col="status"><span class="badge {% if d.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">{{ d.get_status_display }}</span></td>
+    <td data-col="actions">
+      <div class="d-flex gap-1">
+        {% if status_filter == 'deleted' %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_restore' 'distributor' d.pk %}"
+                  class="btn btn-sm btn-success"
+                  data-confirm="Restore {{ d.company_name }}?" data-confirm-title="Restore Marketplace?" data-confirm-type="success" data-confirm-icon="✅">Restore</button>
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_purge' 'distributor' d.pk %}"
+                  class="btn btn-sm btn-outline-danger"
+                  data-confirm="Permanently archive {{ d.company_name }}? This cannot be undone."
+                  data-confirm-title="Delete permanently?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete permanently</button>
+        {% else %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:distributor_toggle' d.pk %}"
+                class="btn btn-sm {% if d.status == 'active' %}btn-warning{% else %}btn-success{% endif %}"
+                data-confirm="{% if d.status == 'active' %}Suspend {{ d.company_name }}? {{ d.customer_count }} customer(s) will not be able to shop until reactivated.{% else %}Activate {{ d.company_name }}? Customers will be able to shop again.{% endif %}"
+                data-confirm-title="{% if d.status == 'active' %}Suspend Marketplace?{% else %}Activate Marketplace?{% endif %}"
+                data-confirm-type="{% if d.status == 'active' %}warning{% else %}success{% endif %}"
+                data-confirm-icon="{% if d.status == 'active' %}⚠️{% else %}✅{% endif %}">{% if d.status == 'active' %}Suspend{% else %}Activate{% endif %}</button>
+          {% if d.status == 'suspended' %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_soft_delete' 'distributor' d.pk %}"
+                  class="btn btn-sm btn-outline-danger"
+                  data-confirm="Delete {{ d.company_name }}? It moves to the Deleted tab and stays recoverable until the grace period ends."
+                  data-confirm-title="Delete Marketplace?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete</button>
+          {% endif %}
+        {% endif %}
+      </div>
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="9" class="text-center text-muted py-4">No marketplaces found.</td></tr>
+  {% endfor %}
+{% endblock %}
+
+{% block empty_row %}{% endblock %}
+
+{% block mobile_cards %}
+  {% for d in distributors %}
+  <div class="card border-0 shadow-sm mb-2 p-3">
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <div>
+        <div class="fw-semibold"><a href="{% url 'admin_panel:distributor_detail' d.pk %}" class="text-decoration-none text-dark">{{ d.company_name }}</a></div>
+        <div class="text-muted small">{{ d.area|default:"—" }} · {{ d.user.username }}</div>
+        <div class="text-muted small">{{ d.customer_count }} customers · {{ d.order_count }} orders · Delivery ₹{{ d.delivery_charge }}</div>
+      </div>
+      <span class="badge {% if d.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">{{ d.get_status_display }}</span>
+    </div>
+    <div class="d-flex gap-2">
+      <button type="submit" formmethod="post" formaction="{% url 'admin_panel:distributor_toggle' d.pk %}"
+            class="btn btn-sm {% if d.status == 'active' %}btn-warning{% else %}btn-success{% endif %} w-100"
+            data-confirm="{% if d.status == 'active' %}Suspend {{ d.company_name }}?{% else %}Activate {{ d.company_name }}?{% endif %}"
+            data-confirm-title="{% if d.status == 'active' %}Suspend?{% else %}Activate?{% endif %}"
+            data-confirm-type="{% if d.status == 'active' %}warning{% else %}success{% endif %}"
+            data-confirm-icon="{% if d.status == 'active' %}⚠️{% else %}✅{% endif %}">{% if d.status == 'active' %}Suspend{% else %}Activate{% endif %}</button>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">No marketplaces found.</p>
+  {% endfor %}
+
+  <!-- per-column instant-search JS (marketplace-only) -->
+  <script>
+  (function() {
+    'use strict';
+    function mapParamName(dataCol) {
+      if (dataCol === 'name') return 'company';
+      if (dataCol === 'status') return 'status_col';
+      return dataCol;
+    }
+    function buildUrlWithColumnFilters() {
+      var params = new URLSearchParams();
+      var existingParams = new URLSearchParams(window.location.search);
+      if (existingParams.has('status')) params.append('status', existingParams.get('status'));
+      if (existingParams.has('sort')) params.append('sort', existingParams.get('sort'));
+      document.querySelectorAll('.col-search-input').forEach(function(inp) {
+        var val = inp.value.trim();
+        var dataCol = inp.dataset.col;
+        if (val && dataCol) params.append(mapParamName(dataCol), val);
+      });
+      return window.location.pathname + '?' + params.toString();
+    }
+    var searchTimers = {};
+    document.querySelectorAll('.col-search-input').forEach(function(input) {
+      input.addEventListener('input', function() {
+        var col = this.dataset.col;
+        if (!col) return;
+        if (searchTimers[col]) clearTimeout(searchTimers[col]);
+        searchTimers[col] = setTimeout(function() { window.location.href = buildUrlWithColumnFilters(); }, 400);
+      });
+    });
+  })();
+  </script>
+{% endblock %}

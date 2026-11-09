@@ -1,0 +1,91 @@
+{% extends 'admin_panel/partner_list_base.html' %}
+{% comment %}
+Distributors (wholesale; code: Wholesaler) list. Now uses the common
+partner-list layout so it matches Suppliers/Stockist/Marketplaces: tabs,
+search, bulk suspend/activate, sortable card table. Keeps its own extra columns
+(Territory, Login, Margin, Marketplaces count) and the "Manage" action.
+Config passed by wholesaler_list view.
+{% endcomment %}
+
+{% block colspan %}8{% endblock %}
+
+{% block table_head %}
+  <th data-col="name">{% include 'partials/sort_header.html' with field="name" label="Company" current_sort=sort %}</th>
+  <th data-col="area">{% include 'partials/sort_header.html' with field="area" label="Territory" current_sort=sort %}</th>
+  <th data-col="username">Login</th>
+  <th data-col="margin">Margin</th>
+  <th data-col="marketplaces">{% include 'partials/sort_header.html' with field="marketplaces" label="Marketplaces" current_sort=sort %}</th>
+  <th data-col="status">{% include 'partials/sort_header.html' with field="status" label="Status" current_sort=sort %}</th>
+  <th data-col="actions">Actions</th>
+{% endblock %}
+
+{% block rows %}
+  {% for w in wholesalers %}
+  <tr>
+    <td><input type="checkbox" class="form-check-input row-check" name="wholesaler_ids" value="{{ w.pk }}"></td>
+    <td class="fw-semibold" data-col="name"><a href="{% url 'admin_panel:wholesaler_detail' w.pk %}" class="text-decoration-none">{{ w.company_name }}</a></td>
+    <td data-col="area">{{ w.area|default:"—" }}</td>
+    <td class="small text-muted" data-col="username">{{ w.user.username }}</td>
+    <td data-col="margin">{{ w.margin_display }}</td>
+    <td data-col="marketplaces"><span class="badge bg-info-subtle text-info">{{ w.ent_count }}</span></td>
+    <td data-col="status"><span class="badge {% if w.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">{{ w.get_status_display }}</span></td>
+    <td data-col="actions">
+      <div class="d-flex gap-1">
+        {% if status_filter == 'deleted' %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_restore' 'wholesaler' w.pk %}"
+                  class="btn btn-sm btn-success"
+                  data-confirm="Restore {{ w.company_name }}?" data-confirm-title="Restore Distributor?" data-confirm-type="success" data-confirm-icon="✅">Restore</button>
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_purge' 'wholesaler' w.pk %}"
+                  class="btn btn-sm btn-outline-danger"
+                  data-confirm="Permanently archive {{ w.company_name }}? This cannot be undone."
+                  data-confirm-title="Delete permanently?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete permanently</button>
+        {% else %}
+          <a href="{% url 'admin_panel:wholesaler_detail' w.pk %}" class="btn btn-sm btn-outline-success">Manage</a>
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:wholesaler_toggle' w.pk %}"
+                class="btn btn-sm {% if w.status == 'active' %}btn-warning{% else %}btn-success{% endif %}"
+                data-confirm="{% if w.status == 'active' %}Suspend {{ w.company_name }}? Its {{ w.ent_count }} marketplace(s) keep running but it cannot restock.{% else %}Activate {{ w.company_name }}?{% endif %}"
+                data-confirm-title="{% if w.status == 'active' %}Suspend Distributor?{% else %}Activate Distributor?{% endif %}"
+                data-confirm-type="{% if w.status == 'active' %}warning{% else %}success{% endif %}"
+                data-confirm-icon="{% if w.status == 'active' %}⚠️{% else %}✅{% endif %}">{% if w.status == 'active' %}Suspend{% else %}Activate{% endif %}</button>
+          {% if w.status == 'suspended' %}
+          <button type="submit" formmethod="post" formaction="{% url 'admin_panel:partner_soft_delete' 'wholesaler' w.pk %}"
+                  class="btn btn-sm btn-outline-danger"
+                  data-confirm="Delete {{ w.company_name }}? It moves to the Deleted tab and stays recoverable until the grace period ends."
+                  data-confirm-title="Delete Distributor?" data-confirm-type="danger" data-confirm-icon="🗑️">Delete</button>
+          {% endif %}
+        {% endif %}
+      </div>
+    </td>
+  </tr>
+  {% empty %}
+  <tr><td colspan="8" class="text-center text-muted py-4">No wholesale Distributors yet. Create one to supply your Marketplaces.</td></tr>
+  {% endfor %}
+{% endblock %}
+
+{% block empty_row %}{% endblock %}
+
+{% block mobile_cards %}
+  {% for w in wholesalers %}
+  <div class="card border-0 shadow-sm mb-2 p-3">
+    <div class="d-flex justify-content-between align-items-start mb-2">
+      <div>
+        <div class="fw-semibold"><a href="{% url 'admin_panel:wholesaler_detail' w.pk %}" class="text-decoration-none text-dark">{{ w.company_name }}</a></div>
+        <div class="text-muted small">{{ w.area|default:"—" }} · {{ w.user.username }}</div>
+        <div class="text-muted small">{{ w.margin_display }} · {{ w.ent_count }} marketplace{{ w.ent_count|pluralize }}</div>
+      </div>
+      <span class="badge {% if w.status == 'active' %}bg-success{% else %}bg-danger{% endif %}">{{ w.get_status_display }}</span>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'admin_panel:wholesaler_detail' w.pk %}" class="btn btn-sm btn-outline-success flex-fill">Manage</a>
+      <button type="submit" formmethod="post" formaction="{% url 'admin_panel:wholesaler_toggle' w.pk %}"
+            class="btn btn-sm {% if w.status == 'active' %}btn-warning{% else %}btn-success{% endif %} flex-fill"
+            data-confirm="{% if w.status == 'active' %}Suspend {{ w.company_name }}?{% else %}Activate {{ w.company_name }}?{% endif %}"
+            data-confirm-title="{% if w.status == 'active' %}Suspend?{% else %}Activate?{% endif %}"
+            data-confirm-type="{% if w.status == 'active' %}warning{% else %}success{% endif %}"
+            data-confirm-icon="{% if w.status == 'active' %}⚠️{% else %}✅{% endif %}">{% if w.status == 'active' %}Suspend{% else %}Activate{% endif %}</button>
+    </div>
+  </div>
+  {% empty %}
+  <p class="text-muted text-center py-4">No wholesale Distributors yet.</p>
+  {% endfor %}
+{% endblock %}

@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% block title %}LaKrish Mart — Fresh Organic Food{% endblock %}
+
+{% block content %}
+<div class="text-white py-4 py-md-5 home-hero" style="background: var(--theme-color, #2e7d32);">
+  <div class="container text-center px-3">
+    <h1 class="fw-bold mb-2">🌿 Fresh. Organic. Delivered.</h1>
+    <p class="lead mb-3 d-none d-sm-block">Premium organic products, dry fruits, nuts & spices.</p>
+    <form method="get" action="{% url 'products:product_list' %}" class="home-hero-search mx-auto mb-3" autocomplete="off">
+      <div class="input-group input-group-lg shadow-sm">
+        <span class="input-group-text bg-white border-0"><i class="bi bi-search"></i></span>
+        <input type="text" name="q" class="form-control border-0" placeholder="Search fruits, spices, dry fruits...">
+        <button class="btn btn-light fw-semibold px-4" type="submit">Search</button>
+      </div>
+    </form>
+    <a href="{% url 'products:product_list' %}" class="btn btn-light btn-lg px-4 btn-shop-all">Shop All Products</a>
+  </div>
+</div>
+
+<div class="container mt-4">
+  <h5 class="mb-3 fw-semibold">Shop by Category</h5>
+  <div class="row g-2">
+    {% for cat in categories %}
+    <div class="col-4 col-sm-4 col-md-2">
+      <a href="{% url 'products:product_list' %}?category={{ cat.slug }}" class="text-decoration-none">
+        <div class="card category-card text-center p-2 h-100 border-0 shadow-sm">
+          {% if cat.image %}
+            <img src="{{ cat.image.url }}" class="mx-auto mb-1" style="height:44px;object-fit:contain" alt="{{ cat.name }}">
+          {% else %}
+            <div class="fs-2 mb-1">🌿</div>
+          {% endif %}
+          <div class="fw-semibold text-dark small">{{ cat.name }}</div>
+        </div>
+      </a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="container mt-4 mb-5 pb-4 product-grid-section">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-semibold mb-0">Featured Products</h5>
+    <a href="{% url 'products:product_list' %}" class="btn btn-outline-success btn-sm">View All →</a>
+  </div>
+  <div class="row g-2 g-md-3 product-grid">
+    {% for product in featured %}
+    <div class="col-6 col-sm-4 col-md-3">
+      {% include 'products/product_card.html' with product=product %}
+    </div>
+    {% empty %}
+    <p class="text-muted">No products yet.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="/static/css/lakrish.js?v=7"></script>
+{% endblock %}
