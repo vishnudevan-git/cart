@@ -498,3 +498,5 @@ in the kg group. Organic Ghee (500 g and 1 kg) is in the kg group.
 ## 2026-11-20 (loose, logging): owner decisions carried out
 **Owner.** Loose (weighed) stock must block too. Built. Automatic shop requests: explained and now block. Full order test: owner will place orders from each role. Activity log for every role on orders: added where missing.
 **Owner.** "If the shop cannot cover the whole order, only no stock, then request from the upper level?" Answer: yes, the trigger is no free stock at the shop. The build takes packs straight from the upper tier, which skips the request-and-confirm step. Correction recorded in article 13 section 8.
+## 2026-11-20 (decision): hold, request, confirm; Auto switch; visibility bug
+**Owner.** Every tier confirms before moving up. Each role has an Auto button, default OFF. Owner questions answered in article 13 section 9. Found bug: stockist and supplier order lists use order-level source, so orders filled by a distributor still appear to the stockist. Owner to confirm before build.

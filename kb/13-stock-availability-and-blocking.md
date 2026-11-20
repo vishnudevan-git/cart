@@ -135,3 +135,26 @@ Any new migration needs a backup first and must be listed here and in article 12
 **Still open:**
 - Nearest-first: block plus request plus confirm (see CORRECTION).
 - Full checkout test: owner will place a real order from each role; the test checklist is to be written with the owner.
+## 9. Owner decisions 2026-11-20 (not yet built): hold, request, confirm
+
+**Rule.** Every tier confirms before the order moves to the next tier up. Stock is held at the nearest tier that has it, a request goes to that tier, and the tier confirms. A tier fills the request from its own stock. If it lacks stock, it sends its own request one level up, and so on.
+
+**Auto switch (owner).** Each role gets one button: Auto. Default OFF. When OFF, the role must confirm each request before it goes up. When ON, the system confirms automatically if the role has enough free stock.
+
+**Plain-language example.** Customer orders 3 packs from Shop A. Shop A has 0. Distributor has 5, Stockist has 10, Supplier has 100.
+- Checkout holds 3 packs at the Distributor. The Distributor sees a request for 3 and confirms.
+- The packs move to Shop A, and Shop A fills the customer's order.
+- If the Distributor had 2 packs, it would fill 2 and send a request up to the Stockist for the other 1 (or hold 3 and request the difference, to be agreed).
+
+**Who sees customer orders (owner question).** Current behaviour, checked in code:
+- The Shop sees all its own customer orders.
+- The Stockist order list shows orders where the Shop's Distributor belongs to that Stockist, and where the order's source is "supplier", with status confirmed or picked. The Stockist therefore sees orders even when the Distributor or Shop already filled them from their own stock. This is a bug.
+- The source check is at order level, not item level. Item-level sources are stored in OrderItem.stock_source (article 13 section 3).
+
+**Example 3 (owner): can a shop order if its own distributor has no stock but its stockist does?**
+Yes. Under nearest-first the customer's order looks at each level in order: Shop, Distributor, Stockist, Supplier. The first level with enough free packs covers it. In the example above the Stockist covers the order, but only after the Distributor confirms that it has none.
+
+**Example 4 (owner): supplier and stockist stock on the same packs.**
+Packs have one place at a time. The Supplier's count drops when it ships to the Stockist, so the same packs are not counted twice. The risk is manual edits. Example: Supplier has 10, ships 4 to Stockist (Supplier now 6, Stockist 4). If the Supplier then types 10 into its stock page, the system shows 14 packs. Nothing stops this today. Decision needed: block manual increases at the Supplier, or allow them only with a supplier note.
+
+**Status.** Not built. Next build: a request record per held line, confirm and reject screens for Distributor, Stockist and Supplier, the Auto switch, and the order visibility fix above. Owner to confirm before the build starts.
