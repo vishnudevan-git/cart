@@ -33,4 +33,6 @@ Rule of thumb: **PROJECT_NOTES.md** = the diary (append-only history).
 
 13. [13 - Stock Availability, Blocking and Returns](13-stock-availability-and-blocking.md) - free stock, blocking on requests, customer-only cancel and return to source. **Source of truth for stock rules.**
 
+14. [14 - Stock Flow Test Scenarios, Results and Open Doubts](14-stock-flow-tests-and-doubts.md) - scenario list with test names, results, and open doubts. Use it to repeat the tests on another system.
+
 _Last reviewed: 2026-11-18 (articles 10–12 added: bundle chain, decision log, handover; reflects PROJECT_NOTES.md through the 2026-11-18 changes)._
