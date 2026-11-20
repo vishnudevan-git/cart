@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Supplier Options Review Checklist</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #26332a;
+      background: #f3f6f3;
+    }
+
+    * { box-sizing: border-box; }
+
+    body { margin: 0; }
+
+    header {
+      padding: 28px max(20px, calc((100% - 1080px) / 2));
+      color: white;
+      background: #2e7d32;
+    }
+
+    header h1 { margin: 0 0 8px; font-size: 1.65rem; }
+    header p { margin: 0; color: #e8f5e9; }
+
+    main { max-width: 1080px; margin: 24px auto; padding: 0 16px 40px; }
+
+    .toolbar, .intro, .check-item {
+      border: 1px solid #e0e8e1;
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 2px 8px #18351d0a;
+    }
+
+    .toolbar {
+      position: sticky;
+      top: 8px;
+      z-index: 2;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      padding: 12px;
+    }
+
+    button {
+      min-height: 38px;
+      padding: 8px 14px;
+      border: 1px solid #2e7d32;
+      border-radius: 8px;
+      color: #2e7d32;
+      background: white;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button.primary { color: white; background: #2e7d32; }
+    button.danger { border-color: #b3261e; color: #b3261e; }
+    button:hover { filter: brightness(.96); }
+
+    #saveState { margin-left: auto; color: #526457; font-size: .9rem; }
+
+    .intro { margin: 16px 0; padding: 16px 18px; line-height: 1.5; }
+    .intro p { margin: 0 0 8px; }
+    .intro p:last-child { margin-bottom: 0; color: #536157; }
+
+    .checklist { display: grid; gap: 12px; }
+
+    .check-item { padding: 16px; }
+
+    .item-heading {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: 6px 12px;
+      margin-bottom: 12px;
+    }
+
+    .item-number { color: #2e7d32; font-weight: 700; }
+    .item-heading h2 { margin: 0; font-size: 1.05rem; }
+    .item-link { color: #34763a; font-size: .88rem; overflow-wrap: anywhere; }
+
+    .fields {
+      display: grid;
+      grid-template-columns: minmax(180px, 250px) 1fr;
+      gap: 12px;
+    }
+
+    label { display: grid; gap: 6px; color: #445247; font-size: .88rem; font-weight: 600; }
+
+    select, textarea, input {
+      width: 100%;
+      border: 1px solid #cbd6cc;
+      border-radius: 7px;
+      padding: 9px 10px;
+      color: #26332a;
+      background: white;
+      font: inherit;
+    }
+
+    textarea { min-height: 76px; resize: vertical; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid #76b77b; outline-offset: 1px; }
+
+    .footer-note { padding: 16px 4px; color: #59665c; font-size: .88rem; }
+
+    @media (max-width: 640px) {
+      header { padding: 22px 18px; }
+      .toolbar { position: static; }
+      #saveState { width: 100%; margin-left: 0; }
+      .fields { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      :root { background: white; }
+      header { padding: 0 0 14px; color: #26332a; background: white; }
+      header p { color: #445247; }
+      main { margin: 0; padding: 0; }
+      .toolbar { display: none; }
+      .check-item, .intro { box-shadow: none; break-inside: avoid; }
+      textarea { min-height: 54px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Supplier Options Review</h1>
+    <p>Review each supplier menu option in order. Record what works and what you want changed.</p>
+  </header>
+
+  <main>
+    <div class="toolbar" aria-label="Checklist actions">
+      <button class="primary" type="button" id="saveButton">Save progress</button>
+      <button type="button" id="exportButton">Download notes</button>
+      <button type="button" id="printButton">Print</button>
+      <button class="danger" type="button" id="clearButton">Clear checklist</button>
+      <span id="saveState" role="status" aria-live="polite">Draft saves automatically in this browser.</span>
+    </div>
+
+    <section class="intro">
+      <p><strong>How to use:</strong> Open each page using its link, check the available options, then choose a decision and write your feedback. Your draft is saved in this browser as you type.</p>
+      <p>Choose “Keep as is” if it works for you, “Change needed” if you want something different, or “Issue / question” if something is unclear or not working. Use <strong>Download notes</strong> when you are ready to send the completed checklist back.</p>
+    </section>
+
+    <section class="checklist" id="checklist" aria-label="Supplier menu checklist">
+      <article class="check-item" data-key="dashboard" data-title="Dashboard">
+        <div class="item-heading"><span class="item-number">01</span><h2>Dashboard</h2><a class="item-link" href="http://localhost:8888/supplier/dashboard/" target="_blank" rel="noopener">/supplier/dashboard/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option selected>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here...">                    Replaced the financial cards with one total order value and four rupee splits:
+          - Fund received.
+          - Product sent · awaiting fund.
+          - Product yet to send.
+          - Cancelled.
+          “Sent” means the supplier has dispatched or the stockist has acknowledged receipt. Each amount is calculated per product line, so partial orders split correctly. Funds received are confirmed supplier settlements. The four split amounts add up to total order value.</textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="products" data-title="My Products">
+        <div class="item-heading"><span class="item-number">02</span><h2>My Products</h2><a class="item-link" href="http://localhost:8888/supplier/products/" target="_blank" rel="noopener">/supplier/products/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="add-product" data-title="Add Product">
+        <div class="item-heading"><span class="item-number">03</span><h2>Add Product</h2><a class="item-link" href="http://localhost:8888/supplier/products/add/" target="_blank" rel="noopener">/supplier/products/add/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="stock" data-title="Manage Stock">
+        <div class="item-heading"><span class="item-number">04</span><h2>Manage Stock</h2><a class="item-link" href="http://localhost:8888/supplier/stock/" target="_blank" rel="noopener">/supplier/stock/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="orders" data-title="Orders">
+        <div class="item-heading"><span class="item-number">05</span><h2>Orders</h2><a class="item-link" href="http://localhost:8888/supplier/orders/" target="_blank" rel="noopener">/supplier/orders/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="restock" data-title="Restock Requests">
+        <div class="item-heading"><span class="item-number">06</span><h2>Restock Requests</h2><a class="item-link" href="http://localhost:8888/supplier/restock-requests/" target="_blank" rel="noopener">/supplier/restock-requests/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="price-history" data-title="Price History">
+        <div class="item-heading"><span class="item-number">07</span><h2>Price History</h2><a class="item-link" href="http://localhost:8888/supplier/price-history/" target="_blank" rel="noopener">/supplier/price-history/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="payouts" data-title="Payout History">
+        <div class="item-heading"><span class="item-number">08</span><h2>Payout History</h2><a class="item-link" href="http://localhost:8888/supplier/payout-history/" target="_blank" rel="noopener">/supplier/payout-history/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="payments" data-title="Payments Center">
+        <div class="item-heading"><span class="item-number">09</span><h2>Payments Center</h2><a class="item-link" href="http://localhost:8888/payments/" target="_blank" rel="noopener">/payments/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="procurement" data-title="Procurement Receivables">
+        <div class="item-heading"><span class="item-number">10</span><h2>Procurement Receivables</h2><a class="item-link" href="http://localhost:8888/supplier/procurement/" target="_blank" rel="noopener">/supplier/procurement/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="storefront" data-title="Storefront">
+        <div class="item-heading"><span class="item-number">11</span><h2>Storefront</h2><a class="item-link" href="http://localhost:8888/supplier/storefront/" target="_blank" rel="noopener">/supplier/storefront/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+      <article class="check-item" data-key="support" data-title="Support">
+        <div class="item-heading"><span class="item-number">12</span><h2>Support</h2><a class="item-link" href="http://localhost:8888/support/my-tickets/" target="_blank" rel="noopener">/support/my-tickets/</a></div>
+        <div class="fields">
+          <label>Decision<select data-field="decision"><option value="">Not reviewed</option><option>Keep as is</option><option>Change needed</option><option>Issue / question</option></select></label>
+          <label>What did you check? What should change?<textarea data-field="notes" placeholder="Write your feedback here..."></textarea></label>
+        </div>
+      </article>
+    </section>
+
+    <p class="footer-note">Saved drafts stay in this browser on this device. Download your notes before clearing browser data or switching devices.</p>
+  </main>
+
+  <script>
+    (() => {
+      const storageKey = 'supplier-options-review-v1';
+      const items = Array.from(document.querySelectorAll('.check-item'));
+      const saveState = document.getElementById('saveState');
+      let saveTimer;
+
+      function collect() {
+        return items.map(item => ({
+          key: item.dataset.key,
+          title: item.dataset.title,
+          decision: item.querySelector('[data-field="decision"]').value,
+          notes: item.querySelector('[data-field="notes"]').value.trim()
+        }));
+      }
+
+      function save(showMessage) {
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(collect()));
+          if (showMessage) saveState.textContent = 'Progress saved in this browser.';
+        } catch (error) {
+          console.error('Unable to save checklist progress.', error);
+          saveState.textContent = 'Could not save in this browser. Download your notes instead.';
+        }
+      }
+
+      function restore() {
+        try {
+          const saved = JSON.parse(localStorage.getItem(storageKey) || '[]');
+          const savedByKey = new Map(saved.map(item => [item.key, item]));
+          items.forEach(item => {
+            const entry = savedByKey.get(item.dataset.key);
+            if (!entry) return;
+            item.querySelector('[data-field="decision"]').value = entry.decision || '';
+            item.querySelector('[data-field="notes"]').value = entry.notes || '';
+          });
+          if (saved.length) saveState.textContent = 'Saved draft restored. Changes save automatically.';
+        } catch (error) {
+          console.error('Unable to restore checklist progress.', error);
+          saveState.textContent = 'Could not read the saved draft. You can still fill and download this checklist.';
+        }
+      }
+
+      function scheduleSave() {
+        saveState.textContent = 'Saving…';
+        clearTimeout(saveTimer);
+        saveTimer = setTimeout(() => save(false), 250);
+      }
+
+      document.getElementById('saveButton').addEventListener('click', () => save(true));
+      document.getElementById('printButton').addEventListener('click', () => window.print());
+      document.getElementById('clearButton').addEventListener('click', () => {
+        if (!window.confirm('Clear all decisions and notes saved in this browser?')) return;
+        items.forEach(item => {
+          item.querySelector('[data-field="decision"]').value = '';
+          item.querySelector('[data-field="notes"]').value = '';
+        });
+        try {
+          localStorage.removeItem(storageKey);
+          saveState.textContent = 'Checklist cleared.';
+        } catch (error) {
+          console.error('Unable to clear saved checklist.', error);
+          saveState.textContent = 'Could not clear the browser draft.';
+        }
+      });
+      document.getElementById('exportButton').addEventListener('click', () => {
+        const rows = collect();
+        const csvValue = value => `"${String(value || '').replaceAll('"', '""')}"`;
+        const csv = [
+          ['Option', 'Decision', 'Notes'].map(csvValue).join(','),
+          ...rows.map(row => [row.title, row.decision || 'Not reviewed', row.notes].map(csvValue).join(','))
+        ].join('\r\n');
+        const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = 'supplier-options-review.csv';
+        link.click();
+        URL.revokeObjectURL(link.href);
+      });
+
+      document.getElementById('checklist').addEventListener('input', scheduleSave);
+      document.getElementById('checklist').addEventListener('change', scheduleSave);
+      restore();
+    })();
+  </script>
+</body>
+</html>

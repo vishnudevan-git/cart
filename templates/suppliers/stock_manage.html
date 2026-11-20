@@ -6,29 +6,128 @@
 
 <style>
   .stock-prod-card { border:1px solid #e5e7eb; border-radius:12px; }
-  .stock-prod-head { background:#f8faf9; border-bottom:1px solid #eef0ef; border-radius:12px 12px 0 0; }
+  .stock-prod-head { background:#ffffff; border-bottom:1px solid #eef0ef; border-radius:12px 12px 0 0; }
+  .stock-cat-head { background:#e3f1e7; border:1px solid #bfe0c7; border-left:5px solid #2e7d32; border-radius:12px; color:#14532d; }
+  .stock-cat-head[aria-expanded="true"] { background:#cfe9d6; }
+  .stock-cat-head:hover { background:#d4ead9; }
+  .stock-prod-head:hover { background:#f3f8f4; }
+  .stock-toggle .chev { display:inline-block; transition:transform .15s ease; }
+  .stock-toggle[aria-expanded="true"] .chev { transform:rotate(90deg); }
   .pack-line { border-bottom:1px solid #f1f3f2; }
   .pack-line:last-child { border-bottom:0; }
   .pool-wrap { background:#f3f8f4; border:1px dashed #bfe0c7; border-radius:10px; }
   .stock-pill { min-width:42px; display:inline-block; text-align:center; }
   .bundle-chip { background:#eef4ff; border:1px solid #cfe0ff; }
+  /* Dark theme: the light tints above need dark equivalents or their text becomes unreadable. */
+  [data-bs-theme='dark'] .stock-prod-card { border-color:#2a3a5a; }
+  [data-bs-theme='dark'] .stock-prod-head { background:#0f3460; border-bottom-color:#2a3a5a; color:#e0e0e0; }
+  [data-bs-theme='dark'] .stock-prod-head:hover { background:#16315a; }
+  [data-bs-theme='dark'] .stock-cat-head { background:#133a2a; border-color:#2a5a40; border-left-color:#4caf50; color:#e6f4ea; }
+  [data-bs-theme='dark'] .stock-cat-head[aria-expanded="true"] { background:#174a34; }
+  [data-bs-theme='dark'] .stock-cat-head:hover { background:#1a4d37; }
+  [data-bs-theme='dark'] .stock-cat-head { background:#0f3460; border-color:#2a3a5a; color:#e0e0e0; }
+  [data-bs-theme='dark'] .stock-cat-head:hover { background:#16315a; }
+  [data-bs-theme='dark'] .pack-line { border-bottom-color:#2a3a5a; }
+  [data-bs-theme='dark'] .pool-wrap { background:#13294b; border-color:#2a4f7a; color:#e0e0e0; }
+  [data-bs-theme='dark'] .bundle-chip { background:#13294b; border-color:#2a4f7a; color:#e0e0e0; }
+  [data-bs-theme='dark'] .stock-prod-head .text-muted,
+  [data-bs-theme='dark'] .stock-cat-head .text-muted,
+  [data-bs-theme='dark'] .bundle-chip .text-muted,
+  [data-bs-theme='dark'] .pool-wrap .form-text { color:#9aa0b0 !important; }
+  [data-bs-theme='dark'] .bg-primary-subtle { background-color:#1e3a5f !important; }
+  [data-bs-theme='dark'] .bg-info-subtle { background-color:#164e63 !important; }
+  [data-bs-theme='dark'] .bg-success-subtle { background-color:#14532d !important; }
+  [data-bs-theme='dark'] .stock-prod-card .input-group-text { background:#0f3460; color:#e0e0e0; border-color:#2a3a5a; }
 </style>
 
-{% comment %}Category filter + live search — a GET form, kept OUTSIDE the
-stock-save POST form (nesting would break both).{% endcomment %}
-<form method="get" class="card border-0 shadow-sm p-3 mb-3">
+<button type="button" class="stock-toggle btn btn-outline-secondary btn-sm mb-2"
+        data-bs-toggle="collapse" data-bs-target="#bulkStockBox"
+        aria-expanded="false" aria-controls="bulkStockBox">
+  <i class="bi bi-chevron-right chev me-1"></i>Bulk stock update (Excel)
+</button>
+<div class="collapse" id="bulkStockBox">
+<div class="card border-0 shadow-sm p-3 mb-3 d-flex flex-wrap gap-3 align-items-center justify-content-between">
+  <div class="small">
+    <strong>Bulk stock update (Excel)</strong><br>
+    <span class="text-muted">Download the sheet, change the yellow "New stock (packs)" cells for plain packs
+      and the yellow "New bundle count" cells for bundle packs, then upload it.
+      Bundle stock = bundle count × box size.</span>
+  </div>
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <a href="{% url 'suppliers:stock_export' %}" class="btn btn-outline-success btn-sm">
+      <i class="bi bi-download me-1"></i>Download stock sheet
+    </a>
+    {# Separate form: it must not be nested inside the stock-save form. #}
+    <form method="post" enctype="multipart/form-data" action="{% url 'suppliers:stock_import' %}"
+          class="d-flex flex-wrap gap-2 align-items-center">
+      {% csrf_token %}
+      <input type="file" name="stock_file" accept=".xlsx" required
+             class="form-control form-control-sm" style="max-width:260px"
+             aria-label="Stock Excel file">
+      <button type="submit" class="btn btn-success btn-sm">
+        <i class="bi bi-upload me-1"></i>Upload sheet
+      </button>
+    </form>
+  </div>
+</div>
+</div>
+
+{% comment %}Category filter + live search. The category list submits on change, and the
+search filters as you type, so there is no Apply button. Kept OUTSIDE the stock-save POST form.{% endcomment %}
+<form method="get" class="card border-0 shadow-sm p-3 mb-3" id="stockFilterForm">
   <div class="d-flex flex-wrap gap-2 align-items-center">
     <input type="search" id="stockSearch" class="form-control form-control-sm"
-           style="max-width:260px" placeholder="🔍 Search product…" autocomplete="off">
-    <select name="category" class="form-select form-select-sm" style="max-width:220px" onchange="this.form.submit()">
+           style="max-width:260px" placeholder="🔍 Search product…" autocomplete="off"
+           aria-label="Search products">
+    {# Same filters as My Products. Each one applies as soon as it changes. #}
+    <select name="category" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()"
+            aria-label="Filter by category">
       <option value="">All Categories</option>
       {% for c in categories %}
         <option value="{{ c.pk }}" {% if category_filter == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
       {% endfor %}
     </select>
-    <button type="submit" class="btn btn-success btn-sm">Apply</button>
-    {% if category_filter %}
-      <a href="{% url 'suppliers:stock_manage' %}" class="btn btn-outline-secondary btn-sm">Clear</a>
+    <select name="status" class="form-select form-select-sm" style="max-width:150px" onchange="this.form.submit()"
+            aria-label="Filter by status">
+      <option value="">All Statuses</option>
+      {% for val, label in status_choices %}
+        <option value="{{ val }}" {% if status_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="bundle" class="form-select form-select-sm" style="max-width:160px" onchange="this.form.submit()"
+            aria-label="Filter by bundle">
+      <option value="">Bundle: All</option>
+      <option value="true" {% if bundle_filter == 'true' %}selected{% endif %}>Bundle: Enabled</option>
+      <option value="false" {% if bundle_filter == 'false' %}selected{% endif %}>Bundle: Disabled</option>
+    </select>
+    <select name="loose" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()"
+            aria-label="Filter by loose sale">
+      <option value="">Loose: All</option>
+      <option value="true" {% if loose_filter == 'true' %}selected{% endif %}>Loose: Enabled</option>
+      <option value="false" {% if loose_filter == 'false' %}selected{% endif %}>Loose: Disabled</option>
+    </select>
+    <select name="mrp" class="form-select form-select-sm" style="max-width:150px" onchange="this.form.submit()"
+            aria-label="Filter by MRP">
+      <option value="">MRP: All</option>
+      <option value="true" {% if mrp_filter == 'true' %}selected{% endif %}>MRP: Enabled</option>
+      <option value="false" {% if mrp_filter == 'false' %}selected{% endif %}>MRP: Disabled</option>
+    </select>
+    <select name="unit" class="form-select form-select-sm" style="max-width:170px" onchange="this.form.submit()"
+            title="The unit the stock is kept in" aria-label="Filter by stock unit">
+      <option value="">Stock unit: All</option>
+      {% for val, label in unit_choices %}
+        <option value="{{ val }}" {% if unit_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select name="pack" class="form-select form-select-sm" style="max-width:170px" onchange="this.form.submit()"
+            title="Products that have a pack of this size" aria-label="Filter by pack size">
+      <option value="">Pack size: All</option>
+      {% for val, label in pack_choices %}
+        <option value="{{ val }}" {% if pack_filter == val %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    {% if category_filter or any_filter %}
+      <a href="{% url 'suppliers:stock_manage' %}" class="btn btn-outline-secondary btn-sm">Clear All</a>
     {% endif %}
     <span class="text-muted small ms-auto">
       <span id="stockCount">{{ products_ctx|length }}</span> product(s)
@@ -39,17 +138,27 @@ stock-save POST form (nesting would break both).{% endcomment %}
 <!-- Quick-filter status bar: isolate items needing a restock in one click -->
 <div class="d-flex flex-wrap align-items-center gap-2 mb-2" id="stockQuickFilter">
   <span class="small text-muted me-1">Show:</span>
-  <button type="button" class="btn btn-sm btn-success quick-filter active" data-filter="all">
+  <button type="button" class="btn btn-sm btn-success quick-filter active" data-filter="all" aria-pressed="true">
     All <span class="badge bg-light text-dark ms-1">{{ products_ctx|length }}</span>
   </button>
-  <button type="button" class="btn btn-sm btn-outline-danger quick-filter" data-filter="out">
+  {% if out_count %}
+  <button type="button" class="btn btn-sm btn-outline-danger quick-filter" data-filter="out" aria-pressed="false">
     <i class="bi bi-x-octagon me-1"></i>Out of Stock <span class="badge bg-danger ms-1">{{ out_count }}</span>
   </button>
-  <button type="button" class="btn btn-sm btn-outline-warning quick-filter" data-filter="low">
+  {% endif %}
+  <button type="button" class="btn btn-sm btn-outline-warning quick-filter" data-filter="low" aria-pressed="false">
     <i class="bi bi-exclamation-triangle me-1"></i>Low Stock <span class="badge bg-warning text-dark ms-1">{{ low_count }}</span>
   </button>
   <span class="text-muted ms-2" style="font-size:11px">
     Low = &le;10 units (packs) or &le;5 kg/L (loose pools)
+  </span>
+  <span class="ms-auto d-flex gap-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="expandAll">
+      <i class="bi bi-arrows-expand me-1"></i>Expand all
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" id="collapseAll">
+      <i class="bi bi-arrows-collapse me-1"></i>Collapse all
+    </button>
   </span>
 </div>
 
@@ -61,149 +170,37 @@ stock-save POST form (nesting would break both).{% endcomment %}
   <span id="changedBadge" class="badge bg-warning text-dark d-none">0 unsaved</span>
 </div>
 
+<div id="stockFlash" aria-live="polite"></div>
+
 <form method="post" id="stockForm">
   {% csrf_token %}
 
-  {% for p in products_ctx %}
-  <div class="stock-prod-card shadow-sm mb-3 stock-row" data-name="{{ p.product.name|lower }}"
-       data-out="{{ p.has_out|yesno:'1,0' }}" data-low="{{ p.has_low|yesno:'1,0' }}">
+  {% regroup products_ctx by product.category as category_groups %}
+  {% for cat in category_groups %}
+  <div class="stock-cat mb-3">
+    <button type="button" class="stock-toggle stock-cat-head btn w-100 text-start p-3 d-flex align-items-center gap-2 shadow-sm"
+            data-bs-toggle="collapse" data-bs-target="#cat-{{ forloop.counter }}"
+            aria-expanded="false" aria-controls="cat-{{ forloop.counter }}">
+      <i class="bi bi-chevron-right chev"></i>
+      <span class="fw-bold">{{ cat.grouper.name|default:"Uncategorised" }}</span>
+      <span class="text-muted small">{{ cat.list|length }} product{{ cat.list|length|pluralize }}</span>
+    </button>
 
-    <!-- Product header -->
-    <div class="stock-prod-head px-3 py-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <div class="fw-semibold">
-        {{ p.product.name }}
-        {% if p.product.category %}<span class="text-muted small ms-1">· {{ p.product.category.name }}</span>{% endif %}
-        {% if p.product.allow_loose_distribution %}
-          <span class="badge bg-info text-dark ms-1" title="Sold loose — stock is one shared pool">Loose</span>
-        {% endif %}
-        {% if p.has_out %}
-          <span class="badge bg-danger ms-1" title="One or more packs/variants are out of stock"><i class="bi bi-x-octagon me-1"></i>Out of stock</span>
-        {% elif p.has_low %}
-          <span class="badge bg-warning text-dark ms-1" title="One or more packs/variants are running low"><i class="bi bi-exclamation-triangle me-1"></i>Low stock</span>
-        {% endif %}
-      </div>
-      <div class="d-flex align-items-center gap-2 flex-wrap">
-        {% if p.is_pool %}
-          <span class="badge bg-light text-success border">Pool-based stock</span>
-        {% else %}
-          <span class="badge bg-light text-secondary border">Per-pack stock</span>
-        {% endif %}
-        <span class="d-flex align-items-center gap-1" style="font-size:.68rem" title="Units of this product currently held downstream (after it left you)">
-          <span class="text-muted">Downstream:</span>
-          <span class="badge bg-primary-subtle text-primary border" title="At the stockist">S {{ p.ds_stockist }}</span>
-          <span class="badge bg-info-subtle text-info border" title="At the wholesale distributor">D {{ p.ds_distributor }}</span>
-          <span class="badge bg-success-subtle text-success border" title="At shops / marketplaces">Shop {{ p.ds_shop }}</span>
-          <span class="text-muted">= {{ p.ds_total }}</span>
-        </span>
-      </div>
-    </div>
-
-    <div class="p-3">
-      {% if p.is_pool %}
-      {# ── LOOSE product: ONE editable pool PER VARIANT; packs read-only ── #}
-      {% for grp in p.variant_groups %}
-      {% if p.has_variants %}
-      <div class="small fw-semibold mt-2 mb-1">
-        <i class="bi bi-diagram-3 me-1 text-success"></i>{{ grp.name|default:"(unnamed variant)" }}
-      </div>
-      {% endif %}
-      <div class="row g-3 align-items-center {% if p.has_variants %}ms-2 ps-2 border-start mb-2{% endif %}">
-        <div class="col-12 col-md-5">
-          <div class="pool-wrap p-3">
-            <label class="form-label small fw-semibold mb-1">Loose stock pool</label>
-            <div class="input-group input-group-sm">
-              <input type="number" name="pool_vt_{{ grp.vt_id }}" value="{{ grp.pool_display }}"
-                     min="0" step="any" inputmode="decimal"
-                     data-original="{{ grp.pool_display }}" data-pool="1"
-                     data-label="{{ p.product.name }}{% if p.has_variants %} · {{ grp.name }}{% endif %}"
-                     class="form-control stock-input">
-              <span class="input-group-text">{{ p.pool_unit }}</span>
-            </div>
-            <div class="form-text" style="font-size:11px">
-              Edit this one value — each pack size below auto-populates from it.
-            </div>
-          </div>
-        </div>
-        <div class="col-12 col-md-7">
-          <div class="small text-muted mb-1">Auto-populated pack stock</div>
-          {% for v in grp.packs %}
-          <div class="pack-line d-flex justify-content-between align-items-center py-1">
-            <span><span class="badge bg-secondary me-2">{{ v.label }}</span>₹{{ v.selling_price }}</span>
-            <span class="badge stock-pill {% if v.stock > 10 %}bg-success{% elif v.stock > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ v.stock }}</span>
-          </div>
-          {% endfor %}
-        </div>
-      </div>
-      {% endfor %}
-
-      {% else %}
-      {# ── Manual product: each pack editable, grouped by variant ── #}
-      {% for grp in p.variant_groups %}
-      {% if p.has_variants %}
-      <div class="small fw-semibold mt-2 mb-1">
-        <i class="bi bi-diagram-3 me-1 text-success"></i>{{ grp.name|default:"(unnamed variant)" }}
-      </div>
-      {% endif %}
-      <div class="table-responsive {% if p.has_variants %}ms-2 ps-2 border-start{% endif %}">
-        <table class="table table-sm align-middle mb-0">
-          <thead class="small text-muted">
-            <tr>
-              <th style="width:28%">Pack</th>
-              <th style="width:22%">Price</th>
-              <th style="width:22%">Current</th>
-              <th style="width:28%">Update stock</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for v in grp.packs %}
-            <tr>
-              <td><span class="badge bg-secondary">{{ v.label }}</span></td>
-              <td>₹{{ v.selling_price }}</td>
-              <td>
-                <span class="badge stock-pill {% if v.stock > 10 %}bg-success{% elif v.stock > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ v.stock }}</span>
-              </td>
-              <td>
-                <input type="number" name="stock_{{ v.pk }}" value="{{ v.stock }}"
-                       min="0" max="1000000" step="1" inputmode="numeric"
-                       data-original="{{ v.stock }}"
-                       data-label="{{ p.product.name }}{% if p.has_variants %} · {{ grp.name }}{% endif %} ({{ v.label }})"
-                       class="form-control form-control-sm stock-input" style="max-width:140px">
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      {% endfor %}
-      {% endif %}
-
-      {# ── Bundles (wholesale-only) — read-only; price & stock computed ── #}
-      {% if p.bundles %}
-      <div class="mt-3 pt-2 border-top">
-        <div class="small fw-semibold mb-2">
-          <i class="bi bi-box-seam me-1"></i>Bundle options
-          <span class="text-muted">(Marketplace / Distributor only · auto from pack stock)</span>
-        </div>
-        {% for b in p.bundles %}
-        <div class="bundle-chip rounded px-2 py-2 mb-2 d-flex flex-wrap justify-content-between align-items-center gap-2">
-          <div class="small">
-            <span class="fw-semibold">{{ b.name }}</span>
-            <span class="text-muted">· {{ b.pack_quantity }} × {{ b.variant.label }} · ₹{{ b.price }}</span>
-          </div>
-          <span class="badge {% if b.available > 0 %}bg-success{% else %}bg-danger{% endif %}">
-            makes {{ b.available }}
-          </span>
-        </div>
+    <div class="collapse" id="cat-{{ forloop.counter }}">
+      <div class="px-2 pt-3">
+        {% for p in cat.list %}
+          {% include "suppliers/partials/stock_product_card.html" %}
         {% endfor %}
       </div>
-      {% endif %}
     </div>
   </div>
-  {% empty %}
+  {% endfor %}
+
+  {% if not products_ctx %}
   <div class="card border-0 shadow-sm">
     <p class="text-center text-muted py-4 mb-0">No products found.</p>
   </div>
-  {% endfor %}
+  {% endif %}
 
   <p id="stockNoMatch" class="text-muted text-center py-3 d-none">No products match your search.</p>
 
@@ -218,10 +215,8 @@ stock-save POST form (nesting would break both).{% endcomment %}
 /* --- Live search + quick-filter (All / Out of Stock / Low Stock) ------- */
 (function () {
   var box = document.getElementById('stockSearch');
-  var rows = Array.prototype.slice.call(document.querySelectorAll('.stock-row'));
   var count = document.getElementById('stockCount');
   var noMatch = document.getElementById('stockNoMatch');
-  var total = rows.length;
   var activeFilter = 'all';   // 'all' | 'out' | 'low'
 
   function matchesFilter(r) {
@@ -230,20 +225,30 @@ stock-save POST form (nesting would break both).{% endcomment %}
     return true;  // 'all'
   }
 
-  function apply() {
+  window.stockApplyFilters = function () {
     var q = box ? box.value.trim().toLowerCase() : '';
     var shown = 0;
-    rows.forEach(function (r) {
+    document.querySelectorAll('.stock-row').forEach(function (r) {
       var nameHit = !q || (r.getAttribute('data-name') || '').indexOf(q) !== -1;
       var visible = nameHit && matchesFilter(r);
       r.classList.toggle('d-none', !visible);
-      if (visible) shown++;
+      if (visible) {
+        shown++;
+        // While searching, open the matching products so their packs are visible.
+        if (q) setOpen(r.querySelector('.collapse'), true);
+      }
+    });
+    // Hide categories with nothing to show; open them while searching.
+    document.querySelectorAll('.stock-cat').forEach(function (c) {
+      var n = c.querySelectorAll('.stock-row:not(.d-none)').length;
+      c.classList.toggle('d-none', n === 0);
+      if (q && n > 0) setOpen(c.querySelector(':scope > .collapse'), true);
     });
     if (count) count.textContent = shown;
     if (noMatch) noMatch.classList.toggle('d-none', shown !== 0);
-  }
+  };
 
-  if (box) box.addEventListener('input', apply);
+  if (box) box.addEventListener('input', window.stockApplyFilters);
 
   /* Quick-filter buttons */
   var qfBar = document.getElementById('stockQuickFilter');
@@ -258,79 +263,207 @@ stock-save POST form (nesting would break both).{% endcomment %}
         b.classList.remove('active', 'btn-success', 'btn-danger', 'btn-warning',
                            'btn-outline-success', 'btn-outline-danger', 'btn-outline-warning');
         var on = (b === btn);
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
         if (f === 'all')  b.classList.add(on ? 'btn-success' : 'btn-outline-success');
         if (f === 'out')  b.classList.add(on ? 'btn-danger'  : 'btn-outline-danger');
         if (f === 'low')  b.classList.add(on ? 'btn-warning' : 'btn-outline-warning');
         if (on) b.classList.add('active');
       });
-      apply();
+      window.stockApplyFilters();
     });
   }
 
-  apply();
+  window.stockApplyFilters();
 })();
 
-/* --- Typo guard + change tracking -------------------------------------- */
+/* --- Expand all / Collapse all (categories and products) ---------------- */
+function setOpen(el, open) {
+  if (!el) return;
+  if (window.bootstrap && bootstrap.Collapse) {
+    var inst = bootstrap.Collapse.getOrCreateInstance(el, { toggle: false });
+    if (open) inst.show(); else inst.hide();
+  } else {
+    el.classList.toggle('show', open);
+  }
+  var trigger = document.querySelector('[data-bs-target="#' + el.id + '"]');
+  if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function setAll(open) {
+  document.querySelectorAll('#stockForm .collapse').forEach(function (el) { setOpen(el, open); });
+}
+(function () {
+  var a = document.getElementById('expandAll');
+  var c = document.getElementById('collapseAll');
+  if (a) a.addEventListener('click', function () { setAll(true); });
+  if (c) c.addEventListener('click', function () { setAll(false); });
+})();
+
+/* --- Shared helpers: change tracking, typo guard ----------------------- */
 (function () {
   var form = document.getElementById('stockForm');
   if (!form) return;
-  var inputs = Array.prototype.slice.call(form.querySelectorAll('.stock-input'));
   var badge = document.getElementById('changedBadge');
 
-  function isChanged(inp) {
+  window.stockInputs = function (root) {
+    return Array.prototype.slice.call((root || form).querySelectorAll('.stock-input'));
+  };
+  window.stockIsChanged = function (inp) {
     return String(inp.value).trim() !== String(inp.dataset.original);
-  }
-
-  function refreshBadge() {
+  };
+  window.stockRefreshBadge = function () {
     var names = {};
-    inputs.forEach(function (inp) {
-      if (isChanged(inp)) names[inp.name] = true;
-      var card = inp.closest('.stock-prod-card');
-      if (card) card.classList.toggle('border-warning', cardHasChange(card));
+    window.stockInputs().forEach(function (inp) {
+      if (window.stockIsChanged(inp)) names[inp.name] = true;
+    });
+    document.querySelectorAll('.stock-prod-card').forEach(function (card) {
+      card.classList.toggle('border-warning',
+        window.stockInputs(card).some(window.stockIsChanged));
     });
     var n = Object.keys(names).length;
     if (badge) {
       badge.textContent = n + ' unsaved';
       badge.classList.toggle('d-none', n === 0);
     }
-  }
-
-  function cardHasChange(card) {
-    return Array.prototype.slice
-      .call(card.querySelectorAll('.stock-input'))
-      .some(isChanged);
-  }
-
-  inputs.forEach(function (inp) { inp.addEventListener('input', refreshBadge); });
-
-  form.addEventListener('submit', function (e) {
-    var suspicious = [];
+  };
+  window.stockSuspicious = function (inputs) {
+    var out = [];
     inputs.forEach(function (inp) {
-      if (!isChanged(inp)) return;
+      if (!window.stockIsChanged(inp)) return;
       var val = parseFloat(inp.value);
       var orig = parseFloat(inp.dataset.original) || 0;
       var label = inp.dataset.label || inp.name;
       var unit = inp.dataset.pool ? ' (pool)' : '';
       if (isNaN(val) || val < 0) {
-        suspicious.push('• ' + label + unit + ': "' + inp.value + '" is not valid');
+        out.push('• ' + label + unit + ': "' + inp.value + '" is not valid');
         return;
       }
       if (orig > 0 && val >= orig * 10 && (val - orig) >= 500) {
-        suspicious.push('• ' + label + unit + ': ' + orig + ' → ' + val + ' (large jump)');
+        out.push('• ' + label + unit + ': ' + orig + ' → ' + val + ' (large jump)');
       } else if (orig === 0 && val >= 1000) {
-        suspicious.push('• ' + label + unit + ': 0 → ' + val + ' (large value)');
+        out.push('• ' + label + unit + ': 0 → ' + val + ' (large value)');
       }
     });
-    if (suspicious.length) {
-      var ok = window.confirm(
-        'Please double-check these values before saving:\n\n' +
-        suspicious.join('\n') + '\n\nSave anyway?'
-      );
-      if (!ok) e.preventDefault();
+    return out;
+  };
+  window.stockConfirm = function (list) {
+    if (!list.length) return true;
+    return window.confirm(
+      'Please double-check these values before saving:\n\n' +
+      list.join('\n') + '\n\nSave anyway?');
+  };
+
+  // Delegated, so cards replaced after a per-product save keep working.
+  form.addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.classList.contains('whole-only')) {
+      var clean = String(t.value).replace(/[^0-9]/g, '');
+      if (clean !== t.value) t.value = clean;
+    }
+    if (t.classList.contains('stock-input')) window.stockRefreshBadge();
+  });
+  form.addEventListener('keydown', function (e) {
+    var blocked = ['e', 'E', '+', '-', '.', ','];
+    if (e.target.classList.contains('whole-only') && e.key && e.key.length === 1
+        && blocked.indexOf(e.key) !== -1) {
+      e.preventDefault();
     }
   });
 
-  refreshBadge();
+  form.addEventListener('submit', function (e) {
+    if (!window.stockConfirm(window.stockSuspicious(window.stockInputs()))) e.preventDefault();
+  });
+
+  window.stockRefreshBadge();
+})();
+
+/* --- Save one product immediately -------------------------------------- */
+(function () {
+  var flash = document.getElementById('stockFlash');
+
+  function showFlash(ok, lines) {
+    if (!flash) return;
+    flash.textContent = '';
+    if (!lines.length) return;
+    var box = document.createElement('div');
+    box.className = 'alert ' + (ok ? 'alert-success' : 'alert-warning') +
+                    ' alert-dismissible py-2 small';
+    lines.forEach(function (text) {
+      var d = document.createElement('div');
+      d.textContent = text;
+      box.appendChild(d);
+    });
+    var close = document.createElement('button');
+    close.type = 'button';
+    close.className = 'btn-close';
+    close.setAttribute('data-bs-dismiss', 'alert');
+    close.setAttribute('aria-label', 'Close');
+    box.appendChild(close);
+    flash.appendChild(box);
+    flash.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function csrfToken() {
+    var el = document.querySelector('#stockForm input[name=csrfmiddlewaretoken]');
+    return el ? el.value : '';
+  }
+
+  function saveProduct(btn) {
+    var pid = btn.dataset.product;
+    var card = document.getElementById('card-' + pid);
+    if (!card) return;
+    var inputs = window.stockInputs(card);
+    if (!window.stockConfirm(window.stockSuspicious(inputs))) return;
+
+    var details = document.getElementById('prod-' + pid);
+    var wasOpen = !!(details && details.classList.contains('show'));
+
+    // Send only this card's fields. The server ignores fields that are not posted.
+    var body = new FormData();
+    body.append('csrfmiddlewaretoken', csrfToken());
+    Array.prototype.slice.call(card.querySelectorAll('input[name]')).forEach(function (el) {
+      body.append(el.name, el.value);
+    });
+
+    btn.disabled = true;
+    fetch(window.location.href, {
+      method: 'POST', body: body, credentials: 'same-origin',
+      headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+      .then(function (r) {
+        if (!r.ok) throw new Error('the server returned ' + r.status + '.');
+        return r.json();
+      })
+      .then(function (data) {
+        var lines = (data.messages || []).slice();
+        (data.skipped || []).forEach(function (s) { lines.push(s.label + ': ' + s.reason); });
+        // Reload only this product, with fresh values from the server.
+        return fetch(window.location.href, { credentials: 'same-origin' })
+          .then(function (r) { return r.text(); })
+          .then(function (html) {
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var fresh = doc.getElementById('card-' + pid);
+            if (!fresh) throw new Error('the product could not be reloaded. Refresh the page.');
+            var node = document.importNode(fresh, true);
+            if (wasOpen) {
+              node.querySelector('#prod-' + pid).classList.add('show');
+              node.querySelector('[data-bs-target="#prod-' + pid + '"]')
+                  .setAttribute('aria-expanded', 'true');
+            }
+            card.replaceWith(node);
+            window.stockRefreshBadge();
+            showFlash(!!data.ok, lines.length ? lines : ['Saved.']);
+          });
+      })
+      .catch(function (err) {
+        btn.disabled = false;
+        showFlash(false, ['Could not finish saving this product: ' + err.message]);
+      });
+  }
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('.save-product');
+    if (b) saveProduct(b);
+  });
 })();
 </script>
 {% endblock %}

@@ -113,6 +113,15 @@ class OrderItem(models.Model):
         max_length=15, choices=FULFILLMENT_CHOICES, default='pending',
         help_text='Per-item fulfillment state for partial shipments.'
     )
+    # Who gave the stock to the customer. A cancel or reduce returns it to the same party.
+    STOCK_SOURCE_CHOICES = (
+        ('supplier', 'Supplier'), ('stockist', 'Stockist'),
+        ('wholesaler', 'Distributor'), ('shop', 'Shop'),
+    )
+    stock_source = models.CharField(
+        max_length=10, choices=STOCK_SOURCE_CHOICES, default='supplier',
+        help_text='Shop items return to the shop; supplier items return to the supplier.'
+    )
     # Tracks which COD collection batch delivered this item.
     delivery_instalment = models.ForeignKey(
         'payments.PaymentInstalment', on_delete=models.SET_NULL,

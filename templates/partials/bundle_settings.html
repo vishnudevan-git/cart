@@ -1,0 +1,71 @@
+{% comment %}
+Shared bundle-rule editor for any selling tier (stockist, distributor, ...).
+Rules: kb/10-bundle-supply-chain.md. Context comes from
+products.bundle_chain.settings_context plus tier_label / buyer_label / forward_label.
+{% endcomment %}
+<div class="alert alert-light border small mb-3">
+  <i class="bi bi-info-circle me-1"></i>
+  These rules decide how <strong>{{ buyer_label }}</strong> may order from you.
+  A bundle is only a count: a bundle of 10 is 10 units of your stock.
+  The most specific rule wins: <strong>product</strong>, then <strong>supplier</strong>, then <strong>global</strong>.
+  Customers always buy singles.
+  <ul class="mb-0 mt-1">
+    <li><strong>Singles allowed</strong>: buyers order any count. You break bundles.</li>
+    <li><strong>Bundle only</strong>: buyers order whole bundles only.</li>
+    <li><strong>Follow upstream</strong>: use {{ forward_label }}'s setting, and keep no loose stock of your own.</li>
+  </ul>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold">Global setting (all suppliers, all products)</div>
+  <div class="card-body">
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-center">
+      {% csrf_token %}
+      <input type="hidden" name="bundle_action" value="set_global">
+      <select name="mode" class="form-select form-select-sm" style="max-width:280px">
+        {% for val, label in bundle_mode_choices %}
+          <option value="{{ val }}" {% if bundle_global_mode == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button class="btn btn-success btn-sm">Save</button>
+    </form>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold">Supplier overrides</div>
+  <div class="card-body">
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3">
+      {% csrf_token %}
+      <input type="hidden" name="bundle_action" value="set_supplier">
+      <select name="supplier_id" class="form-select form-select-sm" style="max-width:260px" required>
+        <option value="">Choose supplier…</option>
+        {% for s in bundle_suppliers %}<option value="{{ s.pk }}">{{ s.company_name }}</option>{% endfor %}
+      </select>
+      <select name="mode" class="form-select form-select-sm" style="max-width:240px">
+        {% for val, label in bundle_mode_choices %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-outline-success btn-sm">Add / update</button>
+    </form>
+    {% include 'partials/bundle_rule_rows.html' with rules=bundle_supplier_rules kind='supplier' %}
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-3">
+  <div class="card-header bg-white fw-semibold">Product overrides</div>
+  <div class="card-body">
+    <form method="post" class="d-flex flex-wrap gap-2 align-items-center mb-3">
+      {% csrf_token %}
+      <input type="hidden" name="bundle_action" value="set_product">
+      <select name="product_id" class="form-select form-select-sm" style="max-width:300px" required>
+        <option value="">Choose product…</option>
+        {% for p in bundle_products %}<option value="{{ p.pk }}">{{ p.name }}{% if p.sku %} [{{ p.sku }}]{% endif %}</option>{% endfor %}
+      </select>
+      <select name="mode" class="form-select form-select-sm" style="max-width:240px">
+        {% for val, label in bundle_mode_choices %}<option value="{{ val }}">{{ label }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-outline-success btn-sm">Add / update</button>
+    </form>
+    {% include 'partials/bundle_rule_rows.html' with rules=bundle_product_rules kind='product' %}
+  </div>
+</div>

@@ -72,10 +72,25 @@ def human_qty(value, unit='g'):
     unit = (unit or 'g').lower()
     if unit in _PIECES:
         return f'{_trim(n, 0)} pcs'
-    big, small = ('L', 'ml') if unit in _LIQUID else ('kg', 'g')
-    if abs(n) >= 1000:
-        return f'{_trim(n / 1000)} {big}'
-    return f'{_trim(n, 0)} {small}'
+    
+    # Handle different weight units
+    if unit == 'kg':
+        # Already in kg, no conversion needed
+        return f'{_trim(n)} kg'
+    elif unit == 'g':
+        big, small = ('kg', 'g')
+        if abs(n) >= 1000:
+            return f'{_trim(n / 1000)} {big}'
+        return f'{_trim(n, 0)} {small}'
+    elif unit == 'l':
+        # Already in litres, no conversion needed
+        return f'{_trim(n)} L'
+    else:
+        # Liquid units (ml) or others
+        big, small = ('L', 'ml') if unit in _LIQUID else ('kg', 'g')
+        if abs(n) >= 1000:
+            return f'{_trim(n / 1000)} {big}'
+        return f'{_trim(n, 0)} {small}'
 
 
 @register.filter
@@ -86,5 +101,12 @@ def exact_qty(value, unit='g'):
     except (TypeError, ValueError):
         return value
     unit = (unit or 'g').lower()
-    label = 'pcs' if unit in _PIECES else ('ml' if unit in _LIQUID else 'g')
+    if unit in _PIECES:
+        label = 'pcs'
+    elif unit in _LIQUID:
+        label = 'ml'
+    elif unit == 'kg':
+        label = 'kg'
+    else:
+        label = 'g'
     return f'{_trim(n, 0)} {label}'

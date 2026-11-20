@@ -55,6 +55,9 @@ class StockistInventory(models.Model):
     stockist = models.ForeignKey(Stockist, on_delete=models.CASCADE, related_name='inventory')
     variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='stockist_inventory')
     quantity = models.PositiveIntegerField(default=0)
+    # Packs promised to open distributor requests. Still held here until delivery,
+    # but not free to promise again. Free = quantity - blocked_quantity.
+    blocked_quantity = models.PositiveIntegerField(default=0)
     # Per-item opt-out: this one product is never auto-restocked, whatever the
     # global settings say. High-value or slow-moving items get ordered by hand.
     auto_restock_exempt = models.BooleanField(default=False)
@@ -64,8 +67,32 @@ class StockistInventory(models.Model):
         unique_together = ('stockist', 'variant')
         ordering = ['variant__product__name', 'variant__label']
 
+    @property
+    def free_quantity(self):
+        """Packs that can still be promised to a distributor request."""
+        return max(0, self.quantity - self.blocked_quantity)
+
     def __str__(self):
         return f'{self.stockist.company_name} | {self.variant} — {self.quantity} units'
+
+
+class StockistLooseStock(models.Model):
+    """Loose measured stock held by a Stockist in the product's base unit."""
+    stockist = models.ForeignKey(
+        Stockist, on_delete=models.CASCADE, related_name='loose_stocks'
+    )
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, related_name='stockist_loose_stocks'
+    )
+    quantity_grams = models.PositiveIntegerField(default=0)
+    cost_price_per_gram = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('stockist', 'product')
+
+    def __str__(self):
+        return f'{self.stockist.company_name} | {self.product.name} — {self.quantity_grams} base units'
 
 
 class ProcessingCharge(models.Model):
@@ -250,6 +277,10 @@ class StockistRestockRequest(models.Model):
     stockist = models.ForeignKey(Stockist, on_delete=models.CASCADE, related_name='restock_requests')
     variant = models.ForeignKey(ProductVariant, on_delete=models.CASCADE, related_name='stockist_restock_requests')
     quantity_requested = models.PositiveIntegerField()
+    loose_supply = models.BooleanField(
+        default=False,
+        help_text='Supplier pack request that will be converted into loose stock on fulfillment.'
+    )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     note = models.CharField(max_length=200, blank=True)
     requested_at = models.DateTimeField(auto_now_add=True)

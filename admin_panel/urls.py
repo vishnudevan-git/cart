@@ -29,6 +29,7 @@ urlpatterns = [
     path('products/<int:pk>/reject/', views.product_reject, name='product_reject'),
     path('products/<int:pk>/delete/', views.product_delete, name='product_delete'),
     path('products/<int:pk>/restore/', views.product_restore, name='product_restore'),
+    path('products/<int:pk>/purge/', views.product_purge, name='product_purge'),
     path('marketplace/', views.marketplace, name='marketplace'),
     # Orders (read-only for admin)
     path('orders/', views.order_list, name='order_list'),
@@ -54,6 +55,7 @@ urlpatterns = [
     path('users/', views.user_list, name='user_list'),
     path('users/create/', views.user_create, name='user_create'),
     path('customers/', views.customer_list, name='customer_list'),
+    path('customers/bulk/', views.customer_bulk_action, name='customer_bulk_action'),
     path('users/<int:pk>/', views.user_detail, name='user_detail'),
     path('users/<int:pk>/edit/', views.user_edit, name='user_edit'),
     path('users/<int:pk>/reset-password/', views.user_reset_password, name='user_reset_password'),
@@ -71,6 +73,10 @@ urlpatterns = [
     path('export/orders/', views.export_orders, name='export_orders'),
     # Low stock
     path('low-stock/', views.low_stock, name='low_stock'),
+    # Orphaned customers from suspended marketplaces
+    path('orphaned-customers/', views.orphaned_customers, name='orphaned_customers'),
+    path('orphaned-customers/assign/', views.assign_orphaned_customer, name='assign_orphaned_customer'),
+    path('orphaned-customers/bulk-assign/', views.bulk_assign_orphaned_customers, name='bulk_assign_orphaned_customers'),
     # Bulk actions
     path('products/bulk/', views.bulk_product_action, name='bulk_product_action'),
     path('suppliers/bulk/', views.bulk_supplier_action, name='bulk_supplier_action'),

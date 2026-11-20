@@ -14,9 +14,9 @@
         <tr class="{% if r.status == 'pending' %}table-warning{% endif %}">
           <td>{{ r.stockist.company_name }}</td>
           <td class="fw-semibold">{{ r.variant.product.name }}</td>
-          <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
+          <td><span class="badge bg-secondary">{{ r.variant.label }}</span>{% if r.loose_supply %}<span class="badge bg-info text-dark ms-1">Loose</span>{% endif %}</td>
           <td class="text-muted">{{ r.variant.product.supplier.company_name }}</td>
-          <td>{{ r.quantity_requested }}</td>
+          <td>{{ r.quantity_requested }} pack(s)</td>
           <td><span class="badge {% if r.status == 'fulfilled' %}bg-success{% elif r.status == 'rejected' %}bg-danger{% elif r.status == 'approved' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">{{ r.get_status_display }}</span></td>
           <td class="text-muted">{{ r.requested_at|date:"d M Y" }}</td>
           <td>
@@ -24,7 +24,7 @@
             <form method="post" class="d-inline">
               {% csrf_token %}
               <input type="hidden" name="req_id" value="{{ r.pk }}">
-              <button name="action" value="fulfill" type="submit" class="btn btn-sm btn-success me-1">Fulfill</button>
+              <span class="small text-muted me-1">Supplier fulfils from Restock Requests</span>
               <button name="action" value="reject" type="submit" class="btn btn-sm btn-outline-danger">Reject</button>
             </form>
             {% else %}

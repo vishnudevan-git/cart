@@ -85,7 +85,8 @@ def cart_view(request):
     """Works for both guests (session) and logged-in customers (DB)."""
     if _is_logged_customer(request):
         distributor = request.user.distributor
-        items = Cart.objects.filter(customer=request.user).select_related('variant__product')
+        items = Cart.objects.filter(customer=request.user, variant__product__is_deleted=False
+                                    ).select_related('variant__product')
         total = sum(i.subtotal(distributor) for i in items)
         return render(request, 'cart/cart.html', {
             'items': items, 'total': total, 'is_guest': False, 'distributor': distributor,
@@ -98,7 +99,8 @@ def cart_view(request):
     total = 0
     for vpk, qty in guest.items():
         try:
-            variant = ProductVariant.objects.select_related('product').get(pk=int(vpk))
+            variant = ProductVariant.objects.select_related('product').get(
+                pk=int(vpk), product__is_deleted=False)
             price = _variant_price(variant, distributor)
             subtotal = price * qty
             items.append({
@@ -120,7 +122,6 @@ def add_to_cart(request, variant_pk):
     from products.models import Product as _Product
     allowed_products = _shoppable_products(request)
     variant = get_object_or_404(ProductVariant, pk=variant_pk, is_active=True, product__in=allowed_products)
-
     if not variant.is_in_stock():
         if ajax:
             return JsonResponse({'success': False, 'error': 'Out of stock.'})
@@ -171,6 +172,7 @@ def update_cart(request, pk):
             item.delete()
     else:
         # pk is variant_pk for guests
+        variant = ProductVariant.objects.filter(pk=_safe_int(pk, 0)).first()
         guest_update(request, str(_safe_int(pk, 0)), qty)
 
     return redirect('cart:cart')
@@ -232,7 +234,8 @@ def set_qty_api(request, variant_pk):
 def cart_offcanvas_view(request):
     """Returns the rendered HTML for the offcanvas cart."""
     if _is_logged_customer(request):
-        db_items = Cart.objects.filter(customer=request.user).select_related('variant__product')
+        db_items = Cart.objects.filter(customer=request.user, variant__product__is_deleted=False
+                                       ).select_related('variant__product')
         distributor = request.user.distributor
         cart_items = []
         for item in db_items:

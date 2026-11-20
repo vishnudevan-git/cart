@@ -112,6 +112,22 @@
     }
     .sidebar-overlay.show { display: block; }
 
+    .rupee-spin-wrap { position: relative; display: inline-flex; min-width: 0; }
+    .rupee-spin-wrap > input.rupee-whole-stepper { padding-right: 1.45rem !important; }
+    .input-group > .rupee-spin-wrap { flex: 1 1 auto; width: 1% !important; }
+    .rupee-spin-buttons {
+      position: absolute; z-index: 2; top: 1px; right: 2px; bottom: 1px;
+      width: 17px; display: flex; flex-direction: column;
+    }
+    .rupee-spin-buttons button {
+      flex: 1 1 50%; border: 0; padding: 0; margin: 0; background: transparent;
+      color: #777; font-size: 9px; line-height: 1; cursor: pointer;
+    }
+    .rupee-spin-buttons button:hover { color: var(--green, #287d36); }
+    .rupee-whole-stepper::-webkit-inner-spin-button,
+    .rupee-whole-stepper::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .rupee-whole-stepper { -moz-appearance: textfield; }
+
     /* Mobile */
     @media (max-width: 767.98px) {
       .sidebar { transform: translateX(-100%); }
@@ -227,7 +243,7 @@
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="{% static 'js/premium-ui.js' %}?v=20261031b"></script>
-<script src="{% static 'js/datatable.js' %}?v=20261031b"></script>
+<script src="{% static 'js/datatable.js' %}?v=20261110c"></script>
 
 <!-- ── Global Confirm Modal ───────────────────────────────────────────────── -->
 <div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true" style="--bs-backdrop-opacity: 0.5;">
@@ -395,6 +411,74 @@
       el.remove();
     });
   });
+
+  // Currency number inputs move by whole rupees with their spinner controls,
+  // preserving any paise already entered. Decimal quantities such as kg/stock
+  // are excluded.
+  function isRupeeNumberInput(input) {
+    if (!input || input.type !== 'number') return false;
+    const fieldName = `${input.name || ''} ${input.id || ''}`.toLowerCase();
+    if (/(stock|quantity|qty|weight|kilogram|\bkg\b)/.test(fieldName)) return false;
+    const step = Number(input.getAttribute('step'));
+    return (Number.isFinite(step) && step > 0 && step < 1)
+      || /(price|mrp|amount|cost|charge|payout|payment|commission|rent_per_day)/.test(fieldName);
+  }
+
+  function stepWholeRupee(input, direction) {
+    const current = input.value.trim() === '' ? (Number(input.min) || 0) : Number(input.value);
+    if (!Number.isFinite(current)) return;
+    let next = current + direction;
+    if (input.min !== '' && Number.isFinite(Number(input.min))) next = Math.max(next, Number(input.min));
+    if (input.max !== '' && Number.isFinite(Number(input.max))) next = Math.min(next, Number(input.max));
+    const decimals = (input.value.split('.')[1] || '').length;
+    input.value = decimals ? next.toFixed(Math.min(decimals, 6)) : String(next);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const changeEvent = new Event('change', { bubbles: true });
+    changeEvent.rupeeSpinner = true;
+    input.dispatchEvent(changeEvent);
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (!isRupeeNumberInput(event.target) || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    stepWholeRupee(event.target, event.key === 'ArrowUp' ? 1 : -1);
+  });
+
+  function addRupeeSpinner(input) {
+    if (!isRupeeNumberInput(input) || input.closest('.rupee-spin-wrap')) return;
+    const wrapper = document.createElement('span');
+    wrapper.className = 'rupee-spin-wrap';
+    wrapper.style.width = input.style.width || '100%';
+    const buttons = document.createElement('span');
+    buttons.className = 'rupee-spin-buttons';
+    buttons.setAttribute('aria-label', 'Adjust whole rupees');
+    [['▲', 1, 'Increase by one rupee'], ['▼', -1, 'Decrease by one rupee']].forEach(([symbol, delta, label]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = symbol;
+      button.title = label;
+      button.setAttribute('aria-label', label);
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        input.focus({ preventScroll: true });
+        stepWholeRupee(input, delta);
+      });
+      buttons.appendChild(button);
+    });
+    input.classList.add('rupee-whole-stepper');
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    wrapper.appendChild(buttons);
+  }
+
+  function scanRupeeInputs(root) {
+    if (root.matches && root.matches('input[type="number"]')) addRupeeSpinner(root);
+    root.querySelectorAll?.('input[type="number"]').forEach(addRupeeSpinner);
+  }
+  scanRupeeInputs(document);
+  new MutationObserver(records => records.forEach(record => {
+    record.addedNodes.forEach(node => { if (node.nodeType === 1) scanRupeeInputs(node); });
+  })).observe(document.body, { childList: true, subtree: true });
 </script>
 {% block extra_js %}{% endblock %}
 </body>

@@ -50,6 +50,7 @@ def check_stockist(stockist):
         variant__product__status='approved',
         variant__product__direct_supply=False,       # never passes through us
         variant__product__owner_enterprise__isnull=True,
+        variant__supplier_can_supply=True,
     ).select_related('variant')
 
     created = 0
@@ -61,10 +62,17 @@ def check_stockist(stockist):
         ).exists()
         if already_open:
             continue
-        StockistRestockRequest.objects.create(
-            stockist=stockist, variant=row.variant,
-            quantity_requested=stockist.auto_restock_quantity, note=AUTO_NOTE,
-        )
+        from .supply_requests import RequestBlocked, create_supplier_request
+        try:
+            create_supplier_request(
+                stockist, row.variant,
+                _round_to_supplier_multiple(
+                    stockist.auto_restock_quantity, row.variant.supplier_order_multiple
+                ),
+                note=AUTO_NOTE,
+            )
+        except RequestBlocked:
+            continue            # not enough free packs at the supplier right now
         created += 1
     return created
 
@@ -87,6 +95,7 @@ def check_wholesaler(wholesaler):
         variant__product__status='approved',
         variant__product__direct_supply=False,
         variant__product__owner_enterprise__isnull=True,
+        variant__supplier_can_supply=True,
     ).select_related('variant')
 
     created = 0
@@ -98,11 +107,19 @@ def check_wholesaler(wholesaler):
         ).exists()
         if already_open:
             continue
-        WholesalerRestockRequest.objects.create(
-            wholesaler=wholesaler, stockist=my_stockist,
-            variant=row.variant,
-            quantity_requested=wholesaler.auto_restock_quantity, note=AUTO_NOTE,
-        )
+        from products.bundle_chain import required_multiple
+        from .supply_requests import RequestBlocked, create_wholesaler_request
+        try:
+            create_wholesaler_request(
+                wholesaler, my_stockist, row.variant,
+                _round_to_supplier_multiple(
+                    wholesaler.auto_restock_quantity, required_multiple(wholesaler, row.variant)
+                ),
+                loose_grams=0,
+                note=AUTO_NOTE,
+            )
+        except RequestBlocked:
+            continue            # the stockist has no free packs right now
         created += 1
     return created
 
@@ -129,6 +146,7 @@ def check_marketplace(distributor):
         variant__is_active=True,
         variant__product__is_deleted=False,
         variant__product__owner_enterprise__isnull=True,   # never our own goods
+        variant__supplier_can_supply=True,
     ).select_related('variant')
 
     created = 0
@@ -142,12 +160,28 @@ def check_marketplace(distributor):
         ).exclude(status__in=['delivered', 'rejected']).exists()
         if already_open:
             continue
+        from products.bundle_chain import required_multiple, routes_via_wholesaler
         RestockRequest.objects.create(
             distributor=distributor, variant=row.variant,
-            quantity_requested=distributor.auto_restock_quantity, note=AUTO_NOTE,
+            quantity_requested=_round_to_supplier_multiple(
+                distributor.auto_restock_quantity, required_multiple(distributor, row.variant)
+            ),
+            loose_grams=0,
+            # kb/10: wait at the Distributor unless it keeps no buffer.
+            status=(
+                'awaiting_stock'
+                if routes_via_wholesaler(distributor, row.variant.product) else 'pending'
+            ),
+            note=AUTO_NOTE,
         )
         created += 1
     return created
+
+
+def _round_to_supplier_multiple(quantity, multiple):
+    multiple = max(1, int(multiple or 1))
+    quantity = max(0, int(quantity))
+    return ((quantity + multiple - 1) // multiple) * multiple
 
 
 def run_all():

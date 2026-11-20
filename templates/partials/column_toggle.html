@@ -6,7 +6,7 @@ Requires: <th data-col="colname"> and <td data-col="colname"> on each cell.
 
 <div class="d-flex align-items-center gap-2">
   {% if count is not None %}
-  <span class="text-muted small">Total Records | <strong>{{ count }}</strong></span>
+  <span class="text-muted small" id="totalCount_{{ table_id }}">Total Records | <strong>{{ count }}</strong></span>
   {% endif %}
 
   <!-- Search icon -->

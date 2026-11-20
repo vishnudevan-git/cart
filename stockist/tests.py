@@ -21,8 +21,10 @@ from django.urls import reverse
 
 from accounts.factories import build_world, make_user, login_as
 from products.models import ProductVariant
-from stockist.models import (Stockist, StockistInventory, StockistRestockRequest,
+from distributors.models import RestockRequest
+from stockist.models import (Stockist, StockistInventory, StockistLooseStock, StockistRestockRequest,
                              get_stockist_price, stockist_for)
+from distributors.wholesaler_models import WholesalerLooseStock, WholesalerRestockRequest
 
 
 class StockRulesTestCase(TestCase):
@@ -87,6 +89,155 @@ class StockistManualRulesTests(StockRulesTestCase):
         self.assertEqual(req.status, 'pending')
         self.assertEqual(self.inv.quantity, 5)
 
+    def test_loose_supplier_delivery_adds_base_units_and_deducts_source_stock(self):
+        self.world.shared_product.allow_loose_distribution = True
+        self.world.shared_product.save(update_fields=['allow_loose_distribution'])
+        self.variant.supplier_supplies_loose = True
+        self.variant.save(update_fields=['supplier_supplies_loose'])
+        req = StockistRestockRequest.objects.create(
+            stockist=self.world.stockist,
+            variant=self.variant,
+            quantity_requested=2,
+            loose_supply=True,
+        )
+        supplier_client = login_as(self.client_class(), self.world.supplier_user)
+        supplier_page = supplier_client.get(reverse('suppliers:restock_requests'))
+        self.assertContains(supplier_page, 'Loose')
+
+        supplier_client.post(reverse('suppliers:restock_requests'), {
+            'kind': 'stockist', 'req_id': req.pk, 'action': 'fulfil',
+        })
+
+        req.refresh_from_db()
+        self.variant.refresh_from_db()
+        loose = StockistLooseStock.objects.get(
+            stockist=self.world.stockist, product=self.world.shared_product
+        )
+        self.assertEqual(req.status, 'fulfilled')
+        self.assertEqual(self.variant.stock, 98)
+        self.assertEqual(loose.quantity_grams, 1000)
+        self.assertEqual(self.inv.quantity, 5)
+
+
+class LooseRestockChainTests(StockRulesTestCase):
+    def setUp(self):
+        super().setUp()
+        self.world.wholesaler.stockist = self.world.stockist
+        self.world.wholesaler.save(update_fields=['stockist'])
+        self.world.shared_product.allow_loose_distribution = True
+        self.world.shared_product.save(update_fields=['allow_loose_distribution'])
+        self.variant.supplier_supplies_loose = True
+        self.variant.save(update_fields=['supplier_supplies_loose'])
+        self.shop_request = RestockRequest.objects.create(
+            distributor=self.world.shop_a,
+            variant=self.variant,
+            quantity_requested=1,
+            loose_grams=1000,
+            status='awaiting_stock',
+        )
+
+    def test_surplus_moves_supplier_to_stockist_to_distributor_then_shop(self):
+        stockist_pool = StockistLooseStock.objects.create(
+            stockist=self.world.stockist,
+            product=self.world.shared_product,
+            quantity_grams=4000,
+            cost_price_per_gram=Decimal('0.50'),
+        )
+        wholesaler_client = login_as(self.client_class(), self.world.wholesaler_user)
+        wholesaler_page = wholesaler_client.get(reverse('wholesaler:my_stock'))
+        self.assertContains(wholesaler_page, 'Loose-stock requests from your Marketplaces')
+        wholesaler_client.post(reverse('wholesaler:my_stock'), {
+            'action': 'restock_loose_for_marketplace',
+            'request_id': self.shop_request.pk,
+            'loose_grams': '3000',
+        })
+
+        upstream = WholesalerRestockRequest.objects.get(
+            marketplace_request=self.shop_request
+        )
+        stockist_client = login_as(self.client_class(), self.world.stockist_user)
+        stockist_page = stockist_client.get(reverse('stockist:distributor_restock'))
+        self.assertContains(stockist_page, 'Restock Requests from Distributors')
+        stockist_client.post(reverse('stockist:distributor_restock'), {
+            'kind': 'wholesaler', 'req_id': upstream.pk, 'action': 'deliver',
+        })
+        stockist_pool.refresh_from_db()
+        distributor_pool = WholesalerLooseStock.objects.get(
+            wholesaler=self.world.wholesaler, product=self.world.shared_product
+        )
+        self.assertEqual(stockist_pool.quantity_grams, 1000)
+        self.assertEqual(distributor_pool.quantity_grams, 3000)
+        upstream.refresh_from_db()
+        self.assertEqual(upstream.status, 'delivered')
+
+        wholesaler_client.post(reverse('wholesaler:my_stock'), {
+            'action': 'fulfil_marketplace_loose',
+            'request_id': self.shop_request.pk,
+        })
+        distributor_pool.refresh_from_db()
+        marketplace_pool = self.world.shop_a.loose_stocks.get(
+            product=self.world.shared_product
+        )
+        self.shop_request.refresh_from_db()
+        self.assertEqual(self.shop_request.status, 'delivered')
+        self.assertEqual(distributor_pool.quantity_grams, 2000)
+        self.assertEqual(marketplace_pool.quantity_grams, 1000)
+
+
+class StockistRestockFulfillmentModeTests(StockRulesTestCase):
+    def setUp(self):
+        super().setUp()
+        self.client_s = login_as(self.client, self.world.stockist_user)
+        self.url = reverse('stockist:distributor_restock')
+
+    def _request(self):
+        return RestockRequest.objects.create(
+            distributor=self.world.shop_a,
+            variant=self.variant,
+            quantity_requested=4,
+        )
+
+    def test_supplier_global_send_mode_is_shown_and_saved_on_approval(self):
+        supplier = self.world.supplier
+        supplier.use_global_shipment_mode = True
+        supplier.default_shipment_mode = 'send'
+        supplier.save(update_fields=['use_global_shipment_mode', 'default_shipment_mode'])
+        request = self._request()
+
+        page = self.client_s.get(self.url)
+        self.assertContains(page, 'Supplier sends to you')
+
+        supplier_client = login_as(self.client_class(), self.world.supplier_user)
+        supplier_page = supplier_client.get(reverse('suppliers:restock_requests'))
+        self.assertContains(supplier_page, 'Supplier sends to stockist')
+
+        self.client_s.post(self.url, {
+            'req_id': request.pk,
+            'action': 'approve',
+            'fulfillment_method': 'stockist_pickup',
+        })
+
+        request.refresh_from_db()
+        self.assertEqual(request.fulfillment_method, 'supplier_transport')
+
+    def test_product_mode_is_used_when_supplier_global_mode_is_disabled(self):
+        supplier = self.world.supplier
+        supplier.use_global_shipment_mode = False
+        supplier.default_shipment_mode = 'collect'
+        supplier.save(update_fields=['use_global_shipment_mode', 'default_shipment_mode'])
+        product = self.world.shared_product
+        product.shipment_mode = 'send'
+        product.save(update_fields=['shipment_mode'])
+        request = self._request()
+
+        self.client_s.post(self.url, {
+            'req_id': request.pk,
+            'action': 'approve',
+        })
+
+        request.refresh_from_db()
+        self.assertEqual(request.fulfillment_method, 'supplier_transport')
+
 
 class WholesalerStockTests(StockRulesTestCase):
     """The wholesale Distributor's ledger: order-in, reduce-only manual."""
@@ -94,6 +245,9 @@ class WholesalerStockTests(StockRulesTestCase):
     def setUp(self):
         super().setUp()
         self.client_w = login_as(self.client, self.world.wholesaler_user)
+        # The stockist holds 10 packs, so distributor requests of up to 10 are accepted.
+        StockistInventory.objects.create(
+            stockist=self.world.stockist, variant=self.variant, quantity=10)
 
     def _request_stock(self, qty=4):
         self.client_w.post(reverse('wholesaler:my_stock'),
@@ -109,6 +263,7 @@ class WholesalerStockTests(StockRulesTestCase):
 
     def test_stockist_delivery_increases_stock(self):
         from distributors.wholesaler_models import WholesalerStock
+        from stockist.models import StockistInventory
         req = self._request_stock(4)
         stockist_client = login_as(self.client_class(), self.world.stockist_user)
 
@@ -117,6 +272,26 @@ class WholesalerStockTests(StockRulesTestCase):
 
         stock = WholesalerStock.objects.get(wholesaler=self.world.wholesaler, variant=self.variant)
         self.assertEqual(stock.quantity, 4)
+        # The packs leave the stockist's own stock too.
+        self.assertEqual(StockistInventory.objects.get(
+            stockist=self.world.stockist, variant=self.variant).quantity, 6)
+
+    def test_delivery_refused_when_stockist_lacks_the_packs(self):
+        from distributors.wholesaler_models import WholesalerStock
+        from stockist.models import StockistInventory
+        req = self._request_stock(4)
+        # Stock falls below the promised 4 after the request was made.
+        StockistInventory.objects.filter(
+            stockist=self.world.stockist, variant=self.variant).update(quantity=2)
+        stockist_client = login_as(self.client_class(), self.world.stockist_user)
+
+        stockist_client.post(reverse('stockist:distributor_restock'),
+                             {'kind': 'wholesaler', 'req_id': req.pk, 'action': 'deliver'})
+
+        self.assertFalse(WholesalerStock.objects.filter(
+            wholesaler=self.world.wholesaler, variant=self.variant, quantity__gt=0).exists())
+        self.assertEqual(StockistInventory.objects.get(
+            stockist=self.world.stockist, variant=self.variant).quantity, 2)
 
     def test_manual_reduce_works_but_never_beyond_stock(self):
         from distributors.wholesaler_models import WholesalerStock
@@ -183,13 +358,15 @@ class MarketplaceStockRulesTests(StockRulesTestCase):
         self.assertEqual(self.stock.quantity, 10)
 
     def test_no_manual_increase_path_exists(self):
-        """The old direct loose-add is gone: a loose restock now only creates a
-        PENDING request — stock rises when the stockist delivers, not before."""
+        """A shop with an assigned wholesale Distributor escalates loose stock
+        through that tier instead of creating stock directly."""
         from distributors.models import RestockRequest, DistributorLooseStock
         from products.models import Product
         Product.all_objects.filter(pk=self.world.shared_product.pk).update(
             allow_loose_distribution=True
         )
+        self.variant.supplier_supplies_loose = True
+        self.variant.save(update_fields=['supplier_supplies_loose'])
 
         self.client_a.post(reverse('distributors:my_stock'),
                            {'action': 'restock', 'restock_type': 'loose',
@@ -197,20 +374,18 @@ class MarketplaceStockRulesTests(StockRulesTestCase):
 
         req = RestockRequest.objects.get(distributor=self.world.shop_a)
         self.assertEqual(req.loose_grams, 2000)
-        self.assertEqual(req.status, 'pending')
+        self.assertEqual(req.status, 'awaiting_stock')
         self.assertFalse(
             DistributorLooseStock.objects.filter(distributor=self.world.shop_a).exists(),
             'loose stock appeared without a delivery'
         )
 
-        # Stockist delivers → NOW it lands in the loose pool.
-        stockist_client = login_as(self.client_class(), self.world.stockist_user)
-        stockist_client.post(reverse('stockist:distributor_restock'),
-                             {'req_id': req.pk, 'action': 'deliver'})
-        loose = DistributorLooseStock.objects.get(distributor=self.world.shop_a)
-        self.assertEqual(loose.quantity_grams, 2000)
-
         # And loose can be reduced manually (offline sale).
+        loose = DistributorLooseStock.objects.create(
+            distributor=self.world.shop_a,
+            product=self.world.shared_product,
+            quantity_grams=2000,
+        )
         self.client_a.post(reverse('distributors:my_stock'),
                            {'action': 'reduce_loose',
                             'product_id': self.world.shared_product.pk, 'kg': '0.5'})
@@ -473,6 +648,9 @@ class AutoRestockTests(StockRulesTestCase):
         WholesalerStock.objects.create(
             wholesaler=self.world.wholesaler, variant=self.variant, quantity=1
         )
+        from stockist.models import StockistInventory
+        StockistInventory.objects.create(
+            stockist=self.world.stockist, variant=self.variant, quantity=10)
         self.world.wholesaler.auto_restock_enabled = True
         self.world.wholesaler.save()
 

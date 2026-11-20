@@ -28,7 +28,8 @@ def checkout(request):
     if not distributor:
         messages.error(request, 'You need a distributor to place orders. Please register with a distributor invite code.')
         return redirect('products:home')
-    cart_items = Cart.objects.filter(customer=request.user).select_related(
+    cart_items = Cart.objects.filter(customer=request.user, variant__product__is_deleted=False
+                                     ).select_related(
         'variant__product__supplier'
     ).prefetch_related(
         Prefetch(
@@ -198,10 +199,15 @@ def checkout(request):
                         if loose:
                             loose.deduct(item.variant, from_loose)
 
+                # Cart rows filled from the shop's own stock. Their supplier stock
+                # already left the supplier when it was delivered down the chain,
+                # so checkout must not deduct it again.
+                from_shop_items = set()
                 if all_from_dist_stock:
                     order.fulfillment_source = 'distributor_stock'
                     order.status = 'at_distributor'
                     order.save()
+                    from_shop_items = {item.pk for item in cart_items}
                     for item in cart_items:
                         consume_item(item, item.quantity)
                     # Stage 7g: the sale just lowered shop stock — top up if the
@@ -219,9 +225,11 @@ def checkout(request):
                         if avail >= item.quantity:
                             consume_item(item, item.quantity)
                             item._fulfillment_status = 'shipped'
+                            from_shop_items.add(item.pk)
                         elif avail > 0:
                             consume_item(item, avail)
                             item._fulfillment_status = 'shipped'
+                            from_shop_items.add(item.pk)
                         else:
                             item._fulfillment_status = 'backordered'
                     # Stage 7g: partial shipment consumed shop stock too.
@@ -252,10 +260,16 @@ def checkout(request):
                         if dvp:
                             base_price = max(base_price, dvp.base_price)
 
-                    if variant.stock < item.quantity:
+                    shop_filled = item.pk in from_shop_items
+                    # Nearest-first (kb/13): the Distributor, then the Stockist, can
+                    # fill the whole line before the supplier is used.
+                    from orders.upstream_stock import consume_upper, pick_upper_tier
+                    upper = None if shop_filled else pick_upper_tier(
+                        distributor, variant, item.quantity)
+                    if not shop_filled and upper is None and variant.available_stock < item.quantity:
                         raise ValueError(
                             f'Insufficient stock for {variant}. '
-                            f'Available: {variant.stock}, requested: {item.quantity}'
+                            f'Available: {variant.available_stock}, requested: {item.quantity}'
                         )
 
                     item_fulfillment = getattr(item, '_fulfillment_status', 'pending')
@@ -275,7 +289,14 @@ def checkout(request):
                         supplier_price=variant.selling_price,
                         mrp=resolved_mrp,
                         fulfillment_status=item_fulfillment,
+                        stock_source=('shop' if shop_filled else (upper or 'supplier')),
                     )
+
+                    if upper:
+                        consume_upper(upper, distributor, variant, item.quantity)
+                        continue
+                    if shop_filled:
+                        continue
 
                     variant.stock = variant.stock - item.quantity
                     variant.save(update_fields=['stock'])
@@ -455,10 +476,21 @@ def order_edit(request, pk):
             item_id = request.POST.get('item_id')
             qty = int(request.POST.get('quantity', 1))
             item = get_object_or_404(OrderItem, pk=item_id, order=order)
+            if qty > item.quantity:
+                # Packs cannot be added to a placed order: the stock for them was never
+                # taken. The customer places a new order for the extra packs instead.
+                messages.error(request, 'You cannot add packs to an existing order. '
+                                        'Place a new order for the extra packs.')
+                return redirect('orders:order_edit', pk=pk)
             if qty < 1:
+                from .stock_return import return_item_stock
+                return_item_stock(order, item, item.quantity)
                 item.delete()
                 messages.success(request, 'Item removed.')
             else:
+                if qty < item.quantity:
+                    from .stock_return import return_item_stock
+                    return_item_stock(order, item, item.quantity - qty)
                 item.quantity = qty
                 item.save(update_fields=['quantity'])
                 messages.success(request, 'Quantity updated.')
@@ -467,6 +499,8 @@ def order_edit(request, pk):
         elif action == 'remove_item':
             item_id = request.POST.get('item_id')
             item = get_object_or_404(OrderItem, pk=item_id, order=order)
+            from .stock_return import return_item_stock
+            return_item_stock(order, item, item.quantity)
             item.delete()
             messages.success(request, 'Item removed.')
             _recalculate_order(order)

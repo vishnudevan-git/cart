@@ -1,0 +1,17 @@
+{% extends 'base_dashboard.html' %}
+{% block title %}Bundle Settings — Distributor{% endblock %}
+{% block page_title %}📦 Bundle Settings — {{ wholesaler.company_name }}{% endblock %}
+{% block content %}
+<div class="mb-3">
+  <a href="{% url 'wholesaler:my_stock' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>My Stock</a>
+</div>
+{% if wholesaler.no_buffer_stock %}
+<div class="alert alert-warning small">
+  <i class="bi bi-exclamation-triangle me-1"></i>
+  <strong>No buffer stock is ON.</strong> Your shops order straight from your stockist,
+  so the stockist's bundle rules apply to them. The rules below take effect only when
+  you turn buffer stock back on.
+</div>
+{% endif %}
+{% include 'partials/bundle_settings.html' %}
+{% endblock %}

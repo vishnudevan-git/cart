@@ -26,7 +26,7 @@ def create_supplier_shipment(sender, instance, created, **kwargs):
         order_item=instance,
         defaults={
             'supplier': supplier,
-            'target': getattr(product, 'delivery_target', 'stockist') or 'stockist',
+            'target': supplier.effective_shipment_target(product),
             'mode': supplier.effective_shipment_mode(product),
             'status': 'awaiting',
         },

@@ -1,12 +1,52 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum
+from django.views.decorators.http import require_POST
+import logging
 from functools import wraps
 from accounts.decorators import ensure_user_role
 from products.models import Product, ProductVariant, ProductBundle, ProductVariantType
 from products.forms import ProductForm, VariantFormSet
 from orders.models import OrderItem
 from .models import Supplier
+
+logger = logging.getLogger(__name__)
+
+
+def _deduct_supplier_pack_stock(variant, quantity):
+    """Deduct source packs from a supplier, keeping a measured stock pool in sync."""
+    if quantity <= 0 or variant.stock < quantity:
+        raise ValueError(f'You only have {variant.stock} × {variant.label} in stock.')
+
+    amount = variant.unit_grams * quantity
+    variant_type = variant.variant_type
+    if variant_type is not None and variant_type.master_stock_grams:
+        if amount > variant_type.master_stock_grams:
+            raise ValueError('Supplier loose stock is insufficient for this request.')
+        variant_type.master_stock_grams -= amount
+        variant_type.save(update_fields=['master_stock_grams'])
+        if variant_type.master_stock_grams:
+            variant_type.sync_pack_stocks()
+        else:
+            variant_type.packs.filter(
+                is_active=True, unit_grams__gt=0
+            ).update(stock=0)
+    elif variant_type is None and variant.product.master_stock_grams and amount > 0:
+        if amount > variant.product.master_stock_grams:
+            raise ValueError('Supplier loose stock is insufficient for this request.')
+        product = variant.product
+        product.master_stock_grams -= amount
+        product.save(update_fields=['master_stock_grams'])
+        if product.master_stock_grams:
+            product.sync_variant_stocks()
+        else:
+            ProductVariant.objects.filter(
+                product=product, is_active=True, unit_grams__gt=0
+            ).update(stock=0)
+    else:
+        variant.stock -= quantity
+        variant.save(update_fields=['stock'])
+    return amount
 
 
 def _save_bundles(product, request):
@@ -67,17 +107,19 @@ def _save_bundles(product, request):
     ProductBundle.objects.filter(product=product).exclude(pk__in=kept_pks).update(is_active=False)
 
 
-def _validate_variant_prices(product, groups, mrp_on=None, suggest_on=None):
+def _validate_variant_prices(product, groups, mrp_on=None, suggest_on=None, manual_mode=None):
     """Enforce the price-ordering rules on a parsed variants payload.
 
       • When MRP is on:       selling price < MRP  (strictly; equal rejected).
       • When Suggested is on:  selling < suggested, and (if MRP on) suggested ≤ MRP.
+      • In manual mode: each smaller pack is priced from the next larger pack;
+        its value must be size-proportional up to a 40% small-pack premium.
 
-    mrp_on / suggest_on override the stored flags (pass the POSTed toggle values
-    when validating a save, since the flags on `product` aren't updated yet).
+    mrp_on / suggest_on and manual_mode may override the stored settings when
+    validating a POST before its product fields have been saved.
     Raises ValueError with a combined message if any pack violates the rules.
     """
-    from decimal import Decimal, InvalidOperation
+    from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
     def _d(v):
         try:
@@ -87,6 +129,7 @@ def _validate_variant_prices(product, groups, mrp_on=None, suggest_on=None):
 
     mrp_on = bool(product.show_mrp) if mrp_on is None else bool(mrp_on)
     suggest_on = bool(product.show_suggested_price) if suggest_on is None else bool(suggest_on)
+    manual_mode = product.pricing_mode == 'manual' if manual_mode is None else bool(manual_mode)
     errors = []
     for g in (groups or [])[:5]:
         if not isinstance(g, dict):
@@ -102,11 +145,10 @@ def _validate_variant_prices(product, groups, mrp_on=None, suggest_on=None):
             sug = _d(pk_data.get('suggested_price'))
             auto = _d(pk_data.get('auto_price'))
             tag = f"{vname} · {pk_data.get('label', '')}"
-            # The auto price is the minimum floor — a manual pack price may be
-            # equal or higher, never lower. (Client blocks this too; this is the
-            # server-side safety net against a stale/crafted POST.)
-            if auto is not None and auto > 0 and price < auto:
-                errors.append(f"{tag}: price \u20b9{price} is below the auto price \u20b9{auto} (set \u20b9{auto} or higher).")
+            # Auto price is a reference in manual mode, not a minimum. This lets
+            # suppliers set genuine per-pack prices, including bulk discounts.
+            if not manual_mode and auto is not None and auto > 0 and price < auto:
+                errors.append(f"{tag}: auto-priced pack cannot be below its calculated price \u20b9{auto}.")
             if mrp_on and mrp is not None and not (price < mrp):
                 errors.append(f"{tag}: selling \u20b9{price} must be LESS than MRP \u20b9{mrp} (not equal).")
             if suggest_on and sug is not None:
@@ -114,8 +156,145 @@ def _validate_variant_prices(product, groups, mrp_on=None, suggest_on=None):
                     errors.append(f"{tag}: suggested \u20b9{sug} must be MORE than your price \u20b9{price}.")
                 if mrp_on and mrp is not None and sug > mrp:
                     errors.append(f"{tag}: suggested \u20b9{sug} cannot exceed MRP \u20b9{mrp}.")
+        if manual_mode:
+            packs_by_size = []
+            for pk_data in (g.get('packs') or []):
+                if not isinstance(pk_data, dict):
+                    continue
+                unit = _d(pk_data.get('unit_grams'))
+                price = _d(pk_data.get('selling_price'))
+                if unit is not None and unit > 0 and price is not None and price > 0:
+                    packs_by_size.append((unit, price, pk_data.get('label') or 'pack'))
+            packs_by_size.sort(key=lambda row: row[0])
+            for smaller, larger in zip(packs_by_size, packs_by_size[1:]):
+                smaller_unit, smaller_price, smaller_label = smaller
+                larger_unit, larger_price, larger_label = larger
+                ratio = smaller_unit / larger_unit
+                proportional_min = (larger_price * ratio).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP,
+                )
+                premium_max = (larger_price * ratio * Decimal('1.4')).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP,
+                )
+                strictly_below_larger = (larger_price - Decimal('0.01')).quantize(
+                    Decimal('0.01'), rounding=ROUND_HALF_UP,
+                )
+                allowed_max = min(premium_max, strictly_below_larger)
+                if smaller_price < proportional_min or smaller_price > allowed_max:
+                    errors.append(
+                        f"{g.get('name') or 'Variant'} · {smaller_label}: manual price "
+                        f"₹{smaller_price} must be between ₹{proportional_min} and "
+                        f"₹{allowed_max} when {larger_label} is ₹{larger_price}."
+                    )
     if errors:
         raise ValueError('Price rules violated — ' + '; '.join(errors))
+
+
+def _validate_variant_groups(groups, *, mrp_on=False, allow_bundle=False, allow_loose=False):
+    """Reject incomplete variant groups before any product or pack rows are saved."""
+    from decimal import Decimal, InvalidOperation
+
+    if not isinstance(groups, list) or not groups:
+        raise ValueError('Add at least one variant before saving.')
+    if len(groups) > 5:
+        raise ValueError('A product can have at most 5 variants.')
+
+    multiple = len(groups) > 1
+    errors = []
+    used_names = set()
+    any_bundled_pack = False
+    for index, group in enumerate(groups, start=1):
+        label = f'Variant {index}'
+        if not isinstance(group, dict):
+            errors.append(f'{label}: invalid variant data.')
+            continue
+        raw_name = group.get('name')
+        name = raw_name.strip() if isinstance(raw_name, str) else ''
+        if multiple and not name:
+            errors.append(f'{label}: enter a name before saving.')
+        if name:
+            name_key = name.casefold()
+            if name_key in used_names:
+                errors.append(f'{label}: variant names must be unique.')
+            used_names.add(name_key)
+
+        packs = group.get('packs')
+        if not isinstance(packs, list) or not packs:
+            errors.append(f'{name or label}: select at least one pack size.')
+            continue
+        seen_sizes = set()
+        for pack in packs:
+            pack_label = (pack.get('label') or 'pack') if isinstance(pack, dict) else 'pack'
+            tag = f'{name or label} · {pack_label}'
+            if not isinstance(pack, dict):
+                errors.append(f'{tag}: invalid pack data.')
+                continue
+            try:
+                unit = Decimal(str(pack.get('unit_grams')))
+            except (InvalidOperation, TypeError, ValueError):
+                unit = Decimal('0')
+            if not unit.is_finite() or unit <= 0 or unit != unit.to_integral_value():
+                errors.append(f'{tag}: choose a valid pack size.')
+            elif int(unit) in seen_sizes:
+                errors.append(f'{name or label}: pack sizes must not be duplicated.')
+            else:
+                seen_sizes.add(int(unit))
+
+            try:
+                price = Decimal(str(pack.get('selling_price')))
+            except (InvalidOperation, TypeError, ValueError):
+                price = Decimal('0')
+            if not price.is_finite() or price <= 0:
+                errors.append(f'{tag}: enter a selling price greater than ₹0.')
+
+            if mrp_on:
+                try:
+                    mrp = Decimal(str(pack.get('mrp')))
+                except (InvalidOperation, TypeError, ValueError):
+                    mrp = Decimal('0')
+                if not mrp.is_finite() or mrp <= 0:
+                    errors.append(f'{tag}: enter an MRP greater than ₹0.')
+
+            try:
+                raw_qty = Decimal(str(pack.get('bundle_qty') or 0))
+                if not raw_qty.is_finite() or raw_qty != raw_qty.to_integral_value():
+                    raise ValueError
+                bundle_qty = int(raw_qty)
+            except (InvalidOperation, TypeError, ValueError):
+                bundle_qty = -1
+            if bundle_qty < 0:
+                errors.append(f'{tag}: packs per bundle must be a whole number of 0 or more.')
+            if bundle_qty > 0:
+                any_bundled_pack = True
+            only_bundle = pack.get('only_bundle') is True
+            if only_bundle and (not allow_bundle or allow_loose or bundle_qty < 2):
+                errors.append(f'{tag}: Only Bundle needs Allow Bundle and at least 2 packs per bundle.')
+            if bundle_qty > 0 and allow_bundle and not allow_loose:
+                raw_count = pack.get('bundle_count')
+                try:
+                    raw_count_value = Decimal(str(raw_count))
+                    if (not raw_count_value.is_finite()
+                            or raw_count_value != raw_count_value.to_integral_value()
+                            or raw_count_value < 0):
+                        raise ValueError
+                    bundle_count = int(raw_count_value)
+                except (InvalidOperation, TypeError, ValueError):
+                    errors.append(f'{tag}: enter a bundle count of 0 or more.')
+            if not allow_loose:
+                if not (allow_bundle and bundle_qty > 0) and pack.get('stock_entered') is not True:
+                    errors.append(f'{tag}: enter stock for this pack before saving.')
+                try:
+                    raw_stock = Decimal(str(pack.get('stock')))
+                    if (not raw_stock.is_finite() or raw_stock < 0
+                            or raw_stock != raw_stock.to_integral_value()):
+                        raise ValueError
+                except (InvalidOperation, TypeError, ValueError):
+                    errors.append(f'{tag}: stock must be a whole number of 0 or more.')
+
+    if allow_bundle and not allow_loose and not any_bundled_pack:
+        errors.append('Allow Bundle is on: enter packs per bundle for at least one pack size.')
+    if errors:
+        raise ValueError('Please complete the variant setup: ' + ' '.join(errors))
 
 
 def _save_product_variants(product, request):
@@ -129,7 +308,8 @@ def _save_product_variants(product, request):
            "packs": [
              {"id": 5 or null, "label": "1kg", "unit_grams": 1000,
               "selling_price": "150.00", "mrp": "195.00",
-              "suggested_price": null, "stock": 40, "bundle_qty": 12},
+                  "suggested_price": null, "stock": 40, "bundle_qty": 12,
+                  "bundle_count": 3},
              ...
            ]},
           ...
@@ -149,9 +329,13 @@ def _save_product_variants(product, request):
     try:
         groups = json.loads(raw)
     except (ValueError, TypeError):
-        return False
-    if not isinstance(groups, list) or not groups:
-        return False
+        raise ValueError('Variant data could not be read. Refresh the page and try again.')
+    _validate_variant_groups(
+        groups,
+        mrp_on=product.show_mrp,
+        allow_bundle=product.allow_bundle,
+        allow_loose=product.allow_loose_distribution,
+    )
 
     groups = groups[:5]                         # hard cap: max 5 variants
     single = len(groups) == 1
@@ -169,7 +353,10 @@ def _save_product_variants(product, request):
             return 0
 
     # Validate price ordering BEFORE writing anything (raises ValueError).
-    _validate_variant_prices(product, groups)
+    _validate_variant_prices(
+        product, groups,
+        manual_mode=request.POST.get('pricing_mode_field') == 'manual',
+    )
 
     existing_types = {vt.pk: vt for vt in product.variant_types.all()}
     kept_type_pks = set()
@@ -219,6 +406,30 @@ def _save_product_variants(product, request):
             if price is None or price <= 0:
                 continue
             ug = _int(pk_data.get('unit_grams'))
+            bundle_qty = _int(pk_data.get('bundle_qty'))
+            only_bundle = pk_data.get('only_bundle') is True and product.allow_bundle
+            vname = name or 'Variant'
+            if only_bundle and bundle_qty <= 1:
+                raise ValueError(
+                    f'{vname} · {pk_data.get("label", "")}: enable Allow Bundle and enter a bundle quantity '
+                    'greater than 1 before selecting Only Bundle.'
+                )
+            # Bundle-mode inventory is entered as complete bundle counts. Keep
+            # that stock source independent from `only_bundle`, which controls
+            # whether downstream buyers may order individual packs.
+            raw_count = pk_data.get('bundle_count')
+            if product.allow_bundle and bundle_qty > 0 and raw_count is not None:
+                bundle_count = max(0, _int(raw_count))
+                bundle_remainder = min(
+                    bundle_qty - 1,
+                    max(0, _int(pk_data.get('bundle_remainder'))),
+                )
+                stock_units = bundle_count * bundle_qty + bundle_remainder
+            elif only_bundle:
+                bundle_count = max(0, _int(pk_data.get('stock')) // bundle_qty)
+                stock_units = bundle_count * bundle_qty
+            else:
+                stock_units = max(0, _int(pk_data.get('stock')))
             # When a toggle is OFF, its values are CLEARED (not just hidden) so
             # re-enabling later starts blank and the supplier re-enters them.
             mrp_val = _dec(pk_data.get('mrp')) if product.show_mrp else None
@@ -228,9 +439,14 @@ def _save_product_variants(product, request):
                 selling_price=price,
                 mrp=mrp_val,
                 suggested_price=sug_val,
-                stock=max(0, _int(pk_data.get('stock'))),
+                stock=stock_units,
                 unit_grams=ug,
                 is_active=True,
+                supplier_can_supply=(
+                    not product.allow_loose_distribution
+                    or pk_data.get('supplier_can_supply', True) is not False
+                ),
+                only_bundle=only_bundle,
             )
             bucket = existing_packs.get(ug) or []
             target = bucket.pop(0) if bucket else None
@@ -246,7 +462,7 @@ def _save_product_variants(product, request):
             kept_pack_pks.add(pack.pk)
 
             # Per-pack bundle (only when the product allows bundles).
-            bqty = _int(pk_data.get('bundle_qty'))
+            bqty = bundle_qty
             if product.allow_bundle and bqty > 0:
                 b = ProductBundle.objects.filter(
                     product=product, variant=pack, is_active=True
@@ -263,13 +479,39 @@ def _save_product_variants(product, request):
                 kept_bundle_pks.add(b.pk)
 
     # Deactivate dropped packs, bundles and variant types (never hard-delete).
+    # Cascade deactivation to downstream visibility - when a pack is removed,
+    # it should no longer be visible to customers/distributors even if stockist
+    # has inventory. Stockist can still see it in their warehouse for fulfillment.
     ProductVariant.objects.filter(product=product).exclude(
         pk__in=kept_pack_pks).update(is_active=False)
+    
+    # When a pack is deactivated, update downstream distributor prices to inactive
+    # so the pack disappears from storefronts while stockist can still fulfill orders
+    from distributors.models import DistributorVariantPrice
+    deactivated_packs = ProductVariant.objects.filter(product=product, is_active=False)
+    DistributorVariantPrice.objects.filter(
+        variant__in=deactivated_packs
+    ).update(is_active=False)
+    
     ProductBundle.objects.filter(product=product).exclude(
         pk__in=kept_bundle_pks).update(is_active=False)
     ProductVariantType.objects.filter(product=product).exclude(
         pk__in=kept_type_pks).update(is_active=False)
     return True
+
+
+def _enforce_variant_price_modes(product):
+    fields = {}
+    if not product.show_mrp:
+        fields['mrp'] = None
+    if not product.show_suggested_price:
+        fields['suggested_price'] = None
+    if not product.allow_loose_distribution:
+        fields['supplier_can_supply'] = True
+    else:
+        fields['only_bundle'] = False
+    if fields:
+        ProductVariant.objects.filter(product=product).update(**fields)
 
 
 def supplier_required(view_func):
@@ -362,42 +604,62 @@ def dashboard(request):
         product__supplier=supplier
     ).select_related('order', 'product', 'variant').order_by('-order__created_at')[:10]
 
-    # ── Financial: order-value earnings (matches the Payout History page) ──
-    # supplier_price × qty, with the variant selling_price as a fallback when
-    # supplier_price was not frozen. Delivered = earned; the rest = pending.
-    from django.db.models.functions import Coalesce
-    from django.db.models import Case, When
-    unit_val = Case(
-        When(supplier_price__gt=0, then=F('supplier_price')),
-        default=Coalesce(F('variant__selling_price'), Decimal('0')),
-        output_field=DecimalField(max_digits=16, decimal_places=2),
-    )
-    line_val = ExpressionWrapper(unit_val * F('quantity'),
-                                 output_field=DecimalField(max_digits=16, decimal_places=2))
-    oi = OrderItem.objects.filter(product__supplier=supplier).exclude(order__status='cancelled')
-    earn = oi.aggregate(
-        earned=Sum(line_val, filter=Q(order__status='delivered')),
-        pending=Sum(line_val, filter=~Q(order__status='delivered')),
-    )
-    earned_delivered = earn['earned'] or 0
-    pending_undelivered = earn['pending'] or 0
-
-    # ── Financial: real settlements owed to the supplier (Payments Center) ──
+    # ── Financial: supplier order value split into four simple buckets ──
     from payments.models import RoleSettlement
-    settle = RoleSettlement.objects.filter(
-        supplier=supplier, stage='stockist_to_supplier'
-    ).aggregate(
-        settled=Sum('amount_paid', filter=Q(status='confirmed')),
-        awaiting=Sum('amount_due', filter=Q(status__in=('pending', 'submitted', 'disputed'))),
-    )
-    settled_amount = settle['settled'] or 0
-    awaiting_settlement = settle['awaiting'] or 0
 
-    # ── Financial: B2B procurement receivable from stockists ──
-    from stockist.procurement_models import StockistSupplierAccount
-    procurement_receivable = StockistSupplierAccount.objects.filter(
-        supplier=supplier
-    ).aggregate(t=Sum('balance_due'))['t'] or 0
+    confirmed_paid_by_order = dict(
+        RoleSettlement.objects.filter(
+            supplier=supplier,
+            stage='stockist_to_supplier',
+            status='confirmed',
+        ).values('order_id').annotate(total=Sum('amount_paid'))
+         .values_list('order_id', 'total')
+    )
+    order_items = (OrderItem.objects.filter(product__supplier=supplier)
+                   .select_related('order', 'variant')
+                   .prefetch_related('supplier_shipment')
+                   .order_by('order_id', 'pk'))
+    items_by_order = {}
+    for item in order_items:
+        shipment = getattr(item, 'supplier_shipment', None)
+        line_value = (item.supplier_price or
+                      (item.variant.selling_price if item.variant_id else Decimal('0'))) * item.quantity
+        is_cancelled = (
+            item.order.status == 'cancelled'
+            or item.fulfillment_status == 'cancelled'
+            or (shipment is not None and shipment.status == 'cancelled')
+        )
+        items_by_order.setdefault(item.order_id, []).append(
+            (line_value, shipment.status if shipment else 'awaiting', is_cancelled)
+        )
+
+    order_value = Decimal('0')
+    fund_received = Decimal('0')
+    sent_awaiting_funds = Decimal('0')
+    yet_to_send = Decimal('0')
+    cancelled_order_value = Decimal('0')
+    for order_id, lines in items_by_order.items():
+        order_value += sum((value for value, _, _ in lines), Decimal('0'))
+        active_value = sum(
+            (value for value, _, cancelled in lines if not cancelled),
+            Decimal('0'),
+        )
+        remaining_received = min(
+            confirmed_paid_by_order.get(order_id) or Decimal('0'),
+            active_value,
+        )
+        for value, shipment_status, cancelled in lines:
+            if cancelled:
+                cancelled_order_value += value
+                continue
+            received_for_line = min(value, remaining_received)
+            fund_received += received_for_line
+            remaining_received -= received_for_line
+            unpaid_value = value - received_for_line
+            if shipment_status in ('dispatched', 'received'):
+                sent_awaiting_funds += unpaid_value
+            else:
+                yet_to_send += unpaid_value
 
     # ── Overall stock value = Σ (pack stock × selling price) ──
     _stock_qs = ProductVariant.objects.filter(
@@ -426,15 +688,24 @@ def dashboard(request):
     from orders.models import SupplierShipment
     ship_rows = (SupplierShipment.objects.filter(supplier=supplier)
                  .exclude(order_item__order__status='cancelled')
-                 .values('status').annotate(n=Count('id')))
-    ship_counts = {r['status']: r['n'] for r in ship_rows}
+                 .values('status').annotate(
+                     order_count=Count('order_item__order_id', distinct=True),
+                     product_count=Count('id'),
+                 ))
+    ship_counts = {r['status']: r for r in ship_rows}
     # Ordered list of (key, label) for display — mirrors SupplierShipment.STATUS_CHOICES.
     shipment_stages = [
         ('awaiting', 'Awaiting'), ('delayed', 'Delayed'), ('confirmed', 'Ready'),
         ('dispatched', 'Dispatched'), ('received', 'Received'), ('unavailable', 'Unavailable'),
     ]
     shipment_counters = [
-        {'key': k, 'label': lbl, 'count': ship_counts.get(k, 0)} for k, lbl in shipment_stages
+        {
+            'key': k,
+            'label': lbl,
+            'order_count': ship_counts.get(k, {}).get('order_count', 0),
+            'product_count': ship_counts.get(k, {}).get('product_count', 0),
+        }
+        for k, lbl in shipment_stages
     ]
 
     return render(request, 'suppliers/dashboard.html', {
@@ -443,11 +714,11 @@ def dashboard(request):
         'recent_orders': recent_orders,
         'product_count': products.count(),
         # financial
-        'earned_delivered': earned_delivered,
-        'pending_undelivered': pending_undelivered,
-        'settled_amount': settled_amount,
-        'awaiting_settlement': awaiting_settlement,
-        'procurement_receivable': procurement_receivable,
+        'order_value': order_value,
+        'fund_received': fund_received,
+        'sent_awaiting_funds': sent_awaiting_funds,
+        'yet_to_send': yet_to_send,
+        'cancelled_order_value': cancelled_order_value,
         # inventory
         'stock_value': stock_value,
         'total_units': total_units,
@@ -464,13 +735,74 @@ def dashboard(request):
 @supplier_required
 def product_list(request):
     supplier = request.user.supplier_profile
+    show_deleted = request.GET.get('show_deleted') == '1'
+    deleted_products = Product.all_objects.filter(
+        supplier=supplier, is_deleted=True
+    ).order_by('-deleted_at', '-created_at') if show_deleted else []
+    deleted_product_count = Product.all_objects.filter(
+        supplier=supplier, is_deleted=True
+    ).count()
     category_filter = request.GET.get('category', '')
     status_filter = request.GET.get('status', '')
-    products = Product.objects.filter(supplier=supplier, is_deleted=False).prefetch_related('variants').order_by('-created_at')
+    bundle_filter = request.GET.get('bundle', '')
+    loose_filter = request.GET.get('loose', '')
+    mrp_filter = request.GET.get('mrp', '')
+    unit_filter = request.GET.get('unit', '')
+    
+    from products.stock_unit import annotate_min_active_pack, effective_stock_unit, effective_unit_q
+    products = annotate_min_active_pack(
+        Product.objects.filter(supplier=supplier, is_deleted=False)
+    ).prefetch_related('variants').order_by('-created_at')
     if category_filter:
         products = products.filter(category_id=category_filter)
     if status_filter:
         products = products.filter(status=status_filter)
+    if bundle_filter:
+        if bundle_filter == 'true':
+            products = products.filter(allow_bundle=True)
+        elif bundle_filter == 'false':
+            products = products.filter(allow_bundle=False)
+    if loose_filter:
+        if loose_filter == 'true':
+            products = products.filter(allow_loose_distribution=True)
+        elif loose_filter == 'false':
+            products = products.filter(allow_loose_distribution=False)
+    if mrp_filter:
+        if mrp_filter == 'true':
+            products = products.filter(show_mrp=True)
+        elif mrp_filter == 'false':
+            products = products.filter(show_mrp=False)
+    # Stock unit filter uses the effective unit: grams products whose packs are all
+    # 50 g or more count as kilograms (products/stock_unit.py).
+    if unit_filter:
+        products = products.filter(effective_unit_q(unit_filter))
+    # Pack size: products with an active pack of this size. Value is
+    # "<effective unit>:<base units>", e.g. "kg:1000" or "ml:1000".
+    pack_filter = request.GET.get('pack', '')
+    pack_unit, _, pack_grams = pack_filter.partition(':')
+    if pack_grams.isdigit() and pack_unit:
+        products = products.filter(
+            effective_unit_q(pack_unit),
+            variants__unit_grams=int(pack_grams), variants__is_active=True,
+        ).distinct()
+    # Pack sizes offered follow the effective unit of each product, and the Stock
+    # unit filter when one is selected.
+    pack_choice_rows = []
+    for prod in Product.objects.filter(supplier=supplier, is_deleted=False).prefetch_related('variants'):
+        live = [v for v in prod.variants.all() if v.is_active and v.unit_grams > 0]
+        if not live:
+            continue
+        unit = effective_stock_unit(prod.master_unit, [v.unit_grams for v in live])
+        if unit_filter and unit != unit_filter:
+            continue
+        for v in live:
+            pack_choice_rows.append((v.unit_grams, f'{unit}:{v.unit_grams}', v.label))
+    pack_choices = []
+    seen = set()
+    for grams, key, label in sorted(pack_choice_rows, key=lambda r: (r[0], r[2])):
+        if key not in seen:
+            seen.add(key)
+            pack_choices.append((key, label))
 
     # Deduplicate variants per product (keep latest by label)
     from products.models import Category
@@ -484,17 +816,27 @@ def product_list(request):
 
     return render(request, 'suppliers/product_list.html', {
         'products': products_with_variants,
+        'show_deleted': show_deleted,
+        'deleted_products': deleted_products,
+        'deleted_product_count': deleted_product_count,
         'categories': categories,
         'category_filter': category_filter,
         'status_filter': status_filter,
+        'bundle_filter': bundle_filter,
+        'loose_filter': loose_filter,
+        'mrp_filter': mrp_filter,
+        'unit_filter': unit_filter,
+        'pack_filter': pack_filter,
+        'pack_choices': pack_choices,
         'status_choices': Product.STATUS_CHOICES,
+        'unit_choices': Product.UNIT_CHOICES,
     })
 
 
 @supplier_required
 def product_add(request):
     supplier = request.user.supplier_profile
-    form = ProductForm(request.POST or None, request.FILES or None)
+    form = ProductForm(request.POST or None, request.FILES or None, supplier=supplier)
     formset = VariantFormSet(request.POST or None, prefix='variants')
     # The variant-aware path posts `variants_json` and bypasses the formset;
     # otherwise require the legacy formset to have >=1 valid pack.
@@ -504,6 +846,40 @@ def product_add(request):
     # "zombie" product with no packs (and no price). validate_min=1 on the
     # formset enforces the at-least-one-pack rule server-side.
     if request.method == 'POST' and form.is_valid() and (use_json or formset.is_valid()):
+        if use_json:
+            import json as _json
+            _posted_groups = []
+            try:
+                _posted_groups = _json.loads(request.POST.get('variants_json') or '[]')
+                _allow_loose = request.POST.get('allow_loose_distribution') == '1'
+                _allow_bundle = request.POST.get('allow_bundle') == '1' and not _allow_loose
+                _validate_variant_groups(
+                    _posted_groups,
+                    mrp_on=request.POST.get('show_mrp_field') == 'true',
+                    allow_bundle=_allow_bundle,
+                    allow_loose=_allow_loose,
+                )
+                _candidate = form.save(commit=False)
+                _validate_variant_prices(
+                    _candidate, _posted_groups,
+                    mrp_on=request.POST.get('show_mrp_field') == 'true',
+                    suggest_on=request.POST.get('show_suggested_field') == 'true',
+                    manual_mode=request.POST.get('pricing_mode_field') == 'manual',
+                )
+            except (ValueError, TypeError) as exc:
+                messages.error(request, str(exc))
+                return render(request, 'suppliers/product_form.html', {
+                    'form': form, 'formset': formset, 'title': 'Add Product',
+                    'supplier': supplier,
+                    'existing_variants_json': '[]',
+                    'existing_bundles_json': '[]',
+                    'variant_groups_json': _json.dumps(
+                        _posted_groups if isinstance(_posted_groups, list) else [],
+                        default=str,
+                    ),
+                    'delivery_target_choices': Product.DELIVERY_TARGET_CHOICES,
+                    'shipment_mode_choices': Product.SHIPMENT_MODE_CHOICES,
+                })
         product = form.save(commit=False)
         product.supplier = supplier
 
@@ -516,12 +892,14 @@ def product_add(request):
         product.status = 'pending'
 
         product.show_mrp = request.POST.get('show_mrp_field') == 'true'
-        # MRP (hard cap) and a suggested price (guidance) may both be on: the
-        # shop cannot exceed the MRP, and the suggested price cautions it to
-        # keep the price reasonable.
-        product.show_suggested_price = request.POST.get('show_suggested_field') == 'true'
+        product.show_suggested_price = (
+            request.POST.get('show_suggested_field') == 'true' and not product.show_mrp
+        )
         product.allow_loose_distribution = request.POST.get('allow_loose_distribution') == '1'
-        product.allow_bundle = request.POST.get('allow_bundle') == '1'
+        product.allow_bundle = (
+            request.POST.get('allow_bundle') == '1'
+            and not product.allow_loose_distribution
+        )
         # Supplier shipment routing (admin may override later at approval).
         _valid_targets = {c[0] for c in Product.DELIVERY_TARGET_CHOICES}
         _valid_modes = {c[0] for c in Product.SHIPMENT_MODE_CHOICES}
@@ -556,6 +934,7 @@ def product_add(request):
             messages.error(request, str(exc))
             return redirect('suppliers:product_edit', pk=product.pk)
 
+        _enforce_variant_price_modes(product)
         messages.success(request, 'Product submitted for admin approval.')
         try:
             from lakrish_mart.activity_logger import act as _act
@@ -569,6 +948,7 @@ def product_add(request):
         messages.error(request, 'Please fix the errors below — the product was not saved.')
     return render(request, 'suppliers/product_form.html', {
         'form': form, 'formset': formset, 'title': 'Add Product',
+        'supplier': supplier,
         'existing_variants_json': '[]',
         'existing_bundles_json': '[]',
         'variant_groups_json': '[]',
@@ -581,7 +961,8 @@ def product_add(request):
 def product_edit(request, pk):
     supplier = request.user.supplier_profile
     product = get_object_or_404(Product, pk=pk, supplier=supplier)
-    form = ProductForm(request.POST or None, request.FILES or None, instance=product)
+    form = ProductForm(request.POST or None, request.FILES or None, instance=product,
+                       supplier=supplier)
     formset = VariantFormSet(request.POST or None, instance=product, prefix='variants')
     if request.method == 'POST' and form.is_valid():
         # Variant-aware path posts `variants_json` and does NOT use the formset,
@@ -597,12 +978,25 @@ def product_edit(request, pk):
             except (ValueError, TypeError):
                 _parsed = []
             try:
+                _allow_loose = request.POST.get('allow_loose_distribution') == '1'
+                _validate_variant_groups(
+                    _parsed,
+                    mrp_on=request.POST.get('show_mrp_field') == 'true',
+                    allow_bundle=request.POST.get('allow_bundle') == '1' and not _allow_loose,
+                    allow_loose=_allow_loose,
+                )
                 _validate_variant_prices(
                     product, _parsed,
                     mrp_on=request.POST.get('show_mrp_field') == 'true',
                     suggest_on=request.POST.get('show_suggested_field') == 'true',
+                    manual_mode=request.POST.get('pricing_mode_field') == 'manual',
                 )
             except ValueError as exc:
+                logger.warning(
+                    'Supplier product edit rejected by variant validation: '
+                    'product_id=%s supplier_id=%s reason=%s',
+                    product.pk, supplier.pk, exc,
+                )
                 messages.error(request, str(exc))
                 return redirect('suppliers:product_edit', pk=product.pk)
         # The JS rebuilds the whole pack table on every save, so treat every
@@ -621,75 +1015,90 @@ def product_edit(request, pk):
         else:
             from django.db import transaction
             from products.models import ProductVariant
-            with transaction.atomic():
-                product = form.save()
-                product.show_mrp = request.POST.get('show_mrp_field') == 'true'
-                # Both may be on: MRP caps, suggested price guides (see product_add).
-                product.show_suggested_price = request.POST.get('show_suggested_field') == 'true'
-                product.allow_loose_distribution = request.POST.get('allow_loose_distribution') == '1'
-                product.allow_bundle = request.POST.get('allow_bundle') == '1'
-                # Supplier shipment routing (admin may override later at approval).
-                _valid_targets = {c[0] for c in Product.DELIVERY_TARGET_CHOICES}
-                _valid_modes = {c[0] for c in Product.SHIPMENT_MODE_CHOICES}
-                _tgt = request.POST.get('delivery_target', 'stockist')
-                _mode = request.POST.get('shipment_mode', 'collect')
-                product.delivery_target = _tgt if _tgt in _valid_targets else 'stockist'
-                product.shipment_mode = _mode if _mode in _valid_modes else 'collect'
-                product.save(update_fields=['show_mrp', 'show_suggested_price',
-                                            'allow_loose_distribution', 'allow_bundle',
-                                            'delivery_target', 'shipment_mode'])
-                # Handle web image URL if no file uploaded
-                if not request.FILES.get('image'):
-                    image_url = request.POST.get('image_url', '').strip()
-                    if image_url:
-                        _save_image_from_url(product, image_url)
+            try:
+                with transaction.atomic():
+                    product = form.save()
+                    product.show_mrp = request.POST.get('show_mrp_field') == 'true'
+                    product.show_suggested_price = (
+                        request.POST.get('show_suggested_field') == 'true' and not product.show_mrp
+                    )
+                    product.allow_loose_distribution = request.POST.get('allow_loose_distribution') == '1'
+                    product.allow_bundle = (
+                        request.POST.get('allow_bundle') == '1'
+                        and not product.allow_loose_distribution
+                    )
+                    # Supplier shipment routing (admin may override later at approval).
+                    _valid_targets = {c[0] for c in Product.DELIVERY_TARGET_CHOICES}
+                    _valid_modes = {c[0] for c in Product.SHIPMENT_MODE_CHOICES}
+                    _tgt = request.POST.get('delivery_target', 'stockist')
+                    _mode = request.POST.get('shipment_mode', 'collect')
+                    product.delivery_target = _tgt if _tgt in _valid_targets else 'stockist'
+                    product.shipment_mode = _mode if _mode in _valid_modes else 'collect'
+                    product.save(update_fields=['show_mrp', 'show_suggested_price',
+                                                'allow_loose_distribution', 'allow_bundle',
+                                                'delivery_target', 'shipment_mode'])
+                    # Handle web image URL if no file uploaded
+                    if not request.FILES.get('image'):
+                        image_url = request.POST.get('image_url', '').strip()
+                        if image_url:
+                            _save_image_from_url(product, image_url)
 
-                # Variant-aware save (new path). Falls back to the legacy
-                # single-variant formset reconciliation if no JSON was posted.
-                if not _save_product_variants(product, request):
-                    # ── Legacy path: reconcile packs by size WITHOUT hard-deleting.
-                    existing = {}
-                    for v in ProductVariant.objects.filter(product=product):
-                        existing.setdefault(v.unit_grams, []).append(v)
-                    kept_pks = set()
-                    for f in clean_formset.forms:
-                        cd = getattr(f, 'cleaned_data', None)
-                        if not cd or cd.get('DELETE') or cd.get('selling_price') is None:
-                            continue
-                        ug = cd.get('unit_grams') or 0
-                        bucket = existing.get(ug) or []
-                        target = bucket.pop(0) if bucket else None
-                        fields = dict(
-                            label=cd.get('label', ''), selling_price=cd['selling_price'],
-                            mrp=cd.get('mrp'), suggested_price=cd.get('suggested_price'),
-                            stock=cd.get('stock') or 0, is_active=True,
-                        )
-                        if target:
-                            for key, val in fields.items():
-                                setattr(target, key, val)
-                            target.save()
-                            kept_pks.add(target.pk)
-                        else:
-                            nv = ProductVariant.objects.create(product=product, unit_grams=ug, **fields)
-                            kept_pks.add(nv.pk)
-                    ProductVariant.objects.filter(product=product).exclude(pk__in=kept_pks).update(is_active=False)
-                    _save_bundles(product, request)
+                    # Variant-aware save (new path). Falls back to the legacy
+                    # single-variant formset reconciliation if no JSON was posted.
+                    if not _save_product_variants(product, request):
+                        # ── Legacy path: reconcile packs by size WITHOUT hard-deleting.
+                        existing = {}
+                        for v in ProductVariant.objects.filter(product=product):
+                            existing.setdefault(v.unit_grams, []).append(v)
+                        kept_pks = set()
+                        for f in clean_formset.forms:
+                            cd = getattr(f, 'cleaned_data', None)
+                            if not cd or cd.get('DELETE') or cd.get('selling_price') is None:
+                                continue
+                            ug = cd.get('unit_grams') or 0
+                            bucket = existing.get(ug) or []
+                            target = bucket.pop(0) if bucket else None
+                            fields = dict(
+                                label=cd.get('label', ''), selling_price=cd['selling_price'],
+                                mrp=cd.get('mrp'), suggested_price=cd.get('suggested_price'),
+                                stock=cd.get('stock') or 0, is_active=True,
+                            )
+                            if target:
+                                for key, val in fields.items():
+                                    setattr(target, key, val)
+                                target.save()
+                                kept_pks.add(target.pk)
+                            else:
+                                nv = ProductVariant.objects.create(product=product, unit_grams=ug, **fields)
+                                kept_pks.add(nv.pk)
+                        ProductVariant.objects.filter(product=product).exclude(pk__in=kept_pks).update(is_active=False)
+                        _save_bundles(product, request)
 
-                # Re-sync per-variant stock/price from the master pool ONLY when
-                # the supplier did NOT submit explicit per-pack prices. When
-                # `variants_json` is present, each pack's price was typed by the
-                # supplier and already saved above — running sync here would
-                # overwrite those hand-entered prices with
-                # unit_grams × master_price_per_unit (the bug that silently reset
-                # a lowered pack price, e.g. to ₹1.00).
-                if (not use_json
-                        and product.master_stock_grams
-                        and product.pricing_mode == 'auto'):
-                    product.sync_variant_stocks()
+                    # Re-sync per-variant stock/price from the master pool ONLY when
+                    # the supplier did NOT submit explicit per-pack prices. When
+                    # `variants_json` is present, each pack's price was typed by the
+                    # supplier and already saved above — running sync here would
+                    # overwrite those hand-entered prices with
+                    # unit_grams × master_price_per_unit (the bug that silently reset
+                    # a lowered pack price, e.g. to ₹1.00).
+                    if (not use_json
+                            and product.master_stock_grams
+                            and product.pricing_mode == 'auto'):
+                        product.sync_variant_stocks()
+                    _enforce_variant_price_modes(product)
+            except ValueError as exc:
+                # Raised inside the atomic block, so every write above is rolled back.
+                logger.warning(
+                    'Supplier product edit rolled back: product_id=%s supplier_id=%s reason=%s',
+                    product.pk, supplier.pk, exc,
+                )
+                messages.error(request, str(exc))
+                return redirect('suppliers:product_edit', pk=pk)
             messages.success(request, 'Product updated.')
             return redirect('suppliers:product_list')
 
     import json
+    from decimal import Decimal, ROUND_HALF_UP
     # Legacy single-pack list (kept for the existing JS pre-load of pack buttons
     # — it drives the FIRST variant's table on load).
     existing_variants = json.dumps(list(
@@ -719,10 +1128,30 @@ def product_edit(request, pk):
                 'mrp': str(p.mrp) if p.mrp is not None else None,
                 'suggested_price': str(p.suggested_price) if p.suggested_price is not None else None,
                 'stock': p.stock,
+                'supplier_can_supply': p.supplier_can_supply,
+                'only_bundle': p.only_bundle,
                 'bundle_qty': _bundle_by_variant.get(p.pk, 0),
+                'bundle_count': (
+                    p.stock // _bundle_by_variant[p.pk]
+                    if _bundle_by_variant.get(p.pk, 0) > 0 else None
+                ),
+                'bundle_remainder': (
+                    p.stock % _bundle_by_variant[p.pk]
+                    if _bundle_by_variant.get(p.pk, 0) > 0 else 0
+                ),
             })
+        price_per_kg = None
+        measurable_packs = [p for p in packs if int(p['unit_grams']) > 0]
+        if measurable_packs:
+            largest_pack = max(measurable_packs, key=lambda p: int(p['unit_grams']))
+            divisor = Decimal('100') if product.master_unit == 'qty' else Decimal('1000')
+            price_per_kg = float(
+                (Decimal(largest_pack['selling_price']) / Decimal(largest_pack['unit_grams']) * divisor)
+                .quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+            )
         variant_groups.append({
             'id': vt.pk, 'name': vt.name, 'packs': packs,
+            'price_per_kg': price_per_kg,
             # Authoritative loose pool for THIS variant (base units, g/ml/qty).
             # Sent so the edit form shows the real pool instead of reconstructing
             # it by summing per-pack counts (which multiplied the pool by the
@@ -737,6 +1166,7 @@ def product_edit(request, pk):
         'existing_bundles_json': existing_bundles,
         'variant_groups_json': variant_groups_json,
         'product': product,
+        'supplier': supplier,
         'delivery_target_choices': Product.DELIVERY_TARGET_CHOICES,
         'shipment_mode_choices': Product.SHIPMENT_MODE_CHOICES,
     })
@@ -751,6 +1181,25 @@ def product_delete(request, pk):
         messages.success(request, f'"{product.name}" removed from your catalogue.')
         return redirect('suppliers:product_list')
     return render(request, 'suppliers/product_confirm_delete.html', {'product': product})
+
+
+@supplier_required
+@require_POST
+def product_restore(request, pk):
+    supplier = request.user.supplier_profile
+    product = get_object_or_404(Product.all_objects, pk=pk, supplier=supplier, is_deleted=True)
+    had_status_snapshot = bool(product.deleted_previous_status)
+    name = product.name
+    product.restore()
+    if had_status_snapshot:
+        messages.success(request, f'"{name}" was restored with its previous approval status.')
+    else:
+        messages.warning(
+            request,
+            f'"{name}" was restored as pending because its previous approval status was not recorded. '
+            'An admin can review it again.',
+        )
+    return redirect('suppliers:product_list')
 
 
 # Base units per whole display unit, keyed by the Product.master_unit code.
@@ -776,6 +1225,127 @@ def _is_pool_product(product):
 
 
 @supplier_required
+def stock_export(request):
+    """Download the supplier's current pack stock as an Excel sheet."""
+    import datetime
+    from django.http import HttpResponse
+    from .stock_excel import build_stock_workbook
+
+    wb = build_stock_workbook(request.user.supplier_profile)
+    response = HttpResponse(
+        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Content-Disposition'] = (
+        f'attachment; filename="stock_{datetime.date.today():%Y-%m-%d}.xlsx"')
+    wb.save(response)
+    return response
+
+
+@supplier_required
+@require_POST
+def stock_import(request):
+    """Apply an uploaded stock sheet, then return to the stock page."""
+    from .stock_excel import apply_stock_workbook
+
+    uploaded = request.FILES.get('stock_file')
+    if uploaded is None or not uploaded.name.lower().endswith('.xlsx'):
+        messages.error(request, 'Upload an .xlsx file downloaded from the stock page.')
+        return redirect('suppliers:stock_manage')
+    if uploaded.size > 5 * 1024 * 1024:
+        messages.error(request, 'The file is larger than 5 MB.')
+        return redirect('suppliers:stock_manage')
+    try:
+        updated, skipped = apply_stock_workbook(request.user.supplier_profile, uploaded)
+    except ValueError as exc:
+        messages.error(request, str(exc))
+        return redirect('suppliers:stock_manage')
+
+    if updated:
+        messages.success(request, f'Stock updated for {updated} pack(s) from the sheet.')
+    elif not skipped:
+        messages.info(request, 'The sheet has no stock changes.')
+    if skipped:
+        shown = '; '.join(f'{label}: {reason}' for label, reason in skipped[:10])
+        more = f' and {len(skipped) - 10} more' if len(skipped) > 10 else ''
+        messages.warning(request, f'{len(skipped)} row(s) not saved: {shown}{more}.')
+    return redirect('suppliers:stock_manage')
+
+
+STOCK_FILTER_FIELDS = ('status', 'bundle', 'loose', 'mrp', 'unit', 'pack')
+
+
+def _stock_filter_context(supplier, params):
+    """My Products filters (status, bundle, loose, MRP, stock unit, pack size) for the
+    stock page. Same rules as product_list, so both pages list the same products.
+
+    Returns (products, context). ``products`` is the matching product queryset.
+    """
+    from products.stock_unit import annotate_min_active_pack, effective_stock_unit, effective_unit_q
+
+    f = {k: params.get(k, '') for k in STOCK_FILTER_FIELDS}
+    base = Product.objects.filter(supplier=supplier, is_deleted=False)
+    products = annotate_min_active_pack(base)
+    if f['status']:
+        products = products.filter(status=f['status'])
+    if f['bundle'] in ('true', 'false'):
+        products = products.filter(allow_bundle=(f['bundle'] == 'true'))
+    if f['loose'] in ('true', 'false'):
+        products = products.filter(allow_loose_distribution=(f['loose'] == 'true'))
+    if f['mrp'] in ('true', 'false'):
+        products = products.filter(show_mrp=(f['mrp'] == 'true'))
+    if f['unit']:
+        products = products.filter(effective_unit_q(f['unit']))
+    pack_unit, _, pack_grams = f['pack'].partition(':')
+    if pack_grams.isdigit() and pack_unit:
+        products = products.filter(
+            effective_unit_q(pack_unit),
+            variants__unit_grams=int(pack_grams), variants__is_active=True,
+        ).distinct()
+
+    # Pack sizes offered follow each product's effective unit and the unit filter.
+    pack_choice_rows = []
+    for prod in base.prefetch_related('variants'):
+        live = [v for v in prod.variants.all() if v.is_active and v.unit_grams > 0]
+        if not live:
+            continue
+        unit = effective_stock_unit(prod.master_unit, [v.unit_grams for v in live])
+        if f['unit'] and unit != f['unit']:
+            continue
+        for v in live:
+            pack_choice_rows.append((v.unit_grams, f'{unit}:{v.unit_grams}', v.label))
+    pack_choices, seen = [], set()
+    for grams, key, label in sorted(pack_choice_rows, key=lambda r: (r[0], r[2])):
+        if key not in seen:
+            seen.add(key)
+            pack_choices.append((key, label))
+
+    context = {
+        'status_filter': f['status'],
+        'bundle_filter': f['bundle'],
+        'loose_filter': f['loose'],
+        'mrp_filter': f['mrp'],
+        'unit_filter': f['unit'],
+        'pack_filter': f['pack'],
+        'status_choices': Product.STATUS_CHOICES,
+        'unit_choices': Product.UNIT_CHOICES,
+        'pack_choices': pack_choices,
+        'any_filter': any(f.values()),
+    }
+    return products, context
+
+
+STOCK_CONFLICT_MSG = ('changed since you opened this page, so it was not saved. '
+                       'Reload the page and enter it again')
+
+
+def _posted_int(request, key, fallback):
+    """Whole number posted under ``key``, or ``fallback`` if missing or not a whole number."""
+    try:
+        return int(request.POST.get(key))
+    except (TypeError, ValueError):
+        return fallback
+
+
+@supplier_required
 def stock_manage(request):
     """Supplier can update stock for all their variants from one page.
 
@@ -794,13 +1364,15 @@ def stock_manage(request):
     category_filter = request.GET.get('category', '')
 
     variants = ProductVariant.objects.filter(
-        product__supplier=supplier, is_active=True
+        product__supplier=supplier, product__is_deleted=False, is_active=True
     ).select_related('product__category', 'variant_type').order_by(
         'product__category__name', 'product__name',
         'variant_type__position', 'selling_price'
     )
     if category_filter:
         variants = variants.filter(product__category_id=category_filter)
+    stock_products, stock_filters = _stock_filter_context(supplier, request.GET)
+    variants = variants.filter(product_id__in=stock_products.values('pk'))
 
     # Group the on-screen packs by product, then by variant-type within each.
     # For LOOSE products each variant is pool-based: one editable pool, packs
@@ -838,6 +1410,7 @@ def stock_manage(request):
                 'is_pool': ctx['is_pool'],
                 'pool_display': (Decimal(vt_pool) / ctx['pool_factor'])
                                 if ctx['is_pool'] else None,
+                'pool_base': vt_pool,
                 'packs': [],
             }
             ctx['_vg_index'][vt_id] = grp
@@ -881,6 +1454,7 @@ def stock_manage(request):
             low_count += 1
 
     # Attach each product's wholesale bundles (one extra query, not N).
+    bundle_box = {}     # variant pk -> packs per bundle (box size)
     if by_product:
         bundles = ProductBundle.objects.filter(
             product_id__in=by_product.keys(), is_active=True
@@ -890,6 +1464,15 @@ def stock_manage(request):
             if ctx is not None:
                 b.available = b.available_bundles()   # computed for the template
                 ctx['bundles'].append(b)
+                bundle_box[b.variant_id] = b.pack_quantity
+
+    # Bundle packs of manual products take a bundle count instead of a pack count.
+    for ctx in products_ctx:
+        for v in ctx['variants']:
+            v.bundle_box = None if ctx['is_pool'] else bundle_box.get(v.pk)
+            if v.bundle_box:
+                v.bundle_count = v.stock // v.bundle_box
+                v.bundle_leftover = v.stock % v.bundle_box
 
     if request.method == 'POST':
         # Upper bound that catches fat-finger typos (e.g. an extra digit) while
@@ -919,6 +1502,10 @@ def stock_manage(request):
                     except (InvalidOperation, ValueError, TypeError):
                         skipped.append((label, 'not a valid number'))
                         continue
+                    # NaN and Infinity parse as Decimal but cannot become grams.
+                    if not amount.is_finite():
+                        skipped.append((label, 'not a valid number'))
+                        continue
                     if amount < 0:
                         skipped.append((label, 'cannot be negative'))
                         continue
@@ -926,18 +1513,52 @@ def stock_manage(request):
                     if new_base > MAX_POOL_BASE:
                         skipped.append((label, 'stock is unrealistically large'))
                         continue
-                    vt = ProductVariantType.objects.filter(
-                        pk=grp['vt_id'], product=product).first()
-                    if vt is None or new_base == vt.master_stock_grams:
+                    # Compare with the pool the supplier loaded, not the live
+                    # value, so an order that changed the pool is not overwritten.
+                    baseline = _posted_int(request, f"orig_pool_{grp['vt_id']}",
+                                           grp.get('pool_base'))
+                    if new_base == baseline:
                         continue
-                    vt.master_stock_grams = new_base
-                    vt.save(update_fields=['master_stock_grams'])
+                    saved = ProductVariantType.objects.filter(
+                        pk=grp['vt_id'], product=product,
+                        master_stock_grams=baseline,
+                    ).update(master_stock_grams=new_base)
+                    if not saved:
+                        skipped.append((label, STOCK_CONFLICT_MSG))
+                        continue
+                    vt = ProductVariantType.objects.get(pk=grp['vt_id'])
                     vt.sync_pack_stocks()     # auto-populate this variant's packs
                     updated += 1
                 continue
 
             # Non-loose product — each pack keeps its own stock count.
             for variant in ctx['variants']:
+                if variant.bundle_box:
+                    # Bundle pack: the typed value is a bundle count. Stock becomes
+                    # count x box size, and packs left over after full bundles are kept.
+                    key = f'bundle_count_{variant.pk}'
+                    if key not in request.POST:
+                        continue
+                    raw = (request.POST.get(key) or '').strip()
+                    label = f'{product.name} ({variant.label}) bundles'
+                    if not (raw.isascii() and raw.isdigit()):
+                        skipped.append((label, 'not a whole number'))
+                        continue
+                    box = variant.bundle_box
+                    baseline = _posted_int(request, f'orig_{variant.pk}', variant.stock)
+                    if int(raw) == baseline // box:
+                        continue
+                    new_stock = int(raw) * box + baseline % box
+                    if new_stock > MAX_STOCK:
+                        skipped.append((label, f'exceeds the {MAX_STOCK:,} pack limit'))
+                        continue
+                    saved = ProductVariant.objects.filter(
+                        pk=variant.pk, stock=baseline).update(stock=new_stock)
+                    if not saved:
+                        skipped.append((label, STOCK_CONFLICT_MSG))
+                        continue
+                    updated += 1
+                    continue
                 key = f'stock_{variant.pk}'
                 if key not in request.POST:
                     continue
@@ -954,14 +1575,19 @@ def stock_manage(request):
                 if new_stock > MAX_STOCK:
                     skipped.append((label, f'exceeds the {MAX_STOCK:,} limit'))
                     continue
-                if new_stock == variant.stock:
+                # Compare with the stock the supplier loaded, not the live value.
+                # Rows the supplier did not touch then never overwrite an order
+                # that changed the count in the meantime.
+                baseline = _posted_int(request, f'orig_{variant.pk}', variant.stock)
+                if new_stock == baseline:
                     continue
-                variant.stock = new_stock
-                variant.save(update_fields=['stock'])
+                saved = ProductVariant.objects.filter(
+                    pk=variant.pk, stock=baseline).update(stock=new_stock)
+                if not saved:
+                    skipped.append((label, STOCK_CONFLICT_MSG))
+                    continue
                 updated += 1
 
-            # Bundles carry no stock of their own — availability is computed
-            # from the pack stock above, so nothing to save here.
 
         if updated:
             messages.success(request, f'Stock updated for {updated} product(s)/pack(s).')
@@ -976,10 +1602,22 @@ def stock_manage(request):
                 'Please re-check those values.'
             )
 
+        # Per-product "Save this product" posts with X-Requested-With and gets JSON,
+        # so the rest of the page keeps its unsaved edits.
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            from django.contrib.messages import get_messages
+            from django.http import JsonResponse
+            return JsonResponse({
+                'ok': not skipped,
+                'updated': updated,
+                'skipped': [{'label': name, 'reason': reason} for name, reason in skipped],
+                'messages': [str(m) for m in get_messages(request)],
+            })
+
         # Keep the supplier on the same filtered view after saving.
         url = reverse('suppliers:stock_manage')
-        if category_filter:
-            url += f'?category={category_filter}'
+        if request.GET:
+            url += f'?{request.GET.urlencode()}'
         return redirect(url)
 
     # Only categories this supplier actually sells in.
@@ -1000,6 +1638,21 @@ def stock_manage(request):
         ctx['ds_shop'] = pp.ds_shop
         ctx['ds_total'] = pp.ds_total
 
+    # Totals in grams or ml when every pack has a size, so packs of different
+    # sizes add up correctly. Otherwise fall back to a plain pack count.
+    from products.stock_units import attach_downstream_base_totals, format_base_units
+    attach_downstream_base_totals(_ds_products)
+    for ctx in products_ctx:
+        pp = ctx['product']
+        sized = pp.master_unit in ('g', 'ml') and all(
+            v.unit_grams > 0 for v in ctx['variants'])
+        for tier in ('stockist', 'distributor', 'shop', 'total'):
+            base = getattr(pp, f'ds_{tier}_base')
+            if sized and base is not None:
+                ctx[f'ds_{tier}_label'] = format_base_units(base, pp.master_unit)
+            else:
+                ctx[f'ds_{tier}_label'] = f"{ctx[f'ds_{tier}']} packs"
+
     return render(request, 'suppliers/stock_manage.html', {
         'products_ctx': products_ctx,
         'variant_count': len(variants),
@@ -1007,6 +1660,7 @@ def stock_manage(request):
         'category_filter': category_filter,
         'out_count': out_count,
         'low_count': low_count,
+        **stock_filters,
     })
 
 
@@ -1027,7 +1681,7 @@ def _ensure_shipment(order_item, supplier):
         order_item=order_item,
         defaults={
             'supplier': supplier,
-            'target': getattr(prod, 'delivery_target', 'stockist') or 'stockist',
+            'target': supplier.effective_shipment_target(prod),
             'mode': supplier.effective_shipment_mode(prod),
             'status': 'awaiting',
         },
@@ -1048,7 +1702,7 @@ def _backfill_shipments(base_items, supplier):
     SupplierShipment.objects.bulk_create([
         SupplierShipment(
             order_item=it, supplier=supplier,
-            target=getattr(it.product, 'delivery_target', 'stockist') or 'stockist',
+            target=supplier.effective_shipment_target(it.product),
             mode=supplier.effective_shipment_mode(it.product),
             status='awaiting',
         ) for it in missing
@@ -1073,6 +1727,22 @@ def _reassert_modes(supplier):
         for m in ('collect', 'send'):
             awaiting.filter(order_item__product__shipment_mode=m).exclude(mode=m)\
                 .update(mode=m, updated_at=now)
+
+
+def _reassert_targets(supplier):
+    """Keep awaiting shipment snapshots in sync with the effective target."""
+    from django.utils import timezone
+    from orders.models import SupplierShipment
+    now = timezone.now()
+    awaiting = SupplierShipment.objects.filter(
+        supplier=supplier, status__in=['awaiting', 'delayed'])
+    if supplier.use_global_shipment_mode:
+        awaiting.exclude(target=supplier.default_shipment_target).update(
+            target=supplier.default_shipment_target, updated_at=now)
+    else:
+        for target, _label in SupplierShipment.TARGET_CHOICES:
+            awaiting.filter(order_item__product__delivery_target=target).exclude(target=target)\
+                .update(target=target, updated_at=now)
 
 
 def _log_ship(request, event, order, detail=''):
@@ -1150,17 +1820,23 @@ def _orders_post(request, supplier, base_items):
     if action == 'set_global_mode':
         supplier.use_global_shipment_mode = request.POST.get('use_global') == '1'
         gm = request.POST.get('default_shipment_mode', 'collect')
+        gt = request.POST.get('default_shipment_target', 'stockist')
         if gm in {c[0] for c in Supplier.SHIPMENT_MODE_CHOICES}:
             supplier.default_shipment_mode = gm
-        supplier.save(update_fields=['use_global_shipment_mode', 'default_shipment_mode'])
+        if gt in {c[0] for c in Supplier.SHIPMENT_TARGET_CHOICES}:
+            supplier.default_shipment_target = gt
+        supplier.save(update_fields=['use_global_shipment_mode', 'default_shipment_mode',
+                                     'default_shipment_target'])
         _reassert_modes(supplier)
+        _reassert_targets(supplier)
         if supplier.use_global_shipment_mode:
             messages.success(
                 request,
-                f'Global mode set to "{supplier.get_default_shipment_mode_display()}". '
+                f'Global shipment routing set to "{supplier.get_default_shipment_target_display()}" '
+                f'with "{supplier.get_default_shipment_mode_display()}" handover. '
                 f'It now applies to all products.')
         else:
-            messages.success(request, 'Global mode off - each product uses its own setting.')
+            messages.success(request, 'Global shipment routing off - each product uses its own settings.')
         return redirect(back)
 
     # ── Bulk ready: mark many lines (collect OR send) as packed, any orders ──
@@ -1392,6 +2068,7 @@ def orders(request):
     # Set-based housekeeping (zero rows touched in the normal case).
     _backfill_shipments(base_items, supplier)
     _reassert_modes(supplier)
+    _reassert_targets(supplier)
 
     if request.method == 'POST':
         return _orders_post(request, supplier, base_items)
@@ -1445,40 +2122,40 @@ def orders(request):
             s.dest = _dest_suggestion(it.order, s.target, dest_cache) \
                 if (s.mode == 'send' and s.status == 'confirmed') else ''
 
-    def _needs_action(s):
-        # Still to pack (awaiting), or packed but not yet dispatched.
-        # Delayed and unavailable lines live in their own tabs.
-        if s is None or s.status == 'awaiting':
-            return True
-        return s.status == 'confirmed' and s.mode == 'send'
+    status_tabs = [
+        ('awaiting', 'Awaiting'), ('delayed', 'Delayed'),
+        ('confirmed', 'Ready'), ('dispatched', 'Dispatched'),
+        ('received', 'Received'), ('unavailable', 'Unavailable'),
+        ('cancelled', 'Cancelled'),
+    ]
+    status_groups = {key: {'orders': set(), 'products': 0} for key, _ in status_tabs}
+    for item in items:
+        shipment = ships_all.get(item.pk)
+        status = shipment.status if shipment else 'awaiting'
+        if status not in status_groups:
+            continue
+        status_groups[status]['orders'].add(item.order_id)
+        status_groups[status]['products'] += 1
 
-    def _is_delayed(s):
-        return s is not None and s.status == 'delayed'
-
-    def _is_unavailable(s):
-        return s is not None and s.status == 'unavailable'
-
-    count_action = sum(1 for it in items if _needs_action(ships_all.get(it.pk)))
-    count_delayed = sum(1 for it in items if _is_delayed(ships_all.get(it.pk)))
-    count_unavailable = sum(1 for it in items if _is_unavailable(ships_all.get(it.pk)))
-    count_all = len(items)
-    count_completed = count_all - count_action - count_delayed - count_unavailable
-
-    tab = request.GET.get('tab', 'action')
-    if tab == 'action':
-        visible_items = [it for it in items if _needs_action(ships_all.get(it.pk))]
-    elif tab == 'delayed':
-        visible_items = [it for it in items if _is_delayed(ships_all.get(it.pk))]
-    elif tab == 'unavailable':
-        visible_items = [it for it in items if _is_unavailable(ships_all.get(it.pk))]
-    elif tab == 'completed':
-        visible_items = [it for it in items
-                         if not _needs_action(ships_all.get(it.pk))
-                         and not _is_delayed(ships_all.get(it.pk))
-                         and not _is_unavailable(ships_all.get(it.pk))]
-    else:
-        tab = 'all'
-        visible_items = items
+    shipment_status_tabs = [
+        {
+            'key': key,
+            'label': label,
+            'order_count': len(status_groups[key]['orders']),
+            'product_count': status_groups[key]['products'],
+        }
+        for key, label in status_tabs
+        if status_groups[key]['products'] or key != 'cancelled'
+    ]
+    valid_tabs = {key for key, _ in status_tabs}
+    tab = request.GET.get('tab', 'awaiting')
+    if tab not in valid_tabs:
+        tab = 'awaiting'
+    tab_label = dict(status_tabs)[tab]
+    visible_items = [
+        item for item in items
+        if (ships_all[item.pk].status if item.pk in ships_all else 'awaiting') == tab
+    ]
 
     # ── Packing summary (awaiting lines in the current tab + filters) ───────
     packing = {}
@@ -1590,16 +2267,14 @@ def orders(request):
         'filter_qs': filter_qs,
         'selectable_count': selectable_count,
         'tab': tab,
-        'count_action': count_action,
-        'count_completed': count_completed,
-        'count_unavailable': count_unavailable,
-        'count_delayed': count_delayed,
-        'count_all': count_all,
+        'tab_label': tab_label,
+        'shipment_status_tabs': shipment_status_tabs,
         'delay_reasons': SupplierShipment.DELAY_REASONS,
         'unavailable_reasons': SupplierShipment.UNAVAILABLE_REASONS,
         'today': timezone.localdate(),
         'supplier': supplier,
         'global_mode_choices': Supplier.SHIPMENT_MODE_CHOICES,
+        'global_target_choices': Supplier.SHIPMENT_TARGET_CHOICES,
         'filter_products': list(filter_products),
         'target_choices': [
             ('stockist', 'Stockist'), ('distributor', 'Distributor'),
@@ -1903,43 +2578,93 @@ def restock_requests(request):
             messages.error(request, 'Request not found.')
             return redirect('suppliers:restock_requests')
         if action == 'fulfil':
-            variant = sreq.variant
-            if variant.stock < sreq.quantity_requested:
-                messages.error(
-                    request,
-                    f'You only have {variant.stock} × {variant.label} in stock — '
-                    f'add stock to your product first or reject the request.'
-                )
-                return redirect('suppliers:restock_requests')
+            from django.db import transaction
             from products.models import ProductVariant as PV
-            PV.objects.filter(pk=variant.pk).update(stock=variant.stock - sreq.quantity_requested)
-            inv, _ = StockistInventory.objects.get_or_create(
-                stockist=sreq.stockist, variant=variant, defaults={'quantity': 0}
-            )
-            inv.quantity += sreq.quantity_requested
-            inv.save()
-            sreq.status = 'fulfilled'
-            sreq.fulfilled_at = timezone.now()
-            sreq.save()
+            from stockist.models import StockistLooseStock
+            try:
+                with transaction.atomic():
+                    sreq = StockistRestockRequest.objects.select_for_update().select_related(
+                        'variant__product', 'variant__variant_type', 'stockist'
+                    ).get(pk=sreq.pk, status='pending')
+                    locked_variant = PV.objects.select_for_update().select_related(
+                        'product', 'variant_type'
+                    ).get(pk=sreq.variant_id)
+                    if not locked_variant.is_active or not locked_variant.supplier_can_supply:
+                        raise ValueError('This pack size is not currently enabled for supplier supply.')
+                    if sreq.quantity_requested % max(1, locked_variant.supplier_order_multiple):
+                        raise ValueError(
+                            f'This supplier pack must be requested in multiples of '
+                            f'{locked_variant.supplier_order_multiple}.'
+                        )
+                    expected_loose_delivery = locked_variant.product.allow_loose_distribution
+                    if sreq.loose_supply != expected_loose_delivery:
+                        raise ValueError('The supplier delivery format changed; please submit a new request.')
+                    if sreq.loose_supply and locked_variant.unit_grams <= 0:
+                        raise ValueError('This pack has no measurable size for loose-stock delivery.')
+                    amount = _deduct_supplier_pack_stock(
+                        locked_variant, sreq.quantity_requested
+                    )
+                    # The packs have left: they are no longer held for this request.
+                    from stockist.supply_requests import release_supplier_block
+                    release_supplier_block(locked_variant.pk, sreq.quantity_requested)
+
+                    if sreq.loose_supply:
+                        loose, _ = StockistLooseStock.objects.select_for_update().get_or_create(
+                            stockist=sreq.stockist, product=locked_variant.product,
+                            defaults={'quantity_grams': 0, 'cost_price_per_gram': 0},
+                        )
+                        loose.quantity_grams += amount
+                        loose.cost_price_per_gram = (
+                            locked_variant.selling_price / locked_variant.unit_grams
+                        )
+                        loose.save()
+                    else:
+                        inv, _ = StockistInventory.objects.select_for_update().get_or_create(
+                            stockist=sreq.stockist, variant=locked_variant,
+                            defaults={'quantity': 0}
+                        )
+                        inv.quantity += sreq.quantity_requested
+                        inv.save()
+
+                    sreq.status = 'fulfilled'
+                    sreq.fulfilled_at = timezone.now()
+                    sreq.save(update_fields=['status', 'fulfilled_at'])
+            except StockistRestockRequest.DoesNotExist:
+                messages.error(request, 'This stockist request is no longer pending.')
+                return redirect('suppliers:restock_requests')
+            except ValueError as exc:
+                messages.error(request, str(exc))
+                return redirect('suppliers:restock_requests')
             messages.success(
                 request,
-                f'{sreq.quantity_requested}× {variant.label} of {variant.product.name} '
-                f'sent to {sreq.stockist.company_name}.'
+                (
+                    f'{amount} base units of {locked_variant.product.name} added to '
+                    f'{sreq.stockist.company_name} loose stock.'
+                    if sreq.loose_supply else
+                    f'{sreq.quantity_requested}× {locked_variant.label} of '
+                    f'{locked_variant.product.name} sent to {sreq.stockist.company_name}.'
+                )
             )
         elif action == 'reject':
             sreq.status = 'rejected'
             sreq.save()
+            from stockist.supply_requests import release_supplier_block
+            release_supplier_block(sreq.variant_id, sreq.quantity_requested)
             messages.warning(request, f'Stockist request #{req_id} rejected.')
         return redirect('suppliers:restock_requests')
 
     requests_qs = RestockRequest.objects.filter(
         variant__product__supplier=supplier
     ).select_related(
-        'variant__product', 'distributor'
+        'variant__product__supplier', 'distributor'
     ).order_by('-requested_at')
 
     if status_filter != 'all':
         requests_qs = requests_qs.filter(status=status_filter)
+    for restock_request in requests_qs:
+        restock_request.display_fulfillment_method = (
+            restock_request.effective_fulfillment_method
+        )
 
     if request.method == 'POST':
         req_id = request.POST.get('req_id')
@@ -1952,49 +2677,73 @@ def restock_requests(request):
                 # Stage 7: DIRECT-supply products are delivered by the supplier
                 # straight to the shop — no stockist, no Distributor, no
                 # commissions. Marketplace stock rises; supplier stock falls.
-                if not r.variant.product.direct_supply:
-                    messages.error(request, 'Only direct-supply products can be delivered by the supplier.')
-                    return redirect('suppliers:restock_requests')
-                if r.status not in ('pending', 'approved', 'in_transit'):
-                    messages.error(request, 'Request already resolved.')
-                    return redirect('suppliers:restock_requests')
+                from django.db import transaction
                 from distributors.models import (DistributorStock, DistributorStockBatch,
                                                  DistributorLooseStock)
-                variant = r.variant
-                if r.loose_grams:
-                    ls, _ = DistributorLooseStock.objects.get_or_create(
-                        distributor=r.distributor, product=variant.product,
-                        defaults={'quantity_grams': 0, 'cost_price_per_gram': 0},
-                    )
-                    ls.quantity_grams += r.loose_grams
-                    if variant.unit_grams:
-                        ls.cost_price_per_gram = variant.selling_price / variant.unit_grams
-                    ls.save()
-                    delivered_what = f'{r.loose_grams}g loose {variant.product.name}'
+                try:
+                    with transaction.atomic():
+                        r = RestockRequest.objects.select_for_update().select_related(
+                            'variant__product', 'variant__variant_type', 'distributor'
+                        ).get(pk=r.pk, variant__product__supplier=supplier)
+                        if not r.variant.product.direct_supply:
+                            raise ValueError('Only direct-supply products can be delivered by the supplier.')
+                        if r.status not in ('pending', 'approved', 'in_transit'):
+                            raise ValueError('Request already resolved.')
+                        variant = ProductVariant.objects.select_for_update().select_related(
+                            'product', 'variant_type'
+                        ).get(pk=r.variant_id)
+                        if not variant.is_active or not variant.supplier_can_supply:
+                            raise ValueError('This pack size is not currently enabled for supplier supply.')
+                        if r.loose_grams:
+                            if (
+                                not variant.product.allow_loose_distribution
+                                or variant.unit_grams <= 0
+                            ):
+                                raise ValueError('This product cannot be delivered as loose stock.')
+                            pack_quantity = (
+                                r.loose_grams + variant.unit_grams - 1
+                            ) // variant.unit_grams
+                            multiple = max(1, variant.supplier_order_multiple)
+                            pack_quantity = ((pack_quantity + multiple - 1) // multiple) * multiple
+                            amount = _deduct_supplier_pack_stock(variant, pack_quantity)
+                            loose, _ = DistributorLooseStock.objects.select_for_update().get_or_create(
+                                distributor=r.distributor, product=variant.product,
+                                defaults={'quantity_grams': 0, 'cost_price_per_gram': 0},
+                            )
+                            loose.quantity_grams += amount
+                            loose.cost_price_per_gram = variant.selling_price / variant.unit_grams
+                            loose.save()
+                            r.loose_grams = amount
+                            delivered_what = f'{amount} base units of loose {variant.product.name}'
+                        else:
+                            if r.quantity_requested % max(1, variant.supplier_order_multiple):
+                                raise ValueError(
+                                    f'This supplier pack must be requested in multiples of '
+                                    f'{variant.supplier_order_multiple}.'
+                                )
+                            _deduct_supplier_pack_stock(variant, r.quantity_requested)
+                            stock_obj, _ = DistributorStock.objects.select_for_update().get_or_create(
+                                distributor=r.distributor, variant=variant, defaults={'quantity': 0}
+                            )
+                            DistributorStockBatch.objects.create(
+                                stock=stock_obj,
+                                quantity=r.quantity_requested,
+                                cost_price=variant.selling_price,
+                                note=f'Direct supply — request #{r.pk} delivered by supplier',
+                            )
+                            stock_obj.refresh_quantity()
+                            delivered_what = (
+                                f'{r.quantity_requested}× {variant.label} of {variant.product.name}'
+                            )
+                        r.status = 'delivered'
+                        r.save(update_fields=['status', 'loose_grams', 'updated_at'])
+                except ValueError as exc:
+                    messages.error(request, str(exc))
                 else:
-                    if variant.stock < r.quantity_requested:
-                        messages.error(
-                            request,
-                            f'You only have {variant.stock} × {variant.label} in stock.'
-                        )
-                        return redirect('suppliers:restock_requests')
-                    ProductVariant.objects.filter(pk=variant.pk).update(
-                        stock=variant.stock - r.quantity_requested
+                    messages.success(
+                        request,
+                        f'{delivered_what} delivered to {r.distributor.company_name}.'
                     )
-                    stock_obj, _ = DistributorStock.objects.get_or_create(
-                        distributor=r.distributor, variant=variant, defaults={'quantity': 0}
-                    )
-                    DistributorStockBatch.objects.create(
-                        stock=stock_obj,
-                        quantity=r.quantity_requested,
-                        cost_price=variant.selling_price,
-                        note=f'Direct supply — request #{r.pk} delivered by supplier',
-                    )
-                    stock_obj.refresh_quantity()
-                    delivered_what = f'{r.quantity_requested}× {variant.label} of {variant.product.name}'
-                r.status = 'delivered'
-                r.save()
-                messages.success(request, f'{delivered_what} delivered to {r.distributor.company_name}.')
             elif action == 'dispatch':
                 # Only an open request can be dispatched. Direct-supply products
                 # are delivered with "Deliver (direct)" instead.

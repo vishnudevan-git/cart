@@ -113,6 +113,43 @@ class RequestLoggingMiddleware:
             return f'{user.get_username()}({role})'
         return 'guest'
 
+    # Form fields whose values are logged. Anything else (addresses, notes,
+    # prices typed by users) is logged as a count only.
+    _SHOW_VALUE_KEYS = {
+        'action', 'status', 'mode', 'scope', 'kind', 'bundle_action', 'req_id',
+        'request_id', 'rule_id', 'distributor_id', 'supplier_id', 'product_id',
+        'stockist_id', 'user_id', 'variant_id', 'customer_ids', 'user_ids',
+        'product_ids', 'supplier_ids', 'distributor_ids', 'stockist_ids',
+        'wholesaler_ids', 'bundle_qty', 'bundle_id', 'bundle_name',
+        'no_buffer_stock', 'loose_quantity', 'loose_grams', 'restock_type',
+    }
+    # Field names containing these words are masked completely.
+    _SECRET_WORDS = ('password', 'passwd', 'token', 'secret', 'otp', 'pin', 'csrf', 'session')
+
+    def _post_detail(self, request):
+        """Summary of what was posted: field names, and values for safe fields only."""
+        if request.method not in ('POST', 'PUT', 'PATCH', 'DELETE'):
+            return ''
+        try:
+            data = request.POST
+        except Exception:
+            return ''
+        parts = []
+        for key in data.keys():
+            low = key.lower()
+            values = data.getlist(key)
+            if any(word in low for word in self._SECRET_WORDS):
+                parts.append(f'{key}=***')
+            elif (key in self._SHOW_VALUE_KEYS or key.startswith('qty_')
+                  or key.endswith('_id') or key.endswith('_ids')):
+                shown = ','.join(v[:40] for v in values[:50])
+                if len(values) > 50:
+                    shown += f'(+{len(values) - 50} more)'
+                parts.append(f'{key}={shown}')
+            else:
+                parts.append(f'{key}=<{len(values)} value(s), not logged>')
+        return ' | posted: ' + '; '.join(parts) if parts else ''
+
     def _log(self, request, response, duration_ms):
         from datetime import datetime
 
@@ -127,4 +164,4 @@ class RequestLoggingMiddleware:
             f'{response.status_code} | {duration_ms:6.1f}ms | '
             f'{self._client_ip(request):<15} | {path}'
         )
-        _request_logger.info(line)
+        _request_logger.info(line + self._post_detail(request))

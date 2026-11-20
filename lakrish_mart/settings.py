@@ -322,6 +322,33 @@ if not DEBUG:
     MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
     STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
+# A local Django development server speaks plain HTTP. If the inherited
+# environment says DEBUG=release, the production SSL redirect would send the
+# browser to HTTPS even though runserver has no TLS listener. Relax only those
+# transport settings when runserver binds to loopback; production and network-
+# bound development servers retain the production security settings above.
+if not DEBUG and _is_runserver:
+    _runserver_args = [arg for arg in sys.argv[2:] if not arg.startswith('-')]
+    _runserver_addr = _runserver_args[0] if _runserver_args else ''
+    _runserver_host = (
+        _runserver_addr.rsplit(':', 1)[0].strip('[]')
+        if ':' in _runserver_addr else '127.0.0.1'
+    ).lower()
+    _runserver_loopback = _runserver_host == 'localhost'
+    if not _runserver_loopback:
+        try:
+            import ipaddress as _ipaddress
+            _runserver_loopback = _ipaddress.ip_address(_runserver_host).is_loopback
+        except ValueError:
+            _runserver_loopback = False
+    if _runserver_loopback:
+        SECURE_SSL_REDIRECT = False
+        SECURE_HSTS_SECONDS = 0
+        SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+        SECURE_HSTS_PRELOAD = False
+        SESSION_COOKIE_SECURE = False
+        CSRF_COOKIE_SECURE = False
+
 
 # ── Test-run tweaks ───────────────────────────────────────────────────────────
 # PBKDF2 is deliberately slow, which is right for real passwords and wrong for a

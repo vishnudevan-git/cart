@@ -2,6 +2,163 @@
 {% block title %}Customer Management{% endblock %}
 {% block page_title %}{% if show_deleted %}Deleted Customers{% else %}Customer Management{% endif %}{% endblock %}
 {% block active_nav %}customer_list{% endblock %}
+{% block extra_js %}
+<script>window._bulkScriptOwner = true;</script>
+<script>
+(function () {
+  const form = document.getElementById('bulkForm');
+  if (!form) return;
+  const selectAll = document.getElementById('selectAll');
+  const selectAllTable = document.getElementById('selectAllTable');
+  const countEl = document.getElementById('selectedCount');
+  const actionBtns = document.querySelectorAll('.bulk-action-btn');
+  const assignSelect = document.querySelector('.bulk-assign-select');
+  const assignBtn = document.querySelector('.bulk-assign-btn');
+
+  // Each customer has two checkboxes (desktop row and mobile card), so count unique ids.
+  function rows() { return document.querySelectorAll('.row-check'); }
+  function selected() {
+    const ids = new Set();
+    document.querySelectorAll('.row-check:checked').forEach(cb => ids.add(cb.value));
+    return Array.from(ids);
+  }
+  function allIds() {
+    const ids = new Set();
+    rows().forEach(cb => ids.add(cb.value));
+    return ids;
+  }
+
+  function refresh() {
+    const n = selected().length;
+    const total = allIds().size;
+    if (countEl) countEl.textContent = n + ' selected';
+    const allOn = total > 0 && n === total;
+    if (selectAll) selectAll.checked = allOn;
+    if (selectAllTable) selectAllTable.checked = allOn;
+    actionBtns.forEach(btn => {
+      if (btn === assignBtn) {
+        btn.disabled = n === 0 || !(assignSelect && assignSelect.value);
+      } else {
+        btn.disabled = n === 0;
+      }
+    });
+    if (assignSelect) assignSelect.disabled = n === 0;
+  }
+
+  function setAll(on) {
+    rows().forEach(cb => { cb.checked = on; });
+    refresh();
+  }
+  // Keep the desktop and mobile checkboxes for the same customer in step.
+  document.addEventListener('change', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('row-check')) return;
+    document.querySelectorAll('.row-check[value="' + e.target.value + '"]').forEach(cb => {
+      cb.checked = e.target.checked;
+    });
+  });
+
+  if (selectAll) selectAll.addEventListener('change', function () { setAll(this.checked); });
+  if (selectAllTable) selectAllTable.addEventListener('change', function () { setAll(this.checked); });
+  document.addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('row-check')) refresh();
+    if (e.target === assignSelect) refresh();
+  });
+
+  // Confirm prompt with one item per line. showConfirm writes plain text, so the
+  // lines are added as text nodes with <br> between them (no HTML is inserted).
+  function confirmLines(title, lines, type, icon, onConfirm) {
+    showConfirm({ title: title, message: lines[0] || '', type: type, icon: icon || undefined, onConfirm: onConfirm });
+    const el = document.getElementById('confirmMessage');
+    if (!el) return;
+    el.textContent = '';
+    lines.forEach((line, i) => {
+      if (i > 0) el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(line));
+    });
+  }
+
+  // Line 1: the question. Line 2: distributor above the marketplace. Line 3: stockist.
+  function chainLines(question, opt) {
+    const lines = [question];
+    if (opt.dataset.distributor && opt.dataset.distributor !== 'none') {
+      lines.push('Distributor: ' + opt.dataset.distributor);
+    }
+    if (opt.dataset.stockist && opt.dataset.stockist !== 'none') {
+      lines.push('Stockist: ' + opt.dataset.stockist);
+    }
+    return lines;
+  }
+
+  // How many selected customers already have a marketplace (these would be moved).
+  function movingCount() {
+    const current = new Map();
+    document.querySelectorAll('.row-check:checked').forEach(cb => current.set(cb.value, cb.dataset.current || ''));
+    let n = 0;
+    current.forEach(v => { if (v) n++; });
+    return n;
+  }
+
+  function submitWith(action) {
+    let hidden = form.querySelector('input[name="action"]');
+    if (!hidden) {
+      hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'action';
+      form.appendChild(hidden);
+    }
+    hidden.value = action;
+    form.submit();
+  }
+
+  actionBtns.forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (selected().length === 0) return;
+      const action = this.value;
+      const title = this.dataset.confirmTitle || 'Are you sure?';
+      const type = this.dataset.confirmType || 'danger';
+      const go = () => submitWith(action);
+      const count = selected().length;
+      if (action === 'assign_distributor' && assignSelect && assignSelect.value) {
+        const opt = assignSelect.options[assignSelect.selectedIndex];
+        const lines = chainLines(`Assign ${count} customer(s) to ${opt.text}?`, opt);
+        const moving = movingCount();
+        if (moving) lines.push(`${moving} already have a marketplace and will be moved.`);
+        confirmLines(title, lines, type, null, go);
+      } else {
+        confirmLines(title, [(this.dataset.bulkConfirm || 'Are you sure?') + ` (${count} selected)`], type, null, go);
+      }
+    });
+  });
+
+  // Inline "assign marketplace" dropdowns on each row. Ask first; submit only on
+  // confirm; put the dropdown back to "Not Assigned" if the admin cancels.
+  document.addEventListener('change', function (e) {
+    const sel = e.target;
+    if (!sel.dataset || !sel.dataset.inlineAssign) return;
+    const form = sel.closest('form');
+    if (!form || !sel.value) return;
+    const label = sel.options[sel.selectedIndex].text;
+    const opt = sel.options[sel.selectedIndex];
+    const who = form.dataset.userName || 'this customer';
+    const modal = document.getElementById('confirmModal');
+    let confirmed = false;
+    if (modal) {
+      modal.addEventListener('hidden.bs.modal', function onHidden() {
+        modal.removeEventListener('hidden.bs.modal', onHidden);
+        if (!confirmed) sel.value = '';
+      });
+    }
+    confirmLines('Assign Marketplace?', chainLines(`Assign "${label}" to ${who}?`, opt), 'warning', '🏪', () => {
+      confirmed = true;
+      form.submit();
+    });
+  });
+
+  refresh();
+})();
+</script>
+{% endblock %}
 {% block content %}
 
 <!-- Tab bar -->
@@ -56,12 +213,61 @@
 </div>
 {% endif %}
 
+<!-- Bulk action form. Rows and buttons attach to it with the HTML form attribute,
+     so the per-row forms below can stay as they are (nested forms are not allowed). -->
+<form method="post" action="{% url 'admin_panel:customer_bulk_action' %}" id="bulkForm" class="d-none">
+  {% csrf_token %}
+  <input type="hidden" name="return_query" value="{{ query_string }}">
+</form>
+<div class="card border-0 shadow-sm p-2 mb-3" id="bulkToolbar">
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <div class="form-check mb-0 me-1">
+      <input class="form-check-input" type="checkbox" id="selectAll" title="Select all shown">
+      <label class="form-check-label small fw-semibold" for="selectAll">All</label>
+    </div>
+    <span class="text-muted small me-2" id="selectedCount">0 selected</span>
+    {% if show_deleted %}
+      <button type="submit" form="bulkForm" name="action" value="restore" class="btn btn-sm btn-success bulk-action-btn" disabled
+              data-bulk-confirm="Restore the selected customers?" data-confirm-title="Restore customers?" data-confirm-type="success">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Restore
+      </button>
+      <button type="submit" form="bulkForm" name="action" value="purge" class="btn btn-sm btn-outline-danger bulk-action-btn" disabled
+              data-bulk-confirm="Permanently archive the selected customers? This cannot be undone." data-confirm-title="Delete permanently?" data-confirm-type="danger">
+        <i class="bi bi-trash me-1"></i>Delete permanently
+      </button>
+    {% else %}
+      <button type="submit" form="bulkForm" name="action" value="enable" class="btn btn-sm btn-success bulk-action-btn" disabled
+              data-bulk-confirm="Enable the selected customers?" data-confirm-title="Enable customers?" data-confirm-type="success">
+        <i class="bi bi-check-circle me-1"></i>Enable
+      </button>
+      <button type="submit" form="bulkForm" name="action" value="disable" class="btn btn-sm btn-outline-secondary bulk-action-btn" disabled
+              data-bulk-confirm="Disable the selected customers? They will not be able to log in or shop until enabled." data-confirm-title="Disable customers?" data-confirm-type="warning">
+        <i class="bi bi-slash-circle me-1"></i>Disable
+      </button>
+      <button type="submit" form="bulkForm" name="action" value="delete" class="btn btn-sm btn-outline-danger bulk-action-btn" disabled
+              data-bulk-confirm="Delete the selected customers? They can be restored from Deleted Customers." data-confirm-title="Delete customers?" data-confirm-type="danger">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+      <div class="d-flex align-items-center gap-1 ms-md-2">
+        <select name="distributor_id" form="bulkForm" class="form-select form-select-sm bulk-assign-select" style="max-width:200px" disabled>
+          <option value="">Assign marketplace...</option>
+          {% for d in distributors_bulk %}<option value="{{ d.pk }}" data-distributor="{{ d.upstream_wholesaler_name }}" data-stockist="{{ d.upstream_stockist_name }}">{{ d.company_name }}</option>{% endfor %}
+        </select>
+        <button type="submit" form="bulkForm" name="action" value="assign_distributor" class="btn btn-sm btn-outline-primary bulk-action-btn bulk-assign-btn" disabled
+                data-bulk-confirm="Assign the selected customers to this marketplace?" data-confirm-title="Assign marketplace?" data-confirm-type="warning">
+          Assign
+        </button>
+      </div>
+    {% endif %}
+  </div>
+</div>
 <!-- Desktop table -->
 <div class="card border-0 shadow-sm d-none d-md-block">
   <div class="table-wrap">
     <table class="table align-middle mb-0" id="customerTable">
       <thead class="table-light">
         <tr>
+          <th style="width:40px"><input type="checkbox" class="form-check-input" id="selectAllTable" title="Select all shown"></th>
           <th data-col="username">{% include 'partials/sort_header.html' with field="username" label="Username" current_sort=sort %}</th>
           <th data-col="name">{% include 'partials/sort_header.html' with field="name" label="Name" current_sort=sort %}</th>
           <th data-col="distributor">Marketplace</th>
@@ -74,25 +280,33 @@
       <tbody>
         {% for customer in customers %}
         <tr class="{% if not customer.is_active %}table-secondary{% endif %}">
+          <td><input type="checkbox" class="form-check-input row-check" name="customer_ids" value="{{ customer.pk }}" form="bulkForm" data-current="{{ customer.distributor.company_name|default:'' }}"></td>
           <td data-col="username" class="fw-semibold">{{ customer.username }}</td>
           <td data-col="name">{{ customer.get_full_name|default:"—" }}</td>
           <td data-col="distributor" class="small">
             {% if customer.distributor %}
               <i class="bi bi-truck text-muted me-1"></i>{{ customer.distributor.company_name }}
+              {% if customer.distributor.wholesaler %}
+              <div class="text-muted" style="font-size:.75rem">
+                Distributor: {{ customer.distributor.wholesaler.company_name }}
+                {% if customer.distributor.wholesaler.stockist %}<br>Stockist: {{ customer.distributor.wholesaler.stockist.company_name }}{% endif %}
+              </div>
+              {% endif %}
               {% if customer.distributor.status == 'suspended' %}
                 <span class="badge bg-danger ms-1" title="Marketplace is suspended — customer cannot shop">Suspended</span>
               {% endif %}
             {% else %}
-              <form method="post" class="d-inline-block" style="min-width: 180px;">
+              <form method="post" class="d-inline-block" style="min-width: 180px;"
+                    data-user-name="{{ customer.get_full_name|default:customer.username }}">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="assign_distributor">
                 <input type="hidden" name="user_id" value="{{ customer.pk }}">
-                <select name="distributor_id" class="form-select form-select-sm" 
-                        onchange="this.form.submit()" 
+                <select name="distributor_id" class="form-select form-select-sm"
+                        data-inline-assign="true"
                         title="Assign distributor to {{ customer.username }}">
                   <option value="" class="text-warning">⚠ Not Assigned</option>
                   {% for d in distributors %}
-                    <option value="{{ d.pk }}">{{ d.company_name }}</option>
+                    <option value="{{ d.pk }}" data-distributor="{{ d.upstream_wholesaler_name }}" data-stockist="{{ d.upstream_stockist_name }}">{{ d.company_name }}</option>
                   {% endfor %}
                 </select>
               </form>
@@ -142,10 +356,10 @@
                   <input type="hidden" name="action" value="assign_distributor">
                   <input type="hidden" name="user_id" value="{{ customer.pk }}">
                   <select name="distributor_id" class="form-select form-select-sm" style="max-width:150px"
-                          data-assign-confirm="true" title="Assign distributor">
+                          data-inline-assign="true" title="Assign distributor">
                     <option value="">— Assign —</option>
                     {% for d in distributors %}
-                      <option value="{{ d.pk }}" {% if customer.distributor_id == d.pk %}selected{% endif %}>{{ d.company_name }}</option>
+                      <option value="{{ d.pk }}" data-distributor="{{ d.upstream_wholesaler_name }}" data-stockist="{{ d.upstream_stockist_name }}" {% if customer.distributor_id == d.pk %}selected{% endif %}>{{ d.company_name }}</option>
                     {% endfor %}
                   </select>
                 </form>
@@ -168,7 +382,7 @@
           </td>
         </tr>
         {% empty %}
-        <tr><td colspan="{% if show_deleted %}8{% else %}7{% endif %}" class="text-center text-muted py-4">
+        <tr><td colspan="{% if show_deleted %}9{% else %}8{% endif %}" class="text-center text-muted py-4">
           {% if show_deleted %}No deleted customers.{% else %}No customers found.{% endif %}
         </td></tr>
         {% endfor %}
@@ -182,22 +396,31 @@
   {% for customer in customers %}
   <div class="card border-0 shadow-sm mb-2 p-3 {% if not customer.is_active %}opacity-75{% endif %}">
     <div class="d-flex justify-content-between align-items-start mb-1">
+      <div class="d-flex gap-2 align-items-start">
+        <input type="checkbox" class="form-check-input row-check mt-1" name="customer_ids" value="{{ customer.pk }}" form="bulkForm" title="Select" data-current="{{ customer.distributor.company_name|default:'' }}">
       <div>
         <div class="fw-semibold">{{ customer.username }}</div>
         <div class="text-muted small">{{ customer.get_full_name|default:"—" }}</div>
         {% if customer.distributor %}
           <div class="text-muted small"><i class="bi bi-truck me-1"></i>{{ customer.distributor.company_name }}</div>
+          {% if customer.distributor.wholesaler %}
+          <div class="text-muted" style="font-size:.75rem">
+            Distributor: {{ customer.distributor.wholesaler.company_name }}
+            {% if customer.distributor.wholesaler.stockist %}<br>Stockist: {{ customer.distributor.wholesaler.stockist.company_name }}{% endif %}
+          </div>
+          {% endif %}
         {% else %}
-          <form method="post" class="mt-1">
+          <form method="post" class="mt-1"
+                data-user-name="{{ customer.get_full_name|default:customer.username }}">
             {% csrf_token %}
             <input type="hidden" name="action" value="assign_distributor">
             <input type="hidden" name="user_id" value="{{ customer.pk }}">
-            <select name="distributor_id" class="form-select form-select-sm" 
-                    onchange="this.form.submit()" 
+            <select name="distributor_id" class="form-select form-select-sm"
+                    data-inline-assign="true"
                     title="Assign distributor">
               <option value="" class="text-warning">⚠ Not Assigned</option>
               {% for d in distributors %}
-                <option value="{{ d.pk }}">{{ d.company_name }}</option>
+                <option value="{{ d.pk }}" data-distributor="{{ d.upstream_wholesaler_name }}" data-stockist="{{ d.upstream_stockist_name }}">{{ d.company_name }}</option>
               {% endfor %}
             </select>
           </form>
@@ -206,6 +429,7 @@
           <div class="text-danger small">Deleted: {{ customer.deleted_at|date:"d M Y"|default:"—" }} by {{ customer.deleted_by|default:"—" }}</div>
         {% endif %}
       </div>
+    </div>
       <div class="d-flex flex-column align-items-end gap-1">
         {% if show_deleted %}
           <form method="post" action="{% url 'admin_panel:user_restore' customer.pk %}" class="d-inline">
@@ -225,10 +449,10 @@
             {% csrf_token %}
             <input type="hidden" name="action" value="assign_distributor">
             <input type="hidden" name="user_id" value="{{ customer.pk }}">
-            <select name="distributor_id" class="form-select form-select-sm" data-assign-confirm="true">
+            <select name="distributor_id" class="form-select form-select-sm" data-inline-assign="true">
               <option value="">— Assign Marketplace —</option>
               {% for d in distributors %}
-                <option value="{{ d.pk }}" {% if customer.distributor_id == d.pk %}selected{% endif %}>{{ d.company_name }}</option>
+                <option value="{{ d.pk }}" data-distributor="{{ d.upstream_wholesaler_name }}" data-stockist="{{ d.upstream_stockist_name }}" {% if customer.distributor_id == d.pk %}selected{% endif %}>{{ d.company_name }}</option>
               {% endfor %}
             </select>
           </form>

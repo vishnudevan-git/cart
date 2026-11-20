@@ -1,9 +1,8 @@
 {% extends 'admin_panel/partner_list_base.html' %}
 {% comment %}
 Marketplaces (code: Distributor) list. Uses the common partner-list layout.
-This page keeps its own per-column instant-search (server side + JS) instead of
-the single search box, so show_search is False and the column-search header row
-+ script are provided via block overrides. Config is passed by distributor_list.
+This page has a shared instant-search field plus per-column instant search.
+The column-search header row + script are provided via block overrides.
 {% endcomment %}
 
 {% block colspan %}9{% endblock %}
@@ -114,6 +113,7 @@ the single search box, so show_search is False and the column-search header row
       var existingParams = new URLSearchParams(window.location.search);
       if (existingParams.has('status')) params.append('status', existingParams.get('status'));
       if (existingParams.has('sort')) params.append('sort', existingParams.get('sort'));
+      if (existingParams.has('q')) params.append('q', existingParams.get('q'));
       document.querySelectorAll('.col-search-input').forEach(function(inp) {
         var val = inp.value.trim();
         var dataCol = inp.dataset.col;

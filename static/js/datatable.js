@@ -4,7 +4,7 @@
  * Features
  * ────────
  *  1. AUTO-SEARCH (input[name="q"])
- *     • 400 ms debounce + Enter key; strips legacy onchange attributes.
+ *     • 400 ms debounce + Enter; restores focus after the search reload.
  *     • Also auto-submits filter <select> elements in the same form.
  *
  *  2. BULK SELECTION (multi-master checkbox support)
@@ -32,10 +32,11 @@
     }
   }
 
-  /* ── 1. AUTO-SEARCH ─────────────────────────────────────────────────────── */
+  /* ── 1. AUTO-SEARCH ────────────────────────────────────────────────────── */
 
   function initAutoSearch() {
     document.querySelectorAll('input[name="q"]').forEach(function (input) {
+      if (input.hasAttribute('data-no-auto-search')) return;
       var form = input.closest('form');
       if (!form) return;
 
@@ -52,6 +53,7 @@
           clearTimeout(timer);
           clearSelections();
           dimTable(true);
+          rememberSearchFocus(input);
           form.submit();
         }
       });
@@ -61,6 +63,7 @@
         clearTimeout(timer);
         timer = setTimeout(function () {
           dimTable(true);
+          rememberSearchFocus(input);
           form.submit();
         }, 400);
       });
@@ -79,6 +82,46 @@
         });
       });
     });
+  }
+
+  function rememberSearchFocus(input) {
+    try {
+      sessionStorage.setItem('autoSearchFocus', JSON.stringify({
+        id: input.id,
+        name: input.name,
+        value: input.value,
+        selectionStart: input.selectionStart
+      }));
+    } catch (error) {
+      console.warn('Unable to preserve search focus.', error);
+    }
+  }
+
+  function restoreSearchFocus() {
+    var saved;
+    try {
+      saved = JSON.parse(sessionStorage.getItem('autoSearchFocus') || 'null');
+      sessionStorage.removeItem('autoSearchFocus');
+    } catch (error) {
+      console.warn('Unable to restore search focus.', error);
+      return;
+    }
+    if (!saved) return;
+
+    var input = saved.id ? document.getElementById(saved.id) : null;
+    if (!input && saved.name) {
+      input = Array.from(document.querySelectorAll('input[name]'))
+        .find(function (candidate) {
+          return candidate.name === saved.name && candidate.type !== 'hidden';
+        });
+    }
+    if (!input) return;
+
+    if (input.value !== saved.value) input.value = saved.value;
+    input.focus();
+    if (typeof saved.selectionStart === 'number' && input.setSelectionRange) {
+      input.setSelectionRange(saved.selectionStart, saved.selectionStart);
+    }
   }
 
   /* ── 2. BULK SELECTION ──────────────────────────────────────────────────── */
@@ -248,6 +291,7 @@
   /* ── INIT ───────────────────────────────────────────────────────────────── */
 
   document.addEventListener('DOMContentLoaded', function () {
+    restoreSearchFocus();
     initAutoSearch();
     initBulkSelection();
   });

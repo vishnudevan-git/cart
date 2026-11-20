@@ -1,12 +1,15 @@
 """Supplier surfaces — the stock-manage category filter and the add-product form."""
+import json
 from decimal import Decimal
 
 from django.test import TestCase
 from django.urls import reverse
 
 from accounts.factories import build_world, make_category, make_shared_product, login_as
-from products.models import Product, ProductVariant
-from distributors.models import DistributorVariantPrice
+from products.models import Product, ProductVariant, ProductVariantType
+from distributors.models import DistributorLooseStock, DistributorVariantPrice, RestockRequest
+from orders.models import Order, OrderItem
+from payments.models import RoleSettlement
 
 
 class StockManageCategoryFilterTests(TestCase):
@@ -48,6 +51,25 @@ class StockManageCategoryFilterTests(TestCase):
         # filtered queryset — it must be untouched.
         self.assertEqual(cashew.stock, 100)
         self.assertIn(f'category={self.spices.pk}', response['Location'])
+
+
+class ProductEditReviewBaselineTests(TestCase):
+    def setUp(self):
+        self.world = build_world()
+        variant_type = ProductVariantType.objects.create(
+            product=self.world.shared_product, name=''
+        )
+        self.world.shared_variant.variant_type = variant_type
+        self.world.shared_variant.save(update_fields=['variant_type'])
+        self.client_s = login_as(self.client, self.world.supplier_user)
+
+    def test_edit_page_serializes_variant_unit_price_for_change_review(self):
+        response = self.client_s.get(
+            reverse('suppliers:product_edit', args=[self.world.shared_product.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '"price_per_kg": 1000.0')
 
 
 class SuggestedPriceTests(TestCase):
@@ -100,24 +122,264 @@ class SuggestedPriceTests(TestCase):
             name='Manual Priced Item',
             pricing_mode_field='manual',
             show_suggested_field='false',
-            **{'variants-0-selling_price': '333.00', 'variants-0-mrp': ''},
+            **{'variants-0-selling_price': '100.00', 'variants-0-mrp': ''},
         )
         p = Product.all_objects.get(name='Manual Priced Item')
         self.assertEqual(p.pricing_mode, 'manual')
-        # 1kg auto price would be 200 (0.2/g × 1000); manual 333 must be kept.
-        self.assertEqual(p.variants.get().selling_price, Decimal('333.00'))
+        # 1kg auto price would be 200 (0.2/g × 1000); manual prices may be lower.
+        self.assertEqual(p.variants.get().selling_price, Decimal('100.00'))
 
-    def test_mrp_and_suggested_can_both_be_on(self):
-        # MRP (hard cap) and a suggested price (guidance) may both be enabled:
-        # the shop cannot exceed the MRP and is cautioned toward a fair price.
+    def test_supplier_pack_rules_are_saved_from_variant_payload(self):
+        self._add(
+            name='Case Packed Loose Item',
+            pricing_mode_field='manual',
+            allow_loose_distribution='1',
+            variants_json=json.dumps([{
+                'name': '',
+                'pool_grams': 5000,
+                'packs': [{
+                    'label': '5kg sack',
+                    'unit_grams': 5000,
+                    'selling_price': '750.00',
+                    'stock': 10,
+                    'supplier_can_supply': True,
+                    'supplier_order_multiple': 4,
+                    'supplier_supplies_loose': True,
+                }],
+            }]),
+        )
+        variant = Product.all_objects.get(name='Case Packed Loose Item').variants.get()
+
+        self.assertEqual(variant.supplier_order_multiple, 4)
+        self.assertTrue(variant.supplier_supplies_loose)
+
+    def test_mrp_takes_precedence_over_suggested_price(self):
+        # A printed MRP and a no-MRP suggestion are mutually exclusive modes.
         self._add(show_mrp_field='true', show_suggested_field='true',
                   **{'variants-0-mrp': '300.00', 'variants-0-suggested_price': '240.00'})
         p = Product.all_objects.get(name='No-Sticker Bolt')
         self.assertTrue(p.show_mrp)
-        self.assertTrue(p.show_suggested_price)
+        self.assertFalse(p.show_suggested_price)
         v = p.variants.get()
         self.assertEqual(v.mrp, Decimal('300.00'))
-        self.assertEqual(v.suggested_price, Decimal('240.00'))
+        self.assertIsNone(v.suggested_price)
+
+
+class DirectLooseSupplyTests(TestCase):
+    def setUp(self):
+        self.world = build_world()
+        self.product = self.world.shared_product
+        self.product.direct_supply = True
+        self.product.allow_loose_distribution = True
+        self.product.save(update_fields=['direct_supply', 'allow_loose_distribution'])
+        self.variant = self.product.variants.first()
+        self.variant.supplier_supplies_loose = True
+        self.variant.save(update_fields=['supplier_supplies_loose'])
+        self.client_s = login_as(self.client, self.world.supplier_user)
+
+    def test_supplier_delivers_whole_source_packs_and_deducts_stock(self):
+        req = RestockRequest.objects.create(
+            distributor=self.world.shop_a,
+            variant=self.variant,
+            quantity_requested=2,
+            loose_grams=600,
+        )
+
+        self.client_s.post(reverse('suppliers:restock_requests'), {
+            'req_id': req.pk,
+            'action': 'deliver_direct',
+        })
+
+        req.refresh_from_db()
+        self.variant.refresh_from_db()
+        loose = DistributorLooseStock.objects.get(
+            distributor=self.world.shop_a,
+            product=self.product,
+        )
+        self.assertEqual(req.status, 'delivered')
+        self.assertEqual(req.loose_grams, 1000)
+        self.assertEqual(self.variant.stock, 98)
+        self.assertEqual(loose.quantity_grams, 1000)
+
+
+class SupplierDashboardFinancialSummaryTests(TestCase):
+    def setUp(self):
+        self.world = build_world()
+        self.client_s = login_as(self.client, self.world.supplier_user)
+
+    def _order(self, status):
+        return Order.objects.create(
+            customer=self.world.customer_a,
+            distributor=self.world.shop_a,
+            total_amount=1000,
+            status=status,
+            address='Test address',
+            phone='0000000000',
+        )
+
+    def test_order_values_follow_item_delivery_and_exclude_cancelled_items(self):
+        partial_order = self._order('partially_delivered')
+        OrderItem.objects.create(
+            order=partial_order, product=self.world.shared_product,
+            variant=self.world.shared_variant, quantity=2, price=500,
+            supplier_price=120, fulfillment_status='delivered',
+        )
+        OrderItem.objects.create(
+            order=partial_order, product=self.world.shared_product,
+            variant=self.world.shared_variant, quantity=3, price=500,
+            supplier_price=130, fulfillment_status='pending',
+        )
+        OrderItem.objects.create(
+            order=partial_order, product=self.world.shared_product,
+            variant=self.world.shared_variant, quantity=9, price=500,
+            supplier_price=100, fulfillment_status='cancelled',
+        )
+        cancelled_order = self._order('cancelled')
+        OrderItem.objects.create(
+            order=cancelled_order, product=self.world.shared_product,
+            variant=self.world.shared_variant, quantity=5, price=500,
+            supplier_price=100, fulfillment_status='pending',
+        )
+        partial_order.role_settlements.create(
+            supplier=self.world.supplier, stockist=self.world.stockist,
+            stage='stockist_to_supplier', amount_due=1530,
+            amount_paid=120, status='confirmed',
+        )
+        partial_order.items.filter(supplier_price=120).update(
+            fulfillment_status='delivered'
+        )
+        delivered_item = partial_order.items.get(supplier_price=120)
+        delivered_item.supplier_shipment.status = 'received'
+        delivered_item.supplier_shipment.save(update_fields=['status'])
+
+        response = self.client_s.get(reverse('suppliers:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['order_value'], Decimal('2030'))
+        self.assertEqual(response.context['fund_received'], Decimal('120'))
+        self.assertEqual(response.context['sent_awaiting_funds'], Decimal('120'))
+        self.assertEqual(response.context['yet_to_send'], Decimal('390'))
+        self.assertEqual(response.context['cancelled_order_value'], Decimal('1400'))
+        self.assertEqual(
+            response.context['order_value'],
+            response.context['fund_received']
+            + response.context['sent_awaiting_funds']
+            + response.context['yet_to_send']
+            + response.context['cancelled_order_value'],
+        )
+
+    def test_partial_confirmed_settlement_splits_sent_value_into_received_and_unpaid(self):
+        pending_order = self._order('confirmed')
+        item = OrderItem.objects.create(
+            order=pending_order, product=self.world.shared_product,
+            variant=self.world.shared_variant, quantity=10, price=500,
+            supplier_price=100,
+        )
+        item.supplier_shipment.status = 'dispatched'
+        item.supplier_shipment.save(update_fields=['status'])
+        RoleSettlement.objects.create(
+            order=pending_order, stage='stockist_to_supplier',
+            stockist=self.world.stockist, supplier=self.world.supplier,
+            amount_due=1000, amount_paid=250, status='confirmed',
+        )
+
+        response = self.client_s.get(reverse('suppliers:dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['fund_received'], Decimal('250'))
+        self.assertEqual(response.context['sent_awaiting_funds'], Decimal('750'))
+        self.assertEqual(response.context['yet_to_send'], Decimal('0'))
+
+    def test_shipment_status_counts_orders_with_product_line_counts(self):
+        awaiting_order = self._order('confirmed')
+        ready_order = self._order('confirmed')
+        for _ in range(2):
+            OrderItem.objects.create(
+                order=awaiting_order, product=self.world.shared_product,
+                variant=self.world.shared_variant, quantity=4, price=500,
+                supplier_price=100,
+            )
+        ready_item = OrderItem.objects.create(
+            order=ready_order, product=self.world.shared_product,
+            variant=self.world.shared_variant, quantity=3, price=500,
+            supplier_price=100,
+        )
+        ready_item.supplier_shipment.status = 'confirmed'
+        ready_item.supplier_shipment.save(update_fields=['status'])
+
+        response = self.client_s.get(reverse('suppliers:dashboard'))
+
+        counters = {item['key']: item for item in response.context['shipment_counters']}
+        self.assertEqual(counters['awaiting']['order_count'], 1)
+        self.assertEqual(counters['awaiting']['product_count'], 2)
+        self.assertEqual(counters['confirmed']['order_count'], 1)
+        self.assertEqual(counters['confirmed']['product_count'], 1)
+
+
+class SupplierOrdersShipmentStatusFilterTests(TestCase):
+    def setUp(self):
+        self.world = build_world()
+        self.client_s = login_as(self.client, self.world.supplier_user)
+
+    def _order(self):
+        return Order.objects.create(
+            customer=self.world.customer_a,
+            distributor=self.world.shop_a,
+            total_amount=1000,
+            status='confirmed',
+            address='Test address',
+            phone='0000000000',
+        )
+
+    def _item(self, order, shipment_status):
+        item = OrderItem.objects.create(
+            order=order,
+            product=self.world.shared_product,
+            variant=self.world.shared_variant,
+            quantity=1,
+            price=500,
+            supplier_price=100,
+        )
+        item.supplier_shipment.status = shipment_status
+        item.supplier_shipment.save(update_fields=['status'])
+        return item
+
+    def test_orders_tabs_count_orders_and_products_by_shipment_status(self):
+        mixed_order = self._order()
+        awaiting_items = [self._item(mixed_order, 'awaiting') for _ in range(2)]
+        ready_item = self._item(mixed_order, 'confirmed')
+        dispatched_item = self._item(self._order(), 'dispatched')
+
+        response = self.client_s.get(reverse('suppliers:orders'))
+
+        self.assertEqual(response.status_code, 200)
+        counters = {
+            tab['key']: tab for tab in response.context['shipment_status_tabs']
+        }
+        self.assertEqual(counters['awaiting']['order_count'], 1)
+        self.assertEqual(counters['awaiting']['product_count'], 2)
+        self.assertEqual(counters['confirmed']['order_count'], 1)
+        self.assertEqual(counters['confirmed']['product_count'], 1)
+        self.assertEqual(counters['dispatched']['order_count'], 1)
+        self.assertEqual(counters['dispatched']['product_count'], 1)
+        self.assertNotContains(response, 'Needs action')
+        self.assertNotContains(response, '>Completed<')
+        self.assertNotContains(response, '>All<')
+
+        response = self.client_s.get(
+            f'{reverse("suppliers:orders")}?tab=confirmed'
+        )
+
+        self.assertEqual(response.context['tab'], 'confirmed')
+        self.assertEqual(len(response.context['order_groups']), 1)
+        self.assertEqual(
+            [line.pk for line, _shipment in response.context['order_groups'][0]['lines']],
+            [ready_item.pk],
+        )
+        self.assertNotIn(awaiting_items[0].pk, [
+            line.pk for line, _shipment in response.context['order_groups'][0]['lines']
+        ])
+        self.assertNotEqual(dispatched_item.order_id, mixed_order.pk)
 
 
 class VariantSaveIntegrityTests(TestCase):

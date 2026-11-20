@@ -131,7 +131,9 @@ def product_catalogue(request):
     status_filter = request.GET.get('status', '')  # listed / unlisted / all
     category_filter = request.GET.get('category', '')
 
-    approved_products = list(_distributor_visible_products(dist).prefetch_related(
+    approved_products = list(_distributor_visible_products(dist).filter(
+        variants__is_active=True
+    ).distinct().prefetch_related(
         'variants', 'dist_products', 'category'
     ).select_related('supplier').order_by('supplier__company_name', 'name'))
 
@@ -1040,7 +1042,9 @@ def order_detail(request, pk):
 
         new_status = request.POST.get('status')
         # Distributor can confirm, set out_for_delivery, delivered, or cancel
-        allowed = ['confirmed', 'out_for_delivery', 'delivered', 'cancelled']
+        # Only the customer can cancel (orders/views.py order_edit). Stock returns to the
+        # party that supplied the customer.
+        allowed = ['confirmed', 'out_for_delivery', 'delivered']
         if new_status in allowed:
             order.status = new_status
             order.save()
@@ -1451,7 +1455,7 @@ def my_stock(request):
     ).values_list('product_id', flat=True))
 
     listed_variant_ids = set(ProductVariant.objects.filter(
-        product_id__in=listed_product_ids, is_active=True
+        product_id__in=listed_product_ids, product__is_deleted=False, is_active=True
     ).values_list('pk', flat=True))
 
     # Marketplace OWN products (single-role: never a supplier role). The shop
@@ -1625,56 +1629,111 @@ def my_stock(request):
                 # must arrive through a delivered restock request, same as
                 # packed stock. (Increase only by order; reduce any time.)
                 product_id = request.POST.get('product_id')
-                loose_kg = request.POST.get('loose_kg', '').strip()
-                if product_id and loose_kg:
+                loose_quantity = (
+                    request.POST.get('loose_quantity')
+                    or request.POST.get('loose_kg', '')
+                ).strip()
+                if product_id and loose_quantity:
+                    from products.models import Product as Prod
                     try:
-                        from products.models import Product as Prod
                         product_obj = Prod.objects.get(pk=product_id, pk__in=allowed_product_ids)
                         if product_obj.owner_enterprise_id:
                             raise ValueError('Own products: set their stock directly instead.')
-                        grams = int(float(loose_kg) * 1000)
+                        multiplier = 1000 if product_obj.master_unit in ('g', 'ml') else 1
+                        grams = int(Decimal(loose_quantity) * multiplier)
                         rep_variant = ProductVariant.objects.filter(
-                            product=product_obj, is_active=True, unit_grams__gt=0
+                            product=product_obj, is_active=True,
+                            supplier_can_supply=True,
+                            unit_grams__gt=0
                         ).order_by('unit_grams').first()
                         if grams <= 0 or rep_variant is None:
                             raise ValueError('This product has no weighed pack sizes.')
+                        from products.bundle_chain import (
+                            required_multiple, round_up, routes_via_wholesaler,
+                        )
+                        source_pack_quantity = round_up(
+                            (grams + rep_variant.unit_grams - 1) // rep_variant.unit_grams,
+                            required_multiple(dist, rep_variant),
+                        )
                         RestockRequest.objects.create(
                             distributor=dist,
                             variant=rep_variant,
-                            quantity_requested=1,
+                            quantity_requested=source_pack_quantity,
                             loose_grams=grams,
-                            note=f'LOOSE {loose_kg}kg — from My Stock page',
+                            # kb/10: wait at the Distributor unless it keeps no buffer.
+                            status=(
+                                'awaiting_stock'
+                                if routes_via_wholesaler(dist, product_obj) else 'pending'
+                            ),
+                            note=f'LOOSE {grams} {product_obj.master_unit} — from My Stock page',
                         )
                         messages.success(
                             request,
-                            f'Loose request for {loose_kg}kg of {product_obj.name} sent. '
+                            f'Loose request for {grams} {product_obj.master_unit} of {product_obj.name} sent. '
                             'Stock is added when it is delivered.'
                         )
-                    except Exception as e:
+                    except (Prod.DoesNotExist, InvalidOperation, TypeError, ValueError) as e:
                         messages.error(request, f'Error: {e}')
             else:
                 # Packed: one RestockRequest per variant with qty > 0
                 # fulfillment_method is decided by stockist, not distributor
+                from products.bundle_chain import required_multiple, routes_via_wholesaler
                 submitted = False
+                rejected_sizes = 0
+                bundle_errors = []
                 for key, val in request.POST.items():
-                    if key.startswith('qty_') and val.strip() and int(val.strip()) > 0:
-                        vid = key[4:]
-                        try:
-                            if int(vid) in own_variant_ids:
-                                continue  # own products: the shop IS the source
-                            variant_obj = ProductVariant.objects.get(pk=vid, pk__in=listed_variant_ids)
-                            RestockRequest.objects.create(
-                                distributor=dist,
-                                variant=variant_obj,
-                                quantity_requested=int(val.strip()),
-                                note='Requested from My Stock page',
-                            )
-                            submitted = True
-                        except Exception:
-                            pass
+                    if not key.startswith('qty_') or not val.strip():
+                        continue
+                    try:
+                        qty = int(val.strip())
+                        vid = int(key[4:])
+                    except ValueError:
+                        rejected_sizes += 1
+                        continue
+                    if qty <= 0:
+                        continue
+                    if vid in own_variant_ids:
+                        continue  # own products: the shop IS the source
+                    variant_obj = ProductVariant.objects.filter(
+                        pk=vid, pk__in=listed_variant_ids, supplier_can_supply=True
+                    ).first()
+                    if variant_obj is None:
+                        rejected_sizes += 1
+                        continue
+                    # kb/10: the step comes from the tier that actually sells
+                    # to this shop (a no-buffer Distributor is skipped).
+                    multiple = required_multiple(dist, variant_obj)
+                    if qty % multiple:
+                        bundle_errors.append(
+                            f'{variant_obj.product.name} {variant_obj.label}: '
+                            f'order in multiples of {multiple} (bundle only)'
+                        )
+                        continue
+                    _shop_req = RestockRequest.objects.create(
+                        distributor=dist,
+                        variant=variant_obj,
+                        quantity_requested=qty,
+                        loose_grams=0,
+                        status=(
+                            'awaiting_stock'
+                            if routes_via_wholesaler(dist, variant_obj.product) else 'pending'
+                        ),
+                        note='Requested from My Stock page',
+                    )
+                    from distributors.shop_blocking import block_for_shop_request
+                    block_for_shop_request(_shop_req)
+                    submitted = True
                 if submitted:
                     messages.success(request, 'Restock request(s) sent.')
-                else:
+                if rejected_sizes:
+                    messages.error(
+                        request,
+                        'One or more requested pack sizes are unavailable from the supplier '
+                        'and were not submitted.'
+                    )
+                for err in bundle_errors:
+                    messages.error(request, f'Not sent — {err}.')
+                if not submitted and not rejected_sizes and not bundle_errors:
                     messages.warning(request, 'Enter quantity for at least one size.')
 
         from django.urls import reverse

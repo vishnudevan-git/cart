@@ -192,7 +192,7 @@ Context expected:
 </div>
 
 <!-- Mobile cards -->
-<div class="d-md-none">
+<div class="d-md-none" {% if table_id %}id="{{ table_id }}Mobile"{% endif %}>
   {% for p in products %}
   <div class="card border-0 shadow-sm mb-2">
     <div class="card-body p-3">

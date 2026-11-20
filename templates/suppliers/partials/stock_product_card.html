@@ -1,0 +1,147 @@
+<div class="stock-prod-card shadow-sm mb-3 stock-row" id="card-{{ p.product.pk }}"
+     data-name="{{ p.product.name|lower }}"
+     data-out="{{ p.has_out|yesno:'1,0' }}" data-low="{{ p.has_low|yesno:'1,0' }}">
+
+  <!-- Product header: click to show or hide its full details -->
+  <button type="button" class="stock-toggle stock-prod-head btn w-100 text-start px-3 py-2 d-flex flex-wrap justify-content-between align-items-center gap-2"
+          data-bs-toggle="collapse" data-bs-target="#prod-{{ p.product.pk }}"
+          aria-expanded="false" aria-controls="prod-{{ p.product.pk }}">
+    <span class="fw-semibold">
+      <i class="bi bi-chevron-right chev me-1"></i>{{ p.product.name }}
+      {% if p.product.allow_loose_distribution %}
+        <span class="badge bg-info text-dark ms-1" title="Sold loose — stock is one shared pool">Loose</span>
+      {% endif %}
+      {% if p.has_out %}
+        <span class="badge bg-danger ms-1" title="One or more packs/variants are out of stock"><i class="bi bi-x-octagon me-1"></i>Out of stock</span>
+      {% elif p.has_low %}
+        <span class="badge bg-warning text-dark ms-1" title="One or more packs/variants are running low"><i class="bi bi-exclamation-triangle me-1"></i>Low stock</span>
+      {% endif %}
+    </span>
+    <span class="small text-muted">Show details</span>
+  </button>
+
+  <div class="collapse" id="prod-{{ p.product.pk }}">
+  <div class="p-3 border-top">
+    <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 mb-3">
+      {% if p.is_pool %}
+        <span class="badge bg-light text-success border">Pool-based stock</span>
+      {% else %}
+        <span class="badge bg-light text-secondary border">Per-pack stock</span>
+      {% endif %}
+      <span class="d-flex align-items-center gap-1" style="font-size:.68rem" title="Units of this product currently held downstream (after it left you)">
+        <span class="text-muted">Downstream:</span>
+        <span class="badge bg-primary-subtle text-primary border" title="At the stockist">S {{ p.ds_stockist_label }}</span>
+        <span class="badge bg-info-subtle text-info border" title="At the wholesale distributor">D {{ p.ds_distributor_label }}</span>
+        <span class="badge bg-success-subtle text-success border" title="At shops / marketplaces">Shop {{ p.ds_shop_label }}</span>
+        <span class="text-muted">= {{ p.ds_total_label }}</span>
+      </span>
+    </div>
+
+    {% if p.is_pool %}
+    {# ── LOOSE product: ONE editable pool PER VARIANT; packs read-only ── #}
+    {% for grp in p.variant_groups %}
+    {% if p.has_variants %}
+    <div class="small fw-semibold mt-2 mb-1">
+      <i class="bi bi-diagram-3 me-1 text-success"></i>{{ grp.name|default:"(unnamed variant)" }}
+    </div>
+    {% endif %}
+    <div class="row g-3 align-items-center {% if p.has_variants %}ms-2 ps-2 border-start mb-2{% endif %}">
+      <div class="col-12 col-md-5">
+        <div class="pool-wrap p-3">
+          <label class="form-label small fw-semibold mb-1">Loose stock pool</label>
+          <input type="hidden" name="orig_pool_{{ grp.vt_id }}" value="{{ grp.pool_base }}">
+          <div class="input-group input-group-sm">
+            <input type="number" name="pool_vt_{{ grp.vt_id }}" value="{{ grp.pool_display }}"
+                   aria-label="Loose stock pool for {{ p.product.name }}{% if p.has_variants %} {{ grp.name }}{% endif %}"
+                   min="0" step="any" inputmode="decimal"
+                   data-original="{{ grp.pool_display }}" data-pool="1"
+                   data-label="{{ p.product.name }}{% if p.has_variants %} · {{ grp.name }}{% endif %}"
+                   class="form-control stock-input">
+            <span class="input-group-text">{{ p.pool_unit }}</span>
+          </div>
+          <div class="form-text" style="font-size:11px">
+            Edit this one value — each pack size below auto-populates from it.
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-7">
+        <div class="small text-muted mb-1">Auto-populated pack stock</div>
+        {% for v in grp.packs %}
+        <div class="pack-line d-flex justify-content-between align-items-center py-1">
+          <span><span class="badge bg-secondary me-2">{{ v.label }}</span>₹{{ v.selling_price }}</span>
+          <span class="badge stock-pill {% if v.stock > 10 %}bg-success{% elif v.stock > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ v.stock }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+
+    {% else %}
+    {# ── Manual product: each pack editable, grouped by variant ── #}
+    {% for grp in p.variant_groups %}
+    {% if p.has_variants %}
+    <div class="small fw-semibold mt-2 mb-1">
+      <i class="bi bi-diagram-3 me-1 text-success"></i>{{ grp.name|default:"(unnamed variant)" }}
+    </div>
+    {% endif %}
+    <div class="table-responsive {% if p.has_variants %}ms-2 ps-2 border-start{% endif %}">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="small text-muted">
+          <tr>
+            <th style="width:28%">Pack</th>
+            <th style="width:22%">Price</th>
+            <th style="width:16%">Current</th>
+            <th style="width:12%">Blocked</th>
+            <th style="width:24%">Update stock</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in grp.packs %}
+          <tr>
+            <td><span class="badge bg-secondary">{{ v.label }}</span></td>
+            <td>₹{{ v.selling_price }}</td>
+            <td>
+              <span class="badge stock-pill {% if v.stock > 10 %}bg-success{% elif v.stock > 0 %}bg-warning text-dark{% else %}bg-danger{% endif %}">{{ v.stock }}</span>
+            </td>
+            <td><span class="badge bg-warning text-dark" title="Packs held by stockist restock requests">{{ v.blocked_stock }}</span></td>
+            <td>
+              <input type="hidden" name="orig_{{ v.pk }}" value="{{ v.stock }}">
+              {% if v.bundle_box %}
+              <div class="d-flex align-items-center gap-1">
+                <input type="text" name="bundle_count_{{ v.pk }}" value="{{ v.bundle_count }}"
+                       inputmode="numeric" pattern="[0-9]*" autocomplete="off"
+                       data-original="{{ v.bundle_count }}"
+                       aria-label="Bundles for {{ p.product.name }} {{ v.label }}"
+                       data-label="{{ p.product.name }}{% if p.has_variants %} · {{ grp.name }}{% endif %} ({{ v.label }}, bundles)"
+                       class="form-control form-control-sm stock-input whole-only" style="max-width:110px">
+                <span class="small text-muted">bundles</span>
+              </div>
+              <div class="text-muted" style="font-size:11px">
+                {{ v.bundle_box }} packs each{% if v.bundle_leftover %} · {{ v.bundle_leftover }} packs left over{% endif %}
+              </div>
+              {% else %}
+              <input type="number" name="stock_{{ v.pk }}" value="{{ v.stock }}"
+                     min="0" max="1000000" step="1" inputmode="numeric"
+                     data-original="{{ v.stock }}"
+                     aria-label="Stock for {{ p.product.name }} {{ v.label }}"
+                     data-label="{{ p.product.name }}{% if p.has_variants %} · {{ grp.name }}{% endif %} ({{ v.label }})"
+                     class="form-control form-control-sm stock-input whole-only" style="max-width:140px">
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    {# Save only this product. Other products keep their unsaved edits. #}
+    <div class="d-flex justify-content-end mt-3 pt-2 border-top">
+      <button type="button" class="btn btn-success btn-sm save-product" data-product="{{ p.product.pk }}">
+        <i class="bi bi-floppy me-1"></i>Save this product
+      </button>
+    </div>
+  </div>
+  </div>
+</div>

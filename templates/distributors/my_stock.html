@@ -356,8 +356,7 @@ when stock dips; stock still only rises when it is delivered.{% endcomment %}
           <div class="tab-pane fade" id="tabLoose">
             <div class="alert alert-info small py-2">
               <i class="bi bi-info-circle me-1"></i>
-              Loose stock is stored in grams. Any variant size draws from this pool automatically.
-              e.g. 5kg loose → can fulfill 5×1kg, 10×500g, 20×250g, or any mix.<br>
+              Loose stock is stored in the product's base unit. Any customer pack size can draw from this pool automatically.<br>
               <strong>Your request will be sent to the stockist for approval. Stock is added only after delivery.</strong>
             </div>
             <form method="post" id="looseForm">
@@ -367,9 +366,9 @@ when stock dips; stock still only rises when it is delivered.{% endcomment %}
               <input type="hidden" name="product_id" id="looseProductId">
               <div class="row g-2">
                 <div class="col-12">
-                  <label class="form-label small fw-semibold">Quantity (kg)</label>
-                  <input type="number" name="loose_kg" class="form-control form-control-sm"
-                         step="0.1" min="0.1" placeholder="e.g. 5">
+                  <label class="form-label small fw-semibold" id="looseQuantityLabel">Quantity</label>
+                  <input type="number" name="loose_quantity" class="form-control form-control-sm"
+                         step="0.1" min="0.1" placeholder="Enter quantity">
                   <div class="form-text" id="looseCostHint"></div>
                 </div>
               </div>
@@ -493,31 +492,38 @@ productSelect.addEventListener('change', function() {
 
   // Loose preview
   updateLoosePreview(p);
-  document.querySelector('#looseForm [name="loose_kg"]').value = '';
+  document.querySelector('#looseForm [name="loose_quantity"]').value = '';
+  const quantityLabel = document.getElementById('looseQuantityLabel');
+  const quantityInput = document.querySelector('#looseForm [name="loose_quantity"]');
+  const unitLabels = { g: 'Quantity (kg)', ml: 'Quantity (litres)', qty: 'Quantity (units)' };
+  quantityLabel.textContent = unitLabels[p.unit] || 'Quantity';
+  quantityInput.step = p.unit === 'qty' ? '1' : '0.1';
+  quantityInput.min = p.unit === 'qty' ? '1' : '0.1';
 });
 
 function updateLoosePreview(p) {
-  const kgInput = document.querySelector('#looseForm [name="loose_kg"]');
+  const quantityInput = document.querySelector('#looseForm [name="loose_quantity"]');
   const preview = document.getElementById('loosePreview');
   const costHint = document.getElementById('looseCostHint');
-  if (!kgInput || !preview) return;
-  const kg = parseFloat(kgInput.value) || 0;
+  if (!quantityInput || !preview) return;
+  const quantity = parseFloat(quantityInput.value) || 0;
+  const baseUnits = p.unit === 'qty' ? quantity : quantity * 1000;
 
-  // Show cost per kg from admin price of first variant with unit_grams
+  const displayUnit = p.unit === 'ml' ? 'litre' : p.unit === 'g' ? 'kg' : 'unit';
   if (costHint) {
     const ref = p.variants.find(v => v.unit_grams > 0 && v.base_price > 0);
     if (ref) {
-      const cpkg = (ref.base_price / ref.unit_grams * 1000).toFixed(2);
-      costHint.textContent = `Admin cost ≈ ₹${cpkg}/kg (based on ${ref.label} price)`;
+      const baseUnitsPerDisplay = p.unit === 'qty' ? 1 : 1000;
+      const cost = (ref.base_price / ref.unit_grams * baseUnitsPerDisplay).toFixed(2);
+      costHint.textContent = `Admin cost ≈ ₹${cost}/${displayUnit} (based on ${ref.label} price)`;
     }
   }
 
-  if (kg <= 0) { preview.innerHTML = ''; return; }
-  const grams = kg * 1000;
+  if (quantity <= 0) { preview.innerHTML = ''; return; }
   let html = '<div class="small text-muted mt-2"><strong>This will fulfill:</strong><ul class="mb-0">';
   p.variants.forEach(v => {
     if (v.unit_grams > 0) {
-      const packs = Math.floor(grams / v.unit_grams);
+      const packs = Math.floor(baseUnits / v.unit_grams);
       html += `<li>${v.label}: up to <strong>${packs} packs</strong></li>`;
     }
   });
@@ -525,7 +531,7 @@ function updateLoosePreview(p) {
   preview.innerHTML = html;
 }
 
-document.querySelector('#looseForm [name="loose_kg"]').addEventListener('input', function() {
+document.querySelector('#looseForm [name="loose_quantity"]').addEventListener('input', function() {
   const pid = productSelect.value;
   if (pid && productsData[pid]) updateLoosePreview(productsData[pid]);
 });

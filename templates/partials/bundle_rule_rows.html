@@ -1,0 +1,25 @@
+{% if rules %}
+<div class="table-responsive">
+  <table class="table table-sm align-middle mb-0 small">
+    <thead class="table-light"><tr><th>{% if kind == 'supplier' %}Supplier{% else %}Product{% endif %}</th><th>Mode</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rules %}
+      <tr>
+        <td>{% if kind == 'supplier' %}{{ r.supplier.company_name }}{% else %}{{ r.product.name }}{% endif %}</td>
+        <td>{{ r.get_mode_display }}</td>
+        <td class="text-end">
+          <form method="post" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="bundle_action" value="remove">
+            <input type="hidden" name="rule_id" value="{{ r.pk }}">
+            <button class="btn btn-sm btn-outline-danger" title="Remove override"><i class="bi bi-x-lg"></i></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted small mb-0">No overrides. The broader setting applies.</p>
+{% endif %}

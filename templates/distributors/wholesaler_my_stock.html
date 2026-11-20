@@ -14,7 +14,142 @@ manual change can only reduce. Mobile-first: tables scroll in their own box.{% e
   {% if not my_stockist %}<br><span class="text-danger fw-semibold">No stockist assigned yet — ask the admin to set one before requesting stock.</span>{% endif %}
 </div>
 
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <span>Buffer stock &amp; bundles</span>
+    <a href="{% url 'wholesaler:bundle_settings' %}" class="btn btn-outline-primary btn-sm"><i class="bi bi-box-seam me-1"></i>Bundle Settings</a>
+  </div>
+  <div class="card-body">
+    <form method="post" class="d-flex flex-wrap gap-3 align-items-center">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="buffer_setting">
+      <div class="form-check form-switch mb-0">
+        <input class="form-check-input" type="checkbox" role="switch" id="noBuffer" name="no_buffer_stock" value="1"
+               {% if wholesaler.no_buffer_stock %}checked{% endif %} onchange="this.form.submit()">
+        <label class="form-check-label fw-semibold" for="noBuffer">No buffer stock</label>
+      </div>
+      <span class="small text-muted">
+        {% if wholesaler.no_buffer_stock %}
+          ON: your shops' restock requests, both pack (bundle) and loose, go straight to {% if my_stockist %}{{ my_stockist.company_name }}{% else %}your stockist{% endif %}, and the stockist's bundle rules apply to them.
+        {% else %}
+          OFF: your shops' restock requests, both pack (bundle) and loose, wait here. Fill them from your stock or forward them to your stockist.
+        {% endif %}
+      </span>
+    </form>
+  </div>
+</div>
 
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">Pack requests from your Marketplaces</div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light"><tr><th>#</th><th>Shop</th><th>Product</th><th>Requested</th><th>In your stock</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for row in marketplace_packed_requests %}
+        <tr>
+          <td>{{ row.request.pk }}</td>
+          <td>{{ row.request.distributor.company_name }}</td>
+          <td class="fw-semibold">{{ row.request.variant.product.name }} <span class="text-muted">{{ row.request.variant.label }}</span></td>
+          <td>{{ row.request.quantity_requested }}</td>
+          <td>{{ row.available }}</td>
+          <td class="text-nowrap">
+            {% if row.available >= row.request.quantity_requested %}
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="fulfil_marketplace_packed">
+              <input type="hidden" name="request_id" value="{{ row.request.pk }}">
+              <button class="btn btn-sm btn-success">Fill from my stock</button>
+            </form>
+            {% endif %}
+            {% if row.upstream_open %}
+              <span class="badge bg-info text-dark">Waiting for stockist</span>
+            {% else %}
+            <form method="post" class="d-inline">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="forward_marketplace_packed">
+              <input type="hidden" name="request_id" value="{{ row.request.pk }}">
+              <button class="btn btn-sm btn-outline-primary">Request from stockist</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center text-muted py-3">No pack requests waiting.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">Loose Stock</div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light"><tr><th>Product</th><th>Unit</th><th>Available</th></tr></thead>
+      <tbody>
+        {% for stock in loose_stock_items %}
+        <tr>
+          <td class="fw-semibold">{{ stock.product.name }}</td>
+          <td>{{ stock.product.master_unit }}</td>
+          <td>{{ stock.quantity_grams }}</td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="3" class="text-center text-muted py-3">No loose stock yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+  <div class="card-header bg-white fw-semibold">Loose-stock requests from your Marketplaces</div>
+  <div class="table-responsive">
+    <table class="table align-middle mb-0 small">
+      <thead class="table-light">
+        <tr><th>Marketplace</th><th>Product</th><th>Requested</th><th>Loose available</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for row in marketplace_loose_requests %}
+        <tr>
+          <td>{{ row.request.distributor.company_name }}</td>
+          <td>{{ row.request.variant.product.name }}</td>
+          <td>{{ row.request.loose_grams }} {{ row.request.variant.product.master_unit }}</td>
+          <td>{{ row.available }} {{ row.request.variant.product.master_unit }}</td>
+          <td>
+            <div class="d-flex flex-wrap gap-2">
+              {% if row.available >= row.request.loose_grams %}
+              <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="fulfil_marketplace_loose">
+                <input type="hidden" name="request_id" value="{{ row.request.pk }}">
+                <button class="btn btn-sm btn-success">Send available amount</button>
+              </form>
+              {% endif %}
+              {% if my_stockist %}
+              <form method="post" class="d-flex gap-1">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="restock_loose_for_marketplace">
+                <input type="hidden" name="request_id" value="{{ row.request.pk }}">
+                <input type="number" name="loose_grams" min="{{ row.request.loose_grams }}"
+                       value="{{ row.request.loose_grams }}" class="form-control form-control-sm"
+                       style="width:7rem" aria-label="Amount to request from stockist">
+                <button class="btn btn-sm btn-outline-primary" {% if row.upstream_open %}disabled{% endif %}>
+                  {% if row.upstream_open %}Stockist requested{% else %}Request stockist{% endif %}
+                </button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="5" class="text-center text-muted py-3">No Marketplace loose-stock requests are waiting.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% if not wholesaler.no_buffer_stock %}
 {% comment %}Stage 7g: auto-restock — files the restock REQUEST automatically
 when stock dips; stock still only rises when it is delivered.{% endcomment %}
 <form method="post" class="card border-0 shadow-sm p-3 mb-3">
@@ -48,6 +183,7 @@ when stock dips; stock still only rises when it is delivered.{% endcomment %}
     <div class="small text-muted w-100 mb-0">When any stock row falls to the level, a request to your stockist is filed automatically (one open request per item).</div>
   </div>
 </form>
+{% endif %}
 
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-white fw-semibold">Current Stock</div>
@@ -93,6 +229,7 @@ when stock dips; stock still only rises when it is delivered.{% endcomment %}
   </div>
 </div>
 
+{% if not wholesaler.no_buffer_stock %}
 <div class="card border-0 shadow-sm mb-4">
   <div class="card-header bg-white fw-semibold">Request Stock from {% if my_stockist %}{{ my_stockist.company_name }}{% else %}Stockist{% endif %}</div>
   <form method="post">
@@ -107,9 +244,9 @@ when stock dips; stock still only rises when it is delivered.{% endcomment %}
           {% for v in orderable %}
           <tr>
             <td>{{ v.product.name }}</td>
-            <td><span class="badge bg-secondary">{{ v.label }}</span></td>
+            <td><span class="badge bg-secondary">{{ v.label }}</span>{% if v.only_bundle %}<span class="badge bg-info text-dark ms-1">Bundle of {{ v.supplier_order_multiple }} only</span>{% endif %}</td>
             <td>₹{{ v.selling_price }}</td>
-            <td><input type="number" name="qty_{{ v.pk }}" min="0" class="form-control form-control-sm" placeholder="0"></td>
+            <td><input type="number" name="qty_{{ v.pk }}" min="0" step="{{ v.supplier_order_multiple }}" class="form-control form-control-sm" placeholder="0"></td>
           </tr>
           {% empty %}
           <tr><td colspan="4" class="text-center text-muted py-4">Nothing orderable yet.</td></tr>
@@ -124,6 +261,7 @@ when stock dips; stock still only rises when it is delivered.{% endcomment %}
     </div>
   </form>
 </div>
+{% endif %}
 
 <div class="card border-0 shadow-sm">
   <div class="card-header bg-white fw-semibold">Recent Requests</div>
@@ -138,7 +276,7 @@ when stock dips; stock still only rises when it is delivered.{% endcomment %}
           <td class="text-muted">#{{ r.pk }}</td>
           <td>{{ r.variant.product.name }}</td>
           <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
-          <td>{{ r.quantity_requested }}</td>
+          <td>{% if r.loose_grams %}{{ r.loose_grams }} {{ r.variant.product.master_unit }} loose{% else %}{{ r.quantity_requested }}{% endif %}</td>
           <td class="text-muted">{{ r.stockist.company_name }}</td>
           <td>
             {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>

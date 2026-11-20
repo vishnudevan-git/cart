@@ -74,9 +74,9 @@
           </td>
 
           <td class="small text-muted text-nowrap">
-            {% if r.fulfillment_method == 'stockist_pickup' %}🚗 Stockist pickup
-            {% elif r.fulfillment_method == 'supplier_transport' %}🚛 Transport
-            {% elif r.fulfillment_method == 'supplier_courier' %}📦 Courier
+            {% if r.display_fulfillment_method == 'stockist_pickup' %}🚗 Stockist pickup
+            {% elif r.display_fulfillment_method == 'supplier_transport' %}🚛 Supplier sends to stockist
+            {% elif r.display_fulfillment_method == 'supplier_courier' %}📦 Courier
             {% else %}—{% endif %}
           </td>
           <td class="text-muted">{{ r.requested_at|date:"d M Y, H:i" }}</td>
@@ -120,7 +120,7 @@
             <div class="d-inline-flex gap-1">
               <button type="button" class="btn btn-sm btn-primary text-nowrap"
                       data-bs-toggle="collapse" data-bs-target="#disp{{ r.pk }}">
-                <i class="bi bi-send me-1"></i>{% if r.fulfillment_method == 'stockist_pickup' %}Hand over…{% else %}Dispatch…{% endif %}
+                <i class="bi bi-send me-1"></i>{% if r.display_fulfillment_method == 'stockist_pickup' %}Hand over…{% else %}Dispatch to stockist…{% endif %}
               </button>
               <form method="post" class="d-inline"
                     data-confirm="Reject request #{{ r.pk }} from {{ r.distributor.company_name }}? They will see it as rejected."
@@ -133,21 +133,21 @@
             </div>
             <div class="collapse mt-2 text-start" id="disp{{ r.pk }}">
               <form method="post" class="border rounded p-2 bg-light"
-                    data-confirm="{% if r.fulfillment_method == 'stockist_pickup' %}Confirm that {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} has been handed over to the stockist?{% else %}Dispatch {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to {{ r.distributor.company_name }}?{% endif %}"
+                    data-confirm="{% if r.display_fulfillment_method == 'stockist_pickup' %}Confirm that {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} has been handed over to the stockist?{% else %}Dispatch {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to the stockist for {{ r.distributor.company_name }}?{% endif %}"
                     data-confirm-type="success"
-                    data-confirm-title="{% if r.fulfillment_method == 'stockist_pickup' %}Handed over?{% else %}Dispatch now?{% endif %}">
+                    data-confirm-title="{% if r.display_fulfillment_method == 'stockist_pickup' %}Handed over?{% else %}Dispatch to stockist?{% endif %}">
                 {% csrf_token %}
                 <input type="hidden" name="req_id" value="{{ r.pk }}">
                 <input type="hidden" name="action" value="dispatch">
                 <label class="form-label small mb-1" for="trk{{ r.pk }}">
-                  {% if r.fulfillment_method == 'stockist_pickup' %}Stockist's vehicle no. (optional)
-                  {% elif r.fulfillment_method == 'supplier_courier' %}Courier name / tracking no.
+                  {% if r.display_fulfillment_method == 'stockist_pickup' %}Stockist's vehicle no. (optional)
+                  {% elif r.display_fulfillment_method == 'supplier_courier' %}Courier name / tracking no.
                   {% else %}Vehicle / LR no.{% endif %}
                 </label>
                 <input type="text" id="trk{{ r.pk }}" name="tracking_info" maxlength="200"
                        class="form-control form-control-sm mb-2">
                 <button class="btn btn-sm btn-primary w-100">
-                  <i class="bi bi-send me-1"></i>{% if r.fulfillment_method == 'stockist_pickup' %}Confirm hand over{% else %}Confirm dispatch{% endif %}
+                  <i class="bi bi-send me-1"></i>{% if r.display_fulfillment_method == 'stockist_pickup' %}Confirm hand over{% else %}Confirm dispatch{% endif %}
                 </button>
               </form>
             </div>
@@ -184,8 +184,8 @@ goods move supplier → stockist, so supplier stock drops the same moment.{% end
           <td class="text-muted">#{{ r.pk }}</td>
           <td>{{ r.stockist.company_name }}</td>
           <td class="fw-semibold">{{ r.variant.product.name }}</td>
-          <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
-          <td class="fw-semibold">{{ r.quantity_requested }}</td>
+          <td><span class="badge bg-secondary">{{ r.variant.label }}</span>{% if r.loose_supply %}<span class="badge bg-info text-dark ms-1">Loose</span>{% endif %}</td>
+          <td class="fw-semibold">{{ r.quantity_requested }}{% if r.loose_supply %} pack(s){% endif %}</td>
           <td class="{% if r.variant.stock < r.quantity_requested %}text-danger fw-semibold{% else %}text-muted{% endif %}">{{ r.variant.stock }}</td>
           <td>
             {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
@@ -200,7 +200,7 @@ goods move supplier → stockist, so supplier stock drops the same moment.{% end
               <input type="hidden" name="kind" value="stockist">
               <input type="hidden" name="req_id" value="{{ r.pk }}">
               <button name="action" value="fulfil" class="btn btn-sm btn-success"
-                      data-confirm="Send {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to {{ r.stockist.company_name }}? Your stock reduces by the same amount."
+                      data-confirm="{% if r.loose_supply %}Convert {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to loose stock for {{ r.stockist.company_name }}?{% else %}Send {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to {{ r.stockist.company_name }}?{% endif %} Your stock reduces by the same amount."
                       data-confirm-type="success" data-confirm-title="Fulfil request?">Fulfil</button>
               <button name="action" value="reject" class="btn btn-sm btn-outline-danger"
                       data-confirm="Reject stockist request #{{ r.pk }}?"

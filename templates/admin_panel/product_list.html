@@ -101,7 +101,9 @@
             <td data-col="name" class="fw-semibold">{{ p.name }}</td>
             <td data-col="supplier">{{ p.supplier.company_name }}</td>
             <td data-col="category">{{ p.category.name|default:"—" }}</td>
-            <td data-col="variants">{{ p.variants.count }}</td>
+            <td data-col="variants" title="Active variants and active pack sizes. Inactive ones are not counted.">
+      {% if p.active_variant_count %}{{ p.active_variant_count }} variant{{ p.active_variant_count|pluralize }} · {% endif %}{{ p.active_pack_count }} pack{{ p.active_pack_count|pluralize }}
+    </td>
             <td data-col="status">
               {% if show_deleted %}
                 <span class="badge bg-danger">Deleted</span>
@@ -114,7 +116,15 @@
             {% endif %}
             <td>
               {% if show_deleted %}
-                <button type="submit" formaction="{% url 'admin_panel:product_restore' p.pk %}" formmethod="post" class="btn btn-sm btn-success">Restore</button>
+                <div class="d-flex gap-1">
+                  <button type="submit" formaction="{% url 'admin_panel:product_restore' p.pk %}" formmethod="post" class="btn btn-sm btn-success">Restore</button>
+                  <button type="submit" formaction="{% url 'admin_panel:product_purge' p.pk %}" formmethod="post"
+                          class="btn btn-sm btn-outline-danger"
+                          data-confirm="Permanently delete {{ p.name }}? Its variants, stock, and product history will also be deleted. Historical orders will remain without a product link. This cannot be undone."
+                          data-confirm-title="Permanently delete product?" data-confirm-type="danger" data-confirm-icon="🗑️">
+                    Delete permanently
+                  </button>
+                </div>
               {% else %}
                 {% if p.status != 'approved' %}<button type="submit" formaction="{% url 'admin_panel:product_approve' p.pk %}" formmethod="post" class="btn btn-sm btn-success me-1">Approve</button>{% endif %}
                 {% if p.status != 'rejected' %}<button type="submit" formaction="{% url 'admin_panel:product_reject' p.pk %}" formmethod="post" class="btn btn-sm btn-danger me-1">Reject</button>{% endif %}
@@ -154,6 +164,12 @@
             <div class="d-flex gap-2 mt-2">
               {% if show_deleted %}
                 <button type="submit" formaction="{% url 'admin_panel:product_restore' p.pk %}" formmethod="post" class="btn btn-sm btn-success flex-fill">Restore</button>
+                <button type="submit" formaction="{% url 'admin_panel:product_purge' p.pk %}" formmethod="post"
+                        class="btn btn-sm btn-outline-danger flex-fill"
+                        data-confirm="Permanently delete {{ p.name }}? Its variants, stock, and product history will also be deleted. Historical orders will remain without a product link. This cannot be undone."
+                        data-confirm-title="Permanently delete product?" data-confirm-type="danger" data-confirm-icon="🗑️">
+                  Delete permanently
+                </button>
               {% else %}
                 {% if p.status != 'approved' %}<button type="submit" formaction="{% url 'admin_panel:product_approve' p.pk %}" formmethod="post" class="btn btn-sm btn-success flex-fill">Approve</button>{% endif %}
                 {% if p.status != 'rejected' %}<button type="submit" formaction="{% url 'admin_panel:product_reject' p.pk %}" formmethod="post" class="btn btn-sm btn-danger flex-fill">Reject</button>{% endif %}

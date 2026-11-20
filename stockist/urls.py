@@ -12,6 +12,7 @@ urlpatterns = [
     path('processing-charges/download/', views.charges_download, name='charges_download'),
     path('processing-charges/upload/', views.charges_upload, name='charges_upload'),
     path('restock-requests/', views.restock_requests, name='restock_requests'),
+    path('bundle-settings/', views.bundle_settings, name='bundle_settings'),
     path('orders/', views.order_list, name='order_list'),
     path('orders/<int:pk>/', views.order_detail, name='order_detail'),
     path('distributor-restock/', views.distributor_restock, name='distributor_restock'),

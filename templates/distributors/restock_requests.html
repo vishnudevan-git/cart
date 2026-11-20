@@ -66,6 +66,8 @@
               <span class="badge bg-warning text-dark">⏳ Pending</span>
             {% elif r.status == 'approved' %}
               <span class="badge bg-info text-dark">✅ Approved by Stockist</span>
+            {% elif r.status == 'awaiting_stock' %}
+              <span class="badge bg-warning text-dark">Waiting for upstream stock</span>
             {% elif r.status == 'stockist_picked' %}
               <span class="badge bg-primary">📦 Picked by Stockist</span>
             {% elif r.status == 'dispatched' %}

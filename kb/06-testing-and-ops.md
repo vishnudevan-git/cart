@@ -73,3 +73,8 @@ Indexes added **after measuring** at 40k rows (`products.0018`):
 `product_shared_lookup_idx`, `product_owner_idx`, `variant_product_active_idx`.
 A `(stock, is_active)` index was tested and **rejected** (made low-stock slower) —
 don't add it back without re-measuring.
+
+## Logs and audit trail (2026-11-18)
+- Request log: logs/requests_<server start time>.log. One line per request: time, who (username and role), method, status, duration, IP, path. POST lines also list the posted fields. IDs, action, status and similar short fields show values. Free text shows a count only. Passwords, tokens and CSRF values show as ***. Implemented in admin_panel/middleware.py (RequestLoggingMiddleware).
+- Business log: logs/activity.log. Order, payment, user, stock and bulk events (for example CUSTOMER_BULK | DONE).
+- A click that never sends a request is not in either log. Test runs also write to these files.

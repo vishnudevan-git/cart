@@ -1269,3 +1269,42 @@ A central `act` singleton with typed log helpers:
 
 ### Verified: 118/118 tests pass. System check clean.
 Real events already appearing in activity.log (cart add, product submissions).
+
+## Currency spinner behavior — 2026-11-16
+- Rupee-valued number inputs across the dashboard must step by ₹1 when using
+  keyboard up/down arrows or the shared ▲▼ buttons, changing only the rupee
+  amount while preserving any paise (₹12.50 → ₹13.50). Keep decimal quantity
+  controls such as stock and weight on their own steps.
+  Use the shared custom ▲▼ controls instead of native number spinners to prevent
+  duplicate change events.
+  Spinner edits to the product's per-unit price should not open the manual pack
+  price confirmation popup; normal typed edits retain that confirmation.
+  Shared behavior lives in `templates/base_dashboard.html`.
+- On supplier product forms, enabling **Price each pack** hides the shared
+  per-unit selling-price card. Each pack's price is then entered independently;
+  disabling the option restores calculated per-unit pricing.
+- In manual pack-price mode, validate each adjacent smaller/larger pack pair:
+  the smaller price must be at least size-proportional and at most 1.4x that
+  amount, capped strictly below the larger price. For a half-size pack this is
+  50–70% of the larger pack price. Show a live warning and block save outside
+  the range; manual override remains available within the range.
+- Switching **Allow Loose** off clears pool-derived per-pack stocks across all
+  variants. Require an explicit whole-unit stock entry for every selected
+  pack before save; when bundle quantity is configured, require bundle count.
+
+## Order reset, bulk test orders, bundle plan - 2026-11-17
+- Hard-deleted all orders (18 orders, 39 items, 13 supplier shipments, 14 payments) on db.sqlite3.
+  Backup: db.sqlite3.bak-before-order-reset-20261117-123738.
+- Created 4 bulk COD test orders with scripts/bulk_test_orders.py (no stock deduction).
+- Bundle supply-chain rules agreed and recorded in kb/10-bundle-supply-chain.md (not yet implemented).
+- Owner requests and plan changes are logged in kb/11-requirements-decision-log.md.
+
+## Bundle supply chain built - 2026-11-17
+- New: products/bundle_chain.py (chain registry + rules), TierBundleRule model, Wholesaler.no_buffer_stock.
+- Stockist and Distributor Bundle Settings pages (global / supplier / product; singles, bundle only, follow upstream).
+- CHANGED BEHAVIOUR: shop pack restock now waits at its Distributor unless the Distributor turns on No buffer stock
+  (previously pack requests always went straight to the stockist). Distributor can fill from own stock or forward.
+- Bundle step enforced on shop, Distributor and auto-restock requests. Customers unchanged (always singles).
+- Kilogram display fix deferred by owner.
+- Tests: products/test_bundle_chain.py (20 pass). Full suite 156; the 11 pre-existing failures are unchanged.
+- Details: kb/10-bundle-supply-chain.md, decisions: kb/11-requirements-decision-log.md.

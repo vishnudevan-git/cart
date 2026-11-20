@@ -61,6 +61,16 @@ class Supplier(models.Model):
         max_length=8, choices=SHIPMENT_MODE_CHOICES, default='collect',
         verbose_name='Global shipment mode'
     )
+    SHIPMENT_TARGET_CHOICES = (
+        ('stockist', 'Stockist (normal chain)'),
+        ('distributor', 'Distributor (skip stockist)'),
+        ('shop', 'Shop / Marketplace (skip stockist + distributor)'),
+        ('customer', 'Customer (deliver direct)'),
+    )
+    default_shipment_target = models.CharField(
+        max_length=12, choices=SHIPMENT_TARGET_CHOICES, default='stockist',
+        verbose_name='Global ship-to target'
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -75,6 +85,14 @@ class Supplier(models.Model):
         if product is not None:
             return getattr(product, 'shipment_mode', 'collect') or 'collect'
         return 'collect'
+
+    def effective_shipment_target(self, product=None):
+        """The first delivery level that handles a supplier's products."""
+        if self.use_global_shipment_mode:
+            return self.default_shipment_target
+        if product is not None:
+            return getattr(product, 'delivery_target', 'stockist') or 'stockist'
+        return 'stockist'
 
     # Default manager = real marketplace suppliers only. An Marketplace's
     # in-house catalogue holder is invisible here, so it never shows up in

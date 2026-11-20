@@ -11,29 +11,37 @@
 
 <!-- Filter bar -->
 <div class="card border-0 shadow-sm p-3 mb-3">
-  <form method="get" class="d-flex flex-wrap gap-2 align-items-center">
-    {% if show_suspended %}<input type="hidden" name="show_suspended" value="1">{% endif %}
-    <select name="supplier" class="form-select form-select-sm" style="max-width:220px" onchange="this.form.submit()">
+  <form method="get" id="stockFilters" class="d-flex flex-wrap gap-2 align-items-center">
+    <input type="hidden" name="show_suspended" value="{% if show_suspended %}1{% else %}0{% endif %}">
+    <input type="search" name="q" value="{{ search }}" class="form-control form-control-sm" data-no-auto-search="true"
+           style="max-width:260px" placeholder="Search product, SKU, supplier, or category..."
+           aria-label="Search products by name, SKU, supplier, or category">
+    <select name="supplier" class="form-select form-select-sm" style="max-width:220px">
       <option value="">All Suppliers</option>
       {% for s in suppliers %}
         <option value="{{ s.pk }}" {% if selected_supplier == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.company_name }}</option>
       {% endfor %}
     </select>
-    <select name="category" class="form-select form-select-sm" style="max-width:180px" onchange="this.form.submit()">
+    <select name="category" class="form-select form-select-sm" style="max-width:180px">
       <option value="">All Categories</option>
       {% for c in categories %}
         <option value="{{ c.pk }}" {% if selected_category == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.name }}</option>
       {% endfor %}
     </select>
-    {% if show_suspended %}
-      <a href="{% url 'admin_panel:stock_adjust' %}{% if selected_supplier %}?supplier={{ selected_supplier }}{% endif %}" class="btn btn-sm btn-warning"><i class="bi bi-eye-slash me-1"></i>Active suppliers only</a>
-    {% else %}
-      <a href="{% url 'admin_panel:stock_adjust' %}?show_suspended=1{% if selected_supplier %}&supplier={{ selected_supplier }}{% endif %}" class="btn btn-sm btn-outline-warning"><i class="bi bi-eye me-1"></i>Show suspended suppliers' products</a>
-    {% endif %}
+    <div class="btn-group stock-status-toggle" role="group" aria-label="Supplier status filter">
+      <button type="button" class="btn btn-sm {% if not show_suspended %}btn-success{% else %}btn-outline-success{% endif %}"
+              data-stock-status="active" aria-pressed="{% if not show_suspended %}true{% else %}false{% endif %}">
+        Active
+      </button>
+      <button type="button" class="btn btn-sm {% if show_suspended %}btn-success{% else %}btn-outline-success{% endif %}"
+              data-stock-status="suspended" aria-pressed="{% if show_suspended %}true{% else %}false{% endif %}">
+        Suspended
+      </button>
+    </div>
     {% if selected_supplier or selected_category %}
       <a href="{% url 'admin_panel:stock_adjust' %}{% if show_suspended %}?show_suspended=1{% endif %}" class="btn btn-outline-secondary btn-sm">Clear</a>
     {% endif %}
-    <span class="text-muted small ms-auto">{{ products|length }} product{{ products|length|pluralize }}</span>
+    <span id="stockProductCount" class="text-muted small ms-auto">{{ products|length }} product{{ products|length|pluralize }}</span>
   </form>
 </div>
 
@@ -43,6 +51,113 @@
 
 {% block extra_js %}
 <script>
+// Filter in place so each debounce doesn't reload the page and steal focus.
+(() => {
+  const form = document.getElementById('stockFilters');
+  const search = form?.querySelector('input[name="q"]');
+  const table = document.getElementById('adminStockTable');
+  const count = document.getElementById('stockProductCount');
+  const mobile = document.getElementById('adminStockTableMobile');
+  const supplier = form?.querySelector('select[name="supplier"]');
+  const statusInput = form?.querySelector('input[name="show_suspended"]');
+  const statusButtons = form?.querySelectorAll('[data-stock-status]');
+  if (!form || !search || !table) return;
+
+  let timer;
+  let controller;
+  let requestId = 0;
+  let committedStatus = statusInput?.value || '0';
+
+  function updateStatusToggle() {
+    statusButtons?.forEach(button => {
+      const selected = button.dataset.stockStatus === (statusInput?.value === '1' ? 'suspended' : 'active');
+      button.classList.toggle('btn-success', selected);
+      button.classList.toggle('btn-outline-success', !selected);
+      button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+    });
+  }
+
+  async function refreshResults() {
+    const url = new URL(form.action || window.location.href, window.location.origin);
+    url.search = new URLSearchParams(new FormData(form)).toString();
+    const thisRequest = ++requestId;
+    controller?.abort();
+    controller = new AbortController();
+    try {
+      const response = await fetch(url, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        signal: controller.signal
+      });
+      if (!response.ok) throw new Error(`Stock search failed (${response.status})`);
+      const html = await response.text();
+      if (thisRequest !== requestId) return;
+      const doc = new DOMParser().parseFromString(html, 'text/html');
+      const nextTable = doc.getElementById('adminStockTable');
+      if (!nextTable) return;
+
+      const nextSupplier = doc.querySelector('#stockFilters select[name="supplier"]');
+      if (supplier && nextSupplier) supplier.innerHTML = nextSupplier.innerHTML;
+      const nextBody = nextTable.querySelector('tbody');
+      if (nextBody) table.querySelector('tbody').innerHTML = nextBody.innerHTML;
+      if (mobile) {
+        const nextMobile = doc.getElementById('adminStockTableMobile');
+        if (nextMobile) mobile.innerHTML = nextMobile.innerHTML;
+      }
+      const nextCount = doc.getElementById('stockProductCount');
+      if (count && nextCount) count.textContent = nextCount.textContent;
+      const totalCount = doc.getElementById('totalCount_adminStockTable');
+      const currentTotalCount = document.getElementById('totalCount_adminStockTable');
+      if (totalCount && currentTotalCount) currentTotalCount.innerHTML = totalCount.innerHTML;
+
+      // Preserve hidden-column preferences for newly rendered rows.
+      try {
+        const prefs = JSON.parse(localStorage.getItem('col_prefs_adminStockTable') || '{}');
+        table.querySelectorAll('tbody [data-col]').forEach(cell => {
+          cell.style.display = prefs[cell.dataset.col] === false ? 'none' : '';
+        });
+      } catch (_) {}
+      committedStatus = statusInput?.value || '0';
+      updateStatusToggle();
+      history.replaceState({}, '', url);
+    } catch (error) {
+      if (error.name !== 'AbortError') {
+        console.error(error);
+        if (thisRequest === requestId && statusInput) {
+          statusInput.value = committedStatus;
+          updateStatusToggle();
+        }
+      }
+    }
+  }
+
+  search.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(refreshResults, 350);
+  });
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    clearTimeout(timer);
+    refreshResults();
+  });
+  form.querySelectorAll('select[name]').forEach(select => {
+    select.addEventListener('change', () => {
+      clearTimeout(timer);
+      refreshResults();
+    });
+  });
+  statusButtons?.forEach(button => {
+    button.addEventListener('click', () => {
+      const nextStatus = button.dataset.stockStatus === 'suspended' ? '1' : '0';
+      if (!statusInput || statusInput.value === nextStatus) return;
+      statusInput.value = nextStatus;
+      if (supplier) supplier.value = '';
+      updateStatusToggle();
+      clearTimeout(timer);
+      refreshResults();
+    });
+  });
+})();
+
 // "details" sub-row toggle (same behaviour as the supplier products page).
 document.addEventListener('click', function (e) {
   const btn = e.target.closest('.stock-row-toggle');

@@ -62,3 +62,9 @@ category master list, wholesale-Distributor management, and `SiteSettings`
 Supplier Earnings page, standalone Settlement History page (merged into Payments
 Center), and the **entire Telegram bot** feature were deliberately removed. See
 `../PROJECT_NOTES.md` "Removed features log".
+
+## Bulk actions on admin Customers page (2026-11-17)
+- Admin -> Customers (/admin-panel/customers/) has multi-select with select-all.
+- Active tab: Enable, Disable, Delete, Assign marketplace. Deleted tab: Restore, Delete permanently.
+- Endpoint: POST /admin-panel/customers/bulk/ (customer_bulk_action). Only customer accounts; never the main admin or superusers.
+- Tests: admin_panel/test_customer_bulk.py.

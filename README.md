@@ -28,6 +28,7 @@ venv\Scripts\python.exe -m pip install -r requirements.txt
 venv\Scripts\python.exe manage.py migrate
 
 # run server
+$env:DEBUG = "True"  # Force local HTTP mode even if the shell has DEBUG=release.
 venv\Scripts\python.exe manage.py runserver 127.0.0.1:8888
 ```
 

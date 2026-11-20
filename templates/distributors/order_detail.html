@@ -41,7 +41,7 @@
         </li>
         {% endfor %}
       </ul>
-      <div class="small text-muted">Nothing has been cancelled or refunded automatically. Decide whether to wait, or cancel the order below.</div>
+      <div class="small text-muted">Nothing has been cancelled or refunded automatically. Only the customer can cancel an order.</div>
     </div>
     {% endif %}
 
@@ -204,11 +204,6 @@
 
       {% elif order.status == 'confirmed' and order.fulfillment_source == 'supplier' %}
         <div class="alert alert-info small mb-2">Waiting for stockist to pick from supplier.</div>
-        <form method="post" class="mt-2">
-          {% csrf_token %}
-          <input type="hidden" name="status" value="cancelled">
-          <button type="submit" class="btn btn-outline-danger btn-sm w-100">Cancel Order</button>
-        </form>
 
       {% elif order.status == 'at_distributor' %}
         <div class="alert alert-success small mb-2">Items received. Ready to deliver to customer.</div>

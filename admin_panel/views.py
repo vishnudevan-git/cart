@@ -502,9 +502,14 @@ def supplier_suspend(request, pk):
     supplier = get_object_or_404(Supplier, pk=pk)
     supplier.status = 'suspended'
     supplier.save()
+    
+    # When a supplier is suspended, products remain visible if downstream stock exists.
+    # DVP.is_active=False is set when pack is removed, not when supplier is suspended.
+    # The customer will see products if they have downstream stock (DVP row exists).
+    
     from lakrish_mart.activity_logger import act
     act.user('suspended', user=supplier.user, by=request.user, detail=f'Supplier: {supplier.company_name}')
-    messages.warning(request, f'{supplier.company_name} suspended.')
+    messages.warning(request, f'{supplier.company_name} suspended. Products remain visible while downstream stock exists.')
     return redirect('admin_panel:supplier_list')
 
 
@@ -514,6 +519,10 @@ def supplier_activate(request, pk):
     supplier = get_object_or_404(Supplier, pk=pk)
     supplier.status = 'approved'
     supplier.save()
+    
+    # When a supplier is reactivated, products become visible again.
+    # DVP.is_active can be set to True if the supplier adds variants back.
+    
     from lakrish_mart.activity_logger import act
     act.user('activated', user=supplier.user, by=request.user, detail=f'Supplier: {supplier.company_name}')
     messages.success(request, f'{supplier.company_name} activated.')
@@ -586,10 +595,12 @@ def stock_adjust(request):
 
     supplier_id = request.GET.get('supplier')
     category_id = request.GET.get('category')
-    # Default: only ACTIVE (approved) suppliers' products. ?show_suspended=1
-    # includes suspended suppliers' products too.
+    search = request.GET.get('q', '').strip()
+    # Default to approved suppliers; the suspended toggle shows suspended
+    # suppliers exclusively.
     show_suspended = request.GET.get('show_suspended') == '1'
-    suppliers = Supplier.objects.filter(status='approved').order_by('company_name')
+    supplier_status = 'suspended' if show_suspended else 'approved'
+    suppliers = Supplier.objects.filter(status=supplier_status).order_by('company_name')
 
     # Shared-catalogue products only (shop-private own-products are not
     # marketplace stock). Grouped by product so the shared table can render.
@@ -597,12 +608,18 @@ def stock_adjust(request):
                 .select_related('supplier', 'category')
                 .prefetch_related('variants', 'variant_types')
                 .order_by('supplier__company_name', 'name'))
-    if not show_suspended:
-        products = products.filter(supplier__status='approved')
+    products = products.filter(supplier__status=supplier_status)
     if supplier_id:
         products = products.filter(supplier_id=supplier_id)
     if category_id:
         products = products.filter(category_id=category_id)
+    if search:
+        products = products.filter(
+            Q(name__icontains=search)
+            | Q(sku__icontains=search)
+            | Q(supplier__company_name__icontains=search)
+            | Q(category__name__icontains=search)
+        )
 
     from products.stock_display import attach_downstream_detail
     products = annotate_products_for_stock(list(products))
@@ -614,6 +631,7 @@ def stock_adjust(request):
         'categories': Category.objects.all().order_by('name'),
         'selected_supplier': supplier_id,
         'selected_category': category_id,
+        'search': search,
         'show_suspended': show_suspended,
     })
 
@@ -662,7 +680,18 @@ def product_list(request):
         'created': 'created_at', '-created': '-created_at',
     }
     order_by = SORT_MAP.get(sort, 'name')
-    products = Product.objects.select_related('supplier', 'category').prefetch_related('variants')
+    products = Product.all_objects.filter(owner_enterprise__isnull=True).select_related(
+        'supplier', 'category').prefetch_related('variants')
+    # Variants column: count only what is live. Inactive packs and variant types
+    # that have no active pack are not counted.
+    products = products.annotate(
+        active_pack_count=Count('variants', filter=Q(variants__is_active=True), distinct=True),
+        active_variant_count=Count(
+            'variant_types',
+            filter=Q(variant_types__is_active=True, variant_types__packs__is_active=True),
+            distinct=True,
+        ),
+    )
     if show_deleted:
         products = products.filter(is_deleted=True)
     else:
@@ -676,7 +705,7 @@ def product_list(request):
     if category_filter:
         products = products.filter(category_id=category_filter)
     products = products.order_by(order_by)
-    deleted_count = Product.objects.filter(is_deleted=True).count()
+    deleted_count = Product.all_objects.filter(owner_enterprise__isnull=True, is_deleted=True).count()
     pending_count = Product.objects.filter(status='pending', is_deleted=False).count()
     return render(request, 'admin_panel/product_list.html', {
         'products': products,
@@ -697,10 +726,45 @@ def product_list(request):
 @admin_required
 @require_POST
 def product_restore(request, pk):
-    product = get_object_or_404(Product, pk=pk, is_deleted=True)
+    product = get_object_or_404(Product.all_objects, pk=pk, is_deleted=True)
     product.restore()
     messages.success(request, f'"{product.name}" restored.')
     return redirect('admin_panel:product_list')
+
+
+@admin_required
+@require_POST
+def product_purge(request, pk):
+    """Permanently delete a soft-deleted product and its dependent records."""
+    product = get_object_or_404(Product.all_objects, pk=pk, is_deleted=True)
+    product_name = product.name
+    product_sku = product.sku
+    image_name = product.image.name
+    image_storage = product.image.storage
+
+    product.delete()
+    from lakrish_mart.activity_logger import act
+    act.info(
+        f'PRODUCT | HARD_DELETED | "{product_name}" | sku={product_sku} '
+        f'| by={request.user.get_username()}'
+    )
+
+    if image_name:
+        try:
+            image_storage.delete(image_name)
+        except OSError as error:
+            act.error(f'Product image cleanup failed for sku={product_sku}', exc=error)
+            messages.warning(
+                request,
+                f'"{product_name}" was permanently deleted, but its image could not be removed.',
+            )
+        else:
+            messages.warning(request, f'"{product_name}" permanently deleted. This cannot be undone.')
+    else:
+        messages.warning(request, f'"{product_name}" permanently deleted. This cannot be undone.')
+
+    from django.urls import reverse
+    return redirect(f"{reverse('admin_panel:product_list')}?deleted=1")
 
 
 @admin_required
@@ -1028,7 +1092,10 @@ def distributor_list(request):
     }
     order_by = SORT_MAP.get(sort, 'company_name')
     _base = Distributor.objects.select_related('user').annotate(
-        customer_count=Count('customers', filter=Q(customers__is_deleted=False), distinct=True),
+        # Customers only. The shop's own login (role=distributor) is linked to the
+        # same FK but is shown in the Username column, not counted here.
+        customer_count=Count('customers', filter=Q(customers__is_deleted=False,
+                                                    customers__role='customer'), distinct=True),
         order_count=Count('orders', distinct=True),
     ).order_by(order_by)
     if status_filter == 'deleted':
@@ -1080,8 +1147,10 @@ def distributor_list(request):
         'active_nav': 'distributor_list',
         'show_tabs': True,
         'tab_active_value': 'active',
-        'show_search': False,  # uses per-column instant search instead
+        'show_search': True,
         'table_id': 'distTable',
+        'count': distributors.count(),
+        'count_noun': 'marketplace',
         'create_url': reverse('admin_panel:distributor_create'),
         'create_label': 'Create Marketplace',
         'bulk_action_url': reverse('admin_panel:bulk_distributor_action'),
@@ -1150,39 +1219,81 @@ def distributor_detail(request, pk):
 def distributor_toggle(request, pk):
     dist = get_object_or_404(Distributor, pk=pk)
     new_status = 'suspended' if dist.status == 'active' else 'active'
-    dist.status = new_status
-    dist.save()
-
-    from lakrish_mart.activity_logger import act
-    act.user('suspended' if new_status == 'suspended' else 'activated',
-             user=dist.user, by=request.user, detail=f'Marketplace: {dist.company_name}')
+    
     if new_status == 'suspended':
-        customer_count = dist.customers.filter(is_deleted=False).count()
+        # Mark customers as orphans from suspended marketplace
+        # They will have distributor=None but need a way to identify them as
+        # "customers from suspended marketplace" for later manual assignment
+        from accounts.models import User
+        
+        customers = dist.customers.filter(is_deleted=False)
+        customer_count = customers.count()
+        
+        if customer_count > 0:
+            # Mark these customers with a special note in their profile
+            # so admin can identify and assign them to a new marketplace
+            for c in customers:
+                c.preferred_language = f'suspended_marketplace:{dist.company_name}'
+                c.save(update_fields=['preferred_language'])
+            
+            msg = f'{customer_count} customer(s) marked as orphans from suspended marketplace. '
+        else:
+            msg = ''
+        
+        dist.status = 'suspended'
+        dist.save()
+        
         pending_orders = dist.orders.filter(status='pending').count()
-        msg = f'{dist.company_name} suspended.'
-        if customer_count:
-            msg += f' {customer_count} customer(s) will not be able to shop until reactivated.'
+        msg += f'{dist.company_name} suspended.'
         if pending_orders:
             msg += f' {pending_orders} pending order(s) need attention.'
         messages.warning(request, msg)
     else:
+        dist.status = 'active'
+        dist.save()
         messages.success(request, f'{dist.company_name} reactivated. Customers can shop again.')
 
+    from lakrish_mart.activity_logger import act
+    act.user('suspended' if new_status == 'suspended' else 'activated',
+             user=dist.user, by=request.user, detail=f'Marketplace: {dist.company_name}')
+    
     return redirect('admin_panel:distributor_list')
 
 
 @admin_required
 def distributor_delete(request, pk):
-    """Archive a Marketplace without deleting customers, orders, or stock data."""
+    """Archive a Marketplace without deleting customers, orders, or stock data.
+    
+    Key behavior:
+    - Marks customers as orphans from suspended marketplace
+    - Preserves all orders, pricing, and inventory data
+    - Admin can later manually assign orphaned customers to a new marketplace
+    - Marketplaces can be reactivated later to restore access
+    """
     dist = get_object_or_404(Distributor, pk=pk)
 
     if request.method == 'POST':
+        # Mark customers as orphans from suspended marketplace
+        from accounts.models import User
+        customers = dist.customers.filter(is_deleted=False)
+        customer_count = customers.count()
+        
+        if customer_count > 0:
+            # Mark these customers with a special note so admin can identify them
+            for c in customers:
+                c.preferred_language = f'suspended_marketplace:{dist.company_name}'
+                c.save(update_fields=['preferred_language'])
+            msg = f'{customer_count} customer(s) marked as orphans. '
+        else:
+            msg = ''
+        
         dist.status = 'suspended'
         dist.save(update_fields=['status'])
         messages.success(
             request,
             f'Marketplace "{dist.company_name}" archived (suspended). '
-            'Customers, orders, pricing, and inventory were preserved; reactivate it to restore access.'
+            f'{msg}'
+            'Customers are orphans; admin can assign them to a new marketplace.'
         )
         return redirect('admin_panel:distributor_list')
 
@@ -1861,6 +1972,8 @@ def customer_list(request):
     from stockist.models import Stockist
     return render(request, 'admin_panel/customer_list.html', {
         'customers': customers,
+        'query_string': request.GET.urlencode(),
+        'distributors_bulk': Distributor.objects.filter(status='active').select_related('wholesaler__stockist').order_by('company_name'),
         'search': search,
         'show_deleted': show_deleted,
         'unlinked': unlinked,
@@ -1869,7 +1982,7 @@ def customer_list(request):
         'unlinked_count': unlinked_count,
         'suspended_dist_count': suspended_dist_count,
         'sort': sort,
-        'distributors': Distributor.objects.filter(status='active').order_by('company_name'),
+        'distributors': Distributor.objects.filter(status='active').select_related('wholesaler__stockist').order_by('company_name'),
         # Chain-filter option lists (ACTIVE only) + current selections:
         'marketplaces_f': Distributor.objects.filter(status='active', user__is_deleted=False).order_by('company_name'),
         'wholesalers_f': Wholesaler.objects.filter(status='active', user__is_deleted=False).order_by('company_name'),
@@ -2157,6 +2270,94 @@ def bulk_user_action(request):
     return redirect(reverse('admin_panel:user_list') + '?deleted=1')
 
 
+@admin_required
+@require_POST
+def customer_bulk_action(request):
+    """Apply one action to many selected customers on the Customers page.
+
+    Only role=customer accounts are touched, and superusers and the main admin
+    are never changed. Each action also skips rows where it does not apply
+    (for example, "enable" on a deleted customer). The count of applied rows is
+    reported back.
+    """
+    from django.urls import reverse
+    from lakrish_mart.activity_logger import act
+
+    action = request.POST.get('action', '')
+    ids = list(dict.fromkeys(i for i in request.POST.getlist('customer_ids') if i.isdigit()))
+    return_query = request.POST.get('return_query', '').lstrip('?')
+    back = reverse('admin_panel:customer_list') + (f'?{return_query}' if return_query else '')
+
+    actor = f'{request.user.get_username()}({getattr(request.user, "role", "?")})'
+    act.info(f'CUSTOMER_BULK | RECEIVED | action={action or "-"} | selected={len(ids)} | '
+             f'ids={",".join(ids) or "-"} | by={actor}')
+
+    if not ids:
+        act.info(f'CUSTOMER_BULK | NO_SELECTION | action={action or "-"} | by={actor}')
+        messages.warning(request, 'No customers selected.')
+        return redirect(back)
+
+    scope = User.all_objects if action in ('restore', 'purge') else User.objects
+    customers = scope.filter(
+        pk__in=ids, role='customer', is_superuser=False,
+    ).exclude(username='admin')
+    applied = 0
+
+    if action == 'delete':
+        for u in customers.filter(is_deleted=False):
+            u.soft_delete(deleted_by=request.user.username)
+            act.user('soft_deleted', user=u, by=request.user, detail='Customer (bulk)')
+            applied += 1
+        messages.success(request, f'{applied} customer(s) deleted. They can be restored from Deleted Customers.')
+
+    elif action in ('enable', 'disable'):
+        active = action == 'enable'
+        for u in customers.filter(is_deleted=False):
+            if u.is_active != active:
+                u.is_active = active
+                u.save(update_fields=['is_active'])
+            applied += 1
+        state = 'enabled' if active else 'disabled'
+        messages.success(request, f'{applied} customer(s) {state}.')
+
+    elif action == 'assign_distributor':
+        dist_id = request.POST.get('distributor_id', '')
+        dist = Distributor.objects.filter(pk=dist_id).first() if dist_id.isdigit() else None
+        if dist is None:
+            messages.error(request, 'Choose a marketplace to assign.')
+            return redirect(back)
+        for u in customers.filter(is_deleted=False):
+            u.distributor = dist
+            u.save(update_fields=['distributor'])
+            applied += 1
+        messages.success(request, f'{applied} customer(s) assigned to {dist.company_name}.')
+
+    elif action == 'restore':
+        for u in customers.filter(is_deleted=True, is_purged=False):
+            u.restore()
+            act.user('restored', user=u, by=request.user)
+            applied += 1
+        messages.success(request, f'{applied} customer(s) restored.')
+
+    elif action == 'purge':
+        for u in customers.filter(is_deleted=True, is_purged=False):
+            u.purge()
+            act.user('hard_deleted', user=u, by=request.user, detail='permanent archive (bulk)')
+            applied += 1
+        messages.warning(request, f'{applied} customer(s) permanently archived. This cannot be undone.')
+
+    else:
+        messages.error(request, 'Unknown action.')
+        return redirect(back)
+
+    skipped = len(ids) - applied
+    act.info(f'CUSTOMER_BULK | DONE | action={action} | selected={len(ids)} | '
+             f'applied={applied} | skipped={skipped} | by={actor}')
+    if skipped > 0:
+        messages.info(request, f'{skipped} selected row(s) were skipped because the action does not apply to them.')
+    return redirect(back)
+
+
 # ── Price History ─────────────────────────────────────────────────────────────
 
 @admin_required
@@ -2283,7 +2484,7 @@ def bulk_product_action(request):
                 )
                 messages.success(request, f'{count} product(s) deleted.')
             elif action == 'restore':
-                count = Product.objects.filter(pk__in=ids, is_deleted=True).update(
+                count = Product.all_objects.filter(pk__in=ids, is_deleted=True).update(
                     is_deleted=False, deleted_at=None, status='approved'
                 )
                 messages.success(request, f'{count} product(s) restored.')
@@ -2572,8 +2773,8 @@ def stockist_create(request):
 
 @admin_required
 def stockist_restock_list(request):
-    """Admin sees all stockist restock requests and can fulfill them."""
-    from stockist.models import StockistRestockRequest, StockistInventory, Stockist
+    """Admin sees requests; suppliers perform stock-backed fulfilment."""
+    from stockist.models import StockistRestockRequest
     requests_qs = StockistRestockRequest.objects.select_related(
         'stockist', 'variant__product__supplier'
     ).all()
@@ -2584,17 +2785,11 @@ def stockist_restock_list(request):
         try:
             req = StockistRestockRequest.objects.get(pk=req_id)
             if action == 'fulfill':
-                # Add to stockist inventory
-                inv, _ = StockistInventory.objects.get_or_create(
-                    stockist=req.stockist, variant=req.variant, defaults={'quantity': 0}
+                messages.error(
+                    request,
+                    'Stockist requests must be fulfilled by the supplier so source stock '
+                    'is deducted correctly.'
                 )
-                inv.quantity += req.quantity_requested
-                inv.save()
-                req.status = 'fulfilled'
-                from django.utils import timezone
-                req.fulfilled_at = timezone.now()
-                req.save()
-                messages.success(request, f'Fulfilled {req.quantity_requested} units of {req.variant}.')
             elif action == 'reject':
                 req.status = 'rejected'
                 req.save()
@@ -2757,6 +2952,8 @@ def supplier_shipment_api(request):
               .select_related('supplier', 'category')
               .order_by('supplier__company_name', 'name'))
         for p in qs[:500]:
+            effective_target = (p.supplier.effective_shipment_target(p)
+                                if p.supplier else p.delivery_target)
             rows.append({
                 'id': p.pk,
                 'name': p.name,
@@ -2764,11 +2961,15 @@ def supplier_shipment_api(request):
                 'supplier': p.supplier.company_name if p.supplier else '–',
                 'category': p.category.name if p.category else '–',
                 'status': p.status,
-                'target': p.delivery_target,
-                'target_label': p.get_delivery_target_display(),
-                'mode': p.shipment_mode,
-                'mode_label': p.get_shipment_mode_display(),
-                'skipped': skipped_tiers(p.delivery_target),
+                'target': effective_target,
+                'target_label': dict(Product.DELIVERY_TARGET_CHOICES).get(
+                    effective_target, effective_target),
+                'mode': (p.supplier.effective_shipment_mode(p)
+                         if p.supplier else p.shipment_mode),
+                'mode_label': dict(Product.SHIPMENT_MODE_CHOICES).get(
+                    p.supplier.effective_shipment_mode(p) if p.supplier else p.shipment_mode,
+                    p.shipment_mode),
+                'skipped': skipped_tiers(effective_target),
             })
         return JsonResponse({'ok': True, 'products': rows, 'chain': CHAIN})
 
@@ -2968,3 +3169,93 @@ def hierarchy(request):
         'all_wholesalers': all_wholesalers,
         'show_suspended': show_suspended,
     })
+
+
+@admin_required
+def orphaned_customers(request):
+    """List customers from suspended marketplaces who need reassignment.
+    
+    These are customers who had their marketplace suspended.
+    They have distributor=None but preferred_language is set to 
+    'suspended_marketplace:<MarketplaceName>' to identify them.
+    """
+    from accounts.models import User
+    
+    # Find customers from suspended marketplaces
+    # They have distributor=None and preferred_language contains 'suspended_marketplace:'
+    orphaned = User.objects.filter(
+        role='customer',
+        distributor__isnull=True,
+        preferred_language__startswith='suspended_marketplace:',
+        is_deleted=False
+    ).select_related().order_by('-created_at')
+    
+    # Extract the suspended marketplace names
+    for c in orphaned:
+        c.suspended_marketplace = c.preferred_language.replace('suspended_marketplace:', '')
+    
+    return render(request, 'admin_panel/orphaned_customers.html', {
+        'orphaned_customers': orphaned,
+        'total_count': orphaned.count(),
+    })
+
+
+@admin_required
+@require_POST
+def assign_orphaned_customer(request):
+    """Assign an orphaned customer to a marketplace."""
+    customer_id = request.POST.get('customer_id')
+    marketplace_id = request.POST.get('marketplace_id')
+    
+    if not customer_id or not marketplace_id:
+        messages.error(request, 'Invalid request.')
+        return redirect('admin_panel:orphaned_customers')
+    
+    try:
+        customer = User.objects.get(pk=customer_id, role='customer', distributor__isnull=True)
+        marketplace = Distributor.objects.get(pk=marketplace_id, status='active')
+        
+        customer.distributor = marketplace
+        customer.preferred_language = ''  # Clear the special marker
+        customer.save()
+        
+        messages.success(request, f'{customer.username} assigned to {marketplace.company_name}.')
+    except User.DoesNotExist:
+        messages.error(request, 'Customer not found.')
+    except Distributor.DoesNotExist:
+        messages.error(request, 'Marketplace not found or not active.')
+    
+    return redirect('admin_panel:orphaned_customers')
+
+
+@admin_required
+@require_POST
+def bulk_assign_orphaned_customers(request):
+    """Assign multiple orphaned customers to a marketplace."""
+    customer_ids = request.POST.getlist('customer_ids')
+    marketplace_id = request.POST.get('marketplace_id')
+    
+    if not customer_ids or not marketplace_id:
+        messages.error(request, 'Invalid request.')
+        return redirect('admin_panel:orphaned_customers')
+    
+    try:
+        marketplace = Distributor.objects.get(pk=marketplace_id, status='active')
+        customers = User.objects.filter(
+            pk__in=customer_ids,
+            role='customer',
+            distributor__isnull=True,
+            preferred_language__startswith='suspended_marketplace:'
+        )
+        
+        updated = customers.count()
+        customers.update(
+            distributor=marketplace,
+            preferred_language=''
+        )
+        
+        messages.success(request, f'{updated} customer(s) assigned to {marketplace.company_name}.')
+    except Distributor.DoesNotExist:
+        messages.error(request, 'Marketplace not found or not active.')
+    
+    return redirect('admin_panel:orphaned_customers')

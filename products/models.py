@@ -39,8 +39,9 @@ class ProductQuerySet(models.QuerySet):
         product pool is the "shared catalogue".
         """
         if enterprise is None:
-            return self.filter(owner_enterprise__isnull=True)
-        return self.filter(Q(owner_enterprise__isnull=True) | Q(owner_enterprise=enterprise))
+            return self.filter(owner_enterprise__isnull=True, is_deleted=False)
+        return self.filter(Q(owner_enterprise__isnull=True) | Q(owner_enterprise=enterprise),
+                           is_deleted=False)
 
     def owned_by(self, enterprise):
         return self.filter(owner_enterprise=enterprise)
@@ -58,7 +59,9 @@ class SharedProductManager(models.Manager.from_queryset(ProductQuerySet)):
     """
 
     def get_queryset(self):
-        return super().get_queryset().filter(owner_enterprise__isnull=True)
+        # Soft-deleted products are hidden here too. Code that must read them
+        # (admin deleted tab, supplier restore) uses Product.all_objects.
+        return super().get_queryset().filter(owner_enterprise__isnull=True, is_deleted=False)
 
 
 class AllProductManager(models.Manager.from_queryset(ProductQuerySet)):
@@ -79,7 +82,7 @@ class ProductVariantQuerySet(models.QuerySet):
         explicitly. The regression tests in distributors/tests.py assert each of
         those surfaces stays clean.
         """
-        return self.filter(product__owner_enterprise__isnull=True)
+        return self.filter(product__owner_enterprise__isnull=True, product__is_deleted=False)
 
 
 class Product(models.Model):
@@ -103,6 +106,10 @@ class Product(models.Model):
     # Soft delete — supplier deletes hide from supplier/distributor but stay in admin
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    deleted_previous_status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, blank=True, default='',
+        help_text='Approval status to restore after a soft delete.',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     # Master stock in base unit (grams/ml). All variants auto-calculate from this.
     master_stock_grams = models.PositiveIntegerField(
@@ -118,7 +125,9 @@ class Product(models.Model):
     )
     UNIT_CHOICES = (
         ('g', 'Grams (g)'),
+        ('kg', 'Kilograms (kg)'),
         ('ml', 'Millilitres (ml)'),
+        ('l', 'Litres (L)'),
         ('qty', 'Quantity (pieces)'),
     )
     master_unit = models.CharField(
@@ -292,6 +301,8 @@ class Product(models.Model):
 
     def soft_delete(self):
         from django.utils import timezone
+        if not self.is_deleted:
+            self.deleted_previous_status = self.status
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.status = 'rejected'   # hide from storefront
@@ -300,14 +311,19 @@ class Product(models.Model):
     def restore(self):
         self.is_deleted = False
         self.deleted_at = None
-        self.status = 'approved'
+        # Older soft-deleted rows have no snapshot because earlier versions
+        # overwrote their status. Restore those as pending for admin review.
+        self.status = self.deleted_previous_status or 'pending'
+        self.deleted_previous_status = ''
         self.save()
 
     def default_variant(self):
         return self.variants.filter(is_active=True).order_by('selling_price').first()
 
     def is_in_stock(self):
-        return self.variants.filter(is_active=True, stock__gt=0).exists()
+        return self.variants.filter(
+            is_active=True, stock__gt=0
+        ).exists()
 
     def sync_variant_stocks(self):
         """Recalculate stock and price for all variants that have unit_grams set."""
@@ -396,7 +412,19 @@ class ProductVariant(models.Model):
     suggested_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     selling_price = models.DecimalField(max_digits=10, decimal_places=2)
     stock = models.PositiveIntegerField(default=0)
+    # Packs promised to a stockist's open restock request. The supplier still holds
+    # them (stock is only reduced when the supplier ships), but they cannot be
+    # requested or sold again. Available to order = stock - blocked_stock.
+    blocked_stock = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    supplier_can_supply = models.BooleanField(
+        default=True,
+        help_text='When disabled, lower tiers cannot order this pack size from the supplier.'
+    )
+    only_bundle = models.BooleanField(
+        default=False,
+        help_text='When enabled, downstream wholesale orders for this pack must use the configured bundle quantity.'
+    )
     unit_grams = models.PositiveIntegerField(
         verbose_name='Unit size (g/ml)',
         default=0,
@@ -424,6 +452,20 @@ class ProductVariant(models.Model):
 
     def is_in_stock(self):
         return self.stock > 0
+
+    @property
+    def available_stock(self):
+        """Packs that can still be ordered: stock minus packs promised to open requests."""
+        return max(0, self.stock - self.blocked_stock)
+
+    @property
+    def supplier_order_multiple(self):
+        """Compatibility helper: bundle-only packs must be ordered by bundle size."""
+        if not self.only_bundle:
+            return 1
+        return self.bundles.filter(is_active=True).values_list(
+            'pack_quantity', flat=True
+        ).first() or 1
 
     def clean(self):
         super().clean()
@@ -552,6 +594,76 @@ class ProductBundle(models.Model):
 
     def is_in_stock(self):
         return self.is_active and self.available_bundles() > 0
+
+
+class TierBundleRule(models.Model):
+    """How one chain tier (stockist, distributor, ...) sells a product downstream.
+
+    See kb/10-bundle-supply-chain.md. A tier's rule is resolved most-specific
+    first: product row, then supplier row, then its global row, then the
+    default "singles".
+
+    Modes:
+      singles      the buyer below may order any count (the tier breaks bundles)
+      bundle_only  the buyer below must order whole multiples of the bundle size
+      forward      follow the tier above (for a stockist, the supplier's setting)
+
+    ``tier`` + ``owner_id`` identify the seller without a hard FK, so a new tier
+    added to the chain later reuses this table unchanged (register it in
+    products/bundle_chain.py).
+    """
+    TIER_CHOICES = (
+        ('stockist', 'Stockist'),
+        ('wholesaler', 'Distributor'),
+    )
+    SCOPE_CHOICES = (
+        ('global', 'All products'),
+        ('supplier', 'One supplier'),
+        ('product', 'One product'),
+    )
+    MODE_CHOICES = (
+        ('singles', 'Singles allowed (break bundles)'),
+        ('bundle_only', 'Bundle only'),
+        ('forward', 'Follow upstream setting'),
+    )
+    tier = models.CharField(max_length=20, choices=TIER_CHOICES)
+    owner_id = models.PositiveIntegerField()
+    scope = models.CharField(max_length=10, choices=SCOPE_CHOICES)
+    supplier = models.ForeignKey(
+        Supplier, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='tier_bundle_rules'
+    )
+    product = models.ForeignKey(
+        Product, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='tier_bundle_rules'
+    )
+    mode = models.CharField(max_length=12, choices=MODE_CHOICES, default='singles')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tier', 'owner_id'], condition=Q(scope='global'),
+                name='bundle_rule_one_global'),
+            models.UniqueConstraint(
+                fields=['tier', 'owner_id', 'supplier'], condition=Q(scope='supplier'),
+                name='bundle_rule_one_per_supplier'),
+            models.UniqueConstraint(
+                fields=['tier', 'owner_id', 'product'], condition=Q(scope='product'),
+                name='bundle_rule_one_per_product'),
+        ]
+        indexes = [models.Index(fields=['tier', 'owner_id'], name='bundle_rule_owner_idx')]
+
+    def clean(self):
+        super().clean()
+        if self.scope == 'supplier' and not self.supplier_id:
+            raise ValidationError({'supplier': 'Choose a supplier.'})
+        if self.scope == 'product' and not self.product_id:
+            raise ValidationError({'product': 'Choose a product.'})
+
+    def __str__(self):
+        target = self.product or self.supplier or 'all products'
+        return f'{self.tier}#{self.owner_id} {target}: {self.mode}'
 
 
 class Wishlist(models.Model):

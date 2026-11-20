@@ -170,6 +170,19 @@ def _users_with_role(role):
     # marketplace) must not appear in the test-login list and must not be able
     # to log in. Drop them here so they never show.
     users = [u for u in users if not is_user_suspended_partner(u)]
+    # Rule: filter by role-specific profile status
+    # Suppliers must have supplier_profile.status == 'approved'
+    if role == 'supplier':
+        users = [u for u in users if getattr(u, 'supplier_profile', None) and u.supplier_profile.status == 'approved']
+    # Stockists must have stockist_profile.status == 'active'
+    if role == 'stockist':
+        users = [u for u in users if getattr(u, 'stockist_profile', None) and u.stockist_profile.status == 'active']
+    # Wholesalers (Distributors) must have wholesaler_profile.status == 'active'
+    if role == 'wholesaler':
+        users = [u for u in users if getattr(u, 'wholesaler_profile', None) and u.wholesaler_profile.status == 'active']
+    # Distributors (Marketplaces) must have distributor_profile.status == 'active'
+    if role == 'distributor':
+        users = [u for u in users if getattr(u, 'distributor_profile', None) and u.distributor_profile.status == 'active']
     return users
 
 

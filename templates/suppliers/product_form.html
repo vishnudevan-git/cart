@@ -8,7 +8,7 @@
   {{ formset.management_form }}
 
   {% comment %}── COMMON SETTINGS — one frame shared by all variants ──────────
-  Product info, the toggles, and shipment routing. Collapsed on every load so
+  Product info and shipment routing. Collapsed on every load so
   the per-variant pack area gets the room. The per-variant Pack Sizes section
   sits in its own frame below.{% endcomment %}
   <div class="card border-0 shadow-sm p-3 mb-3">
@@ -27,27 +27,28 @@
     </h6>
     <div class="collapse mt-3" id="commonBody">
 
-  {% comment %}Balanced 2-column grid. On lg+ both halves are 50/50; they stack
-  on small screens. Left = Product Info + Shipment Routing; Right = Image +
-  Options.{% endcomment %}
+  {% comment %}Balanced 2-column grid. Shipment routing moves below the image;
+  Options has its own frame below Common settings.{% endcomment %}
   <div class="row g-3">
 
-    <!-- LEFT COLUMN: Product Info (top) + Shipment Routing (bottom) -->
+    <!-- LEFT COLUMN: Product Info -->
     <div class="col-12 col-lg-6">
-      <div class="d-flex flex-column gap-3 h-100">
+      <div class="d-flex flex-column gap-3">
 
         {# ── Card 1: Product Info ────────────────────────────────────── #}
-        <div class="card border shadow-sm p-3">
+        <div class="card border shadow-sm p-3" id="productInfoCard">
           <h6 class="fw-semibold mb-3"><i class="bi bi-box-seam me-1"></i>Product Info</h6>
           <div id="productInfoBody">
             <div class="mb-2">
-              <label class="form-label small fw-semibold mb-1">Product Name *</label>
+        <label class="form-label small fw-semibold mb-1" data-bs-toggle="tooltip"
+               title="Enter the product name buyers will recognize. Pack sizes and variants are entered separately below.">Product Name * <i class="bi bi-info-circle text-muted"></i></label>
               {{ form.name }}
               {% if form.name.errors %}<div class="text-danger small">{{ form.name.errors }}</div>{% endif %}
             </div>
             <div class="row g-2 mb-2">
               <div class="col-7">
-                <label class="form-label small fw-semibold mb-1">Category *</label>
+                <label class="form-label small fw-semibold mb-1" data-bs-toggle="tooltip"
+                       title="Choose the closest product category. It helps buyers find the item and is used in product lists.">Category * <i class="bi bi-info-circle text-muted"></i></label>
                 {{ form.category }}
               </div>
               <div class="col-5">
@@ -59,40 +60,69 @@
               </div>
             </div>
             <div class="mb-0">
-              <label class="form-label small fw-semibold mb-1">Description</label>
+              <label class="form-label small fw-semibold mb-1" data-bs-toggle="tooltip"
+                     title="Describe useful buyer details such as ingredients, origin, quality, storage, or usage.">Description <i class="bi bi-info-circle text-muted"></i></label>
               {{ form.description }}
             </div>
           </div><!-- /#productInfoBody -->
         </div>
 
         {# ── Card 2: Shipment routing — side-by-side dropdowns ────────── #}
-        <div class="card border shadow-sm p-3">
+        <div class="card border shadow-sm p-3" id="shipmentRoutingCard">
           <h6 class="fw-semibold small mb-2" data-bs-toggle="tooltip"
               title="Admin can override this at approval time.">
             <i class="bi bi-truck me-1"></i>Shipment routing <i class="bi bi-info-circle text-muted"></i>
           </h6>
-          <div class="row g-2 align-items-end">
-            <div class="col-12 col-sm-6">
+          <div class="shipment-routing-fields">
+            <div>
               <label class="form-label small fw-semibold mb-1" for="deliveryTarget" data-bs-toggle="tooltip"
                      title="Levels before your target are skipped — they won't see or be told about the order.">
-                You ship this to <i class="bi bi-info-circle text-muted"></i>
+                You ship this to{% if supplier.use_global_shipment_mode %} <span class="text-muted fw-normal">(global)</span>{% endif %}
+                <i class="bi bi-info-circle text-muted"></i>
               </label>
+              {% if supplier.use_global_shipment_mode %}
+              <select id="deliveryTarget" class="form-select form-select-sm" disabled aria-describedby="globalTargetHelp">
+                {% for val, lbl in delivery_target_choices %}
+                <option value="{{ val }}" {% if supplier.default_shipment_target == val %}selected{% endif %}>{{ lbl }}</option>
+                {% endfor %}
+              </select>
+              <input type="hidden" name="delivery_target"
+                     value="{% if product.pk %}{{ product.delivery_target }}{% else %}{{ supplier.default_shipment_target }}{% endif %}">
+              <div id="globalTargetHelp" class="form-text" style="font-size:10px">
+                Using global target: {{ supplier.get_default_shipment_target_display }}
+              </div>
+              {% else %}
               <select name="delivery_target" id="deliveryTarget" class="form-select form-select-sm">
                 {% for val, lbl in delivery_target_choices %}
                 <option value="{{ val }}" {% if product.delivery_target == val %}selected{% endif %}>{{ lbl }}</option>
                 {% endfor %}
               </select>
+              {% endif %}
             </div>
-            <div class="col-12 col-sm-6">
+            <div>
               <label class="form-label small fw-semibold mb-1" for="shipmentMode" data-bs-toggle="tooltip"
                      title="Collect = they pick up after you confirm. Send = you dispatch & record transhipment.">
-                Handover <i class="bi bi-info-circle text-muted"></i>
+                Handover{% if supplier.use_global_shipment_mode %} <span class="text-muted fw-normal">(global)</span>{% endif %}
+                <i class="bi bi-info-circle text-muted"></i>
               </label>
-              <select name="shipment_mode" id="shipmentMode" class="form-select form-select-sm">
-                {% for val, lbl in shipment_mode_choices %}
-                <option value="{{ val }}" {% if product.shipment_mode == val %}selected{% endif %}>{{ lbl }}</option>
-                {% endfor %}
-              </select>
+              {% if supplier.use_global_shipment_mode %}
+                <select id="shipmentMode" class="form-select form-select-sm" disabled aria-describedby="globalHandoverHelp">
+                  {% for val, lbl in shipment_mode_choices %}
+                  <option value="{{ val }}" {% if supplier.default_shipment_mode == val %}selected{% endif %}>{{ lbl }}</option>
+                  {% endfor %}
+                </select>
+                <input type="hidden" name="shipment_mode"
+                       value="{% if product.pk %}{{ product.shipment_mode }}{% else %}{{ supplier.default_shipment_mode }}{% endif %}">
+                <div id="globalHandoverHelp" class="form-text" style="font-size:10px">
+                  Using global mode: {{ supplier.get_default_shipment_mode_display }}
+                </div>
+              {% else %}
+                <select name="shipment_mode" id="shipmentMode" class="form-select form-select-sm">
+                  {% for val, lbl in shipment_mode_choices %}
+                  <option value="{{ val }}" {% if product.shipment_mode == val %}selected{% endif %}>{{ lbl }}</option>
+                  {% endfor %}
+                </select>
+              {% endif %}
             </div>
           </div>
         </div>
@@ -100,13 +130,14 @@
       </div>
     </div>{# /left column #}
 
-    <!-- RIGHT COLUMN: Product Image (top) + Options (bottom) -->
+    <!-- RIGHT COLUMN: Product Image; Shipment routing follows below it -->
     <div class="col-12 col-lg-6">
-      <div class="d-flex flex-column gap-3 h-100">
+      <div class="d-flex flex-column gap-3">
 
         {# ── Card 1: Product Image — upload + clipboard paste ────────── #}
-        <div class="card border shadow-sm p-3">
-          <h6 class="fw-semibold small mb-2"><i class="bi bi-image me-1"></i>Product Image</h6>
+        <div class="card border shadow-sm p-3" id="productImageCard">
+          <h6 class="fw-semibold small mb-2" data-bs-toggle="tooltip"
+              title="Upload a clear photo of the product or paste an image copied to your clipboard."><i class="bi bi-image me-1"></i>Product Image <i class="bi bi-info-circle text-muted"></i></h6>
           {{ form.image }}
           <input type="hidden" name="image_url" id="imageUrlField">
           <!-- Clipboard paste zone -->
@@ -124,37 +155,40 @@
           <input type="file" name="pasted_image" id="pastedImageInput" style="display:none" accept="image/*">
         </div>
 
-        {# ── Card 2: Options — 2-column inline toggle grid ───────────── #}
-        <div class="card border shadow-sm p-3">
-          <h6 class="fw-semibold small mb-2">
-            <i class="bi bi-sliders me-1"></i>Options
-            <span class="text-muted fw-normal" style="font-size:11px">— hover <i class="bi bi-info-circle"></i> for details</span>
+        {# ── Options is moved into its own frame below Common settings ─ #}
+        <div class="card border shadow-sm p-3" id="optionsCard">
+          <h6 class="fw-semibold mb-0 d-flex justify-content-between align-items-center"
+              role="button" id="optionsHeader" data-bs-toggle="collapse" data-bs-target="#optionsBody"
+              aria-expanded="false" aria-controls="optionsBody" style="cursor:pointer; user-select:none">
+            <span><i class="bi bi-sliders me-1"></i>Options <small class="text-muted fw-normal">— hover <i class="bi bi-info-circle"></i> for details</small></span>
+            <i class="bi bi-chevron-down" id="optionsChevron"></i>
           </h6>
-          <div class="row g-1">
+          <div class="collapse mt-2" id="optionsBody">
+          <div class="row g-1 align-items-center options-grid">
             <div class="col-6">
               <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
-                   title="Set each pack's price by hand instead of auto-calculating from the per-kg price.">
+                   title="Set a separate selling price for each pack. Pack prices can reflect brand, packing cost, or bulk discounts.">
                 <input class="form-check-input" type="checkbox" id="manualPriceToggle">
-                <label class="form-check-label small text-nowrap" for="manualPriceToggle">Manual price <i class="bi bi-info-circle text-muted"></i></label>
+                <label class="form-check-label small text-nowrap" for="manualPriceToggle">Price each pack <i class="bi bi-info-circle text-muted"></i></label>
               </div>
             </div>
             <div class="col-6">
               <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
-                   title="Show MRP as a strikethrough to customers. MRP is the hard price ceiling the shop cannot exceed.">
+                   title="Use when this pack has a printed MRP. It is the price ceiling for downstream sellers.">
                 <input class="form-check-input" type="checkbox" id="mrpToggle" {% if product.show_mrp %}checked{% endif %}>
                 <label class="form-check-label small text-nowrap" for="mrpToggle">Show MRP <i class="bi bi-info-circle text-muted"></i></label>
               </div>
             </div>
             <div class="col-6">
               <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
-                   title="Guidance that cautions the shop to set a reasonable price. Not a hard cap — can be used together with MRP.">
+                   title="Use when there is no printed MRP. This is guidance for downstream sellers, not a price cap.">
                 <input class="form-check-input" type="checkbox" id="suggestToggle" {% if product.show_suggested_price %}checked{% endif %}>
                 <label class="form-check-label small text-nowrap" for="suggestToggle">Suggested price <i class="bi bi-info-circle text-muted"></i></label>
               </div>
             </div>
             <div class="col-6">
               <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
-                   title="Marketplaces can buy &amp; sell this product by weight (loose/bulk) without fixed packing.">
+                   title="Allows downstream levels to hold and sell measured loose stock. Enable only if the product can be opened or is supplied in bulk.">
                 <input class="form-check-input" type="checkbox" name="allow_loose_distribution"
                        id="looseToggle" value="1" {% if product.allow_loose_distribution %}checked{% endif %}>
                 <label class="form-check-label small text-nowrap" for="looseToggle">Allow Loose <i class="bi bi-info-circle text-muted"></i></label>
@@ -162,9 +196,11 @@
             </div>
             <div class="col-6">
               <div class="form-check form-switch mb-0" data-bs-toggle="tooltip"
-                   title="Adds a bundle box/bag column per pack (e.g. box of 12). Orderable by wholesale buyers only — hidden from customers.">
+                   title="Enables packs-per-bundle and bundle-count fields for each pack size. Bundle stock is calculated from those counts. Disabled while Allow Loose is on.">
                 <input class="form-check-input" type="checkbox" name="allow_bundle"
-                       id="bundleToggle" value="1" {% if product.allow_bundle %}checked{% endif %}>
+                       id="bundleToggle" value="1"
+                       {% if product.allow_bundle and not product.allow_loose_distribution %}checked{% endif %}
+                       {% if product.allow_loose_distribution %}disabled{% endif %}>
                 <label class="form-check-label small text-nowrap" for="bundleToggle">Allow Bundle <i class="bi bi-info-circle text-muted"></i></label>
               </div>
             </div>
@@ -173,6 +209,7 @@
           <input type="hidden" name="pricing_mode_field" id="pricingModeField" value="auto">
           <input type="hidden" name="show_mrp_field" id="showMrpField" value="{{ product.show_mrp|yesno:'true,false' }}">
           <input type="hidden" name="show_suggested_field" id="showSuggestField" value="{{ product.show_suggested_price|yesno:'true,false' }}">
+          </div><!-- /#optionsBody -->
         </div>
 
       </div>
@@ -181,6 +218,29 @@
 
     </div><!-- /#commonBody -->
   </div><!-- /Common settings card -->
+
+  <div id="optionsFrameHost" class="mb-3"></div>
+  <style>
+    .options-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .options-grid > div { width: auto; }
+    #shipmentRoutingCard .shipment-routing-fields {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: .5rem;
+      align-items: start;
+    }
+    #shipmentRoutingCard .shipment-routing-fields > div { min-width: 0; }
+    #shipmentRoutingCard .shipment-routing-fields .form-label {
+      display: block;
+      min-height: 1.25em;
+      margin-top: 0;
+      line-height: 1.25;
+    }
+    @media (max-width: 575.98px) {
+      .options-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      #shipmentRoutingCard .shipment-routing-fields { grid-template-columns: 1fr; }
+    }
+  </style>
 
   {% comment %}── PER-VARIANT: Pack Sizes & Stock (its own frame, collapsible)
   Starts expanded; the collapse control is wired only AFTER the variant UI has
@@ -191,7 +251,7 @@
         data-bs-toggle="collapse" data-bs-target="#packSizesBody"
         aria-expanded="true" aria-controls="packSizesBody"
         style="cursor:pointer; user-select:none">
-      <span>🎁 Pack Sizes &amp; Stock <small class="text-muted fw-normal">(per variant)</small></span>
+      <span>🎁 Pack Sizes &amp; Stock <small class="text-muted fw-normal" data-bs-toggle="tooltip" title="Choose the pack sizes you sell. Set pack price and stock for every selected size and each variant.">(per variant) <i class="bi bi-info-circle"></i></small></span>
       <span class="d-flex align-items-center gap-2">
         <small class="text-muted fw-normal d-none" id="packSizesSummary"></small>
         <i class="bi bi-chevron-up" id="packSizesChevron"></i>
@@ -202,17 +262,15 @@
 
       <input type="hidden" name="variants_json" id="variantsJson">
 
-      {% comment %}Two columns: Variants (left, wider) | Total Stock + Selling
-      Price stacked vertically (right). Stacking Stock over Price keeps each box
-      short, and the Variants frame stretches (h-100) to match the stacked
-      column so the whole row stays compact.{% endcomment %}
+      {% comment %}Variants and optional Total Stock / Selling Price cards. The
+      variants panel expands to full width when both optional cards are hidden.{% endcomment %}
       <div class="row g-3 mb-3 align-items-stretch">
 
         <!-- COL 1: Variants switcher -->
-        <div class="col-12 col-lg-7">
+        <div class="col-12 col-lg-7" id="variantsPanelColumn">
           <div class="h-100 p-3 rounded" style="background:#f3f8f4; border:1px dashed #bfe0c7">
             <div class="d-flex flex-wrap align-items-center gap-2" id="variantBar">
-              <span class="small fw-semibold me-1"><i class="bi bi-diagram-3 me-1"></i>Variants:</span>
+              <span class="small fw-semibold me-1" data-bs-toggle="tooltip" title="Variants are choices such as Regular and Premium. Each variant has its own pack sizes, prices, and stock."><i class="bi bi-diagram-3 me-1"></i>Variants:</span>
               <div class="d-flex flex-wrap gap-1" id="variantTabs"></div>
               <button type="button" class="btn btn-outline-success btn-sm" id="addVariantBtn"
                       title="Add a variant (max 5). Its packs start as a copy of the current variant.">
@@ -233,23 +291,23 @@
         </div>
 
         <!-- COL 2: Total Stock stacked over Selling Price -->
-        <div class="col-12 col-lg-5">
+        <div class="col-12 col-lg-5" id="stockPricePanelColumn">
           <div class="d-flex flex-column gap-3 h-100">
             <!-- Total Stock (this variant) -->
-            <div class="border rounded p-3" style="background:#fafcff">
-              <div class="fw-semibold small mb-2">📦 Total Stock
+            <div class="border rounded p-3" id="totalStockCard" style="background:#fafcff">
+              <div class="fw-semibold small mb-2" data-bs-toggle="tooltip" title="Allow Loose uses one shared stock pool and calculates available pack quantities. Turn Allow Loose off to enter stock separately for every pack and variant.">📦 Total Stock <i class="bi bi-info-circle text-muted"></i>
                 <span class="text-muted fw-normal" id="stockModeHint" style="font-size:11px"></span>
               </div>
-              <div class="input-group input-group-sm" id="stockInputGroup">
+              <div class="input-group input-group-sm" id="stockInputGroup" data-bs-toggle="tooltip" title="Enter the total loose quantity for this variant. This is hidden when stock is entered per pack.">
                 {{ form.stock_amount }}
               </div>
             </div>
             <!-- Selling Price (this variant) -->
-            <div class="border rounded p-3" style="background:#fafcff">
-              <div class="fw-semibold small mb-2">💰 Selling Price
+            <div class="border rounded p-3" id="pricePerUnitCard" style="background:#fafcff">
+              <div class="fw-semibold small mb-2" data-bs-toggle="tooltip" title="Enter the base selling price. Automatic pack prices are calculated from this and each pack size. Hidden when Price each pack is enabled.">💰 Selling Price <i class="bi bi-info-circle text-muted"></i>
                 <span class="text-muted fw-normal" id="priceLabel" style="font-size:11px">per kg / per litre / per 100 pcs</span>
               </div>
-              <div class="input-group input-group-sm mb-1" id="priceInputGroup">
+              <div class="input-group input-group-sm mb-1" id="priceInputGroup" data-bs-toggle="tooltip" title="Enter price per kg or litre, or per 100 pieces. Pack prices are calculated from this value.">
                 {{ form.price_per_kg }}
               </div>
               <div class="form-text mb-0" style="font-size:11px">e.g. if 1kg costs ₹200, enter 200</div>
@@ -274,7 +332,9 @@
 
         <div class="form-text mt-2" id="bundleHint" style="font-size:11px; display:none">
           <i class="bi bi-box-seam me-1"></i><strong>Bundle</strong> column is on: enter how many packs
-          go in one box/bag for each size (e.g. 12). Leave blank for no bundle. Price &amp; availability
+          go in one box/bag for each size (e.g. 12). A bundle size makes bundle count the stock input;
+          <strong>Only Bundle</strong> separately controls whether buyers can order individual packs.
+          Price &amp; availability
           compute automatically. Wholesale buyers only — hidden from customers.
         </div>
     </div><!-- /#packSizesBody -->
@@ -294,6 +354,29 @@
     </div>
   </div>
 </form>
+
+<script>
+  // Keep all controls in the form while placing related cards together.
+  const imageCard = document.getElementById('productImageCard');
+  const shipmentCard = document.getElementById('shipmentRoutingCard');
+  const optionsCard = document.getElementById('optionsCard');
+  const optionsFrameHost = document.getElementById('optionsFrameHost');
+  if (imageCard && shipmentCard) imageCard.after(shipmentCard);
+  if (optionsFrameHost && optionsCard) optionsFrameHost.after(optionsCard);
+
+  const optionsBody = document.getElementById('optionsBody');
+  const optionsChevron = document.getElementById('optionsChevron');
+  if (optionsBody && optionsChevron) {
+    optionsBody.addEventListener('show.bs.collapse', () => {
+      optionsChevron.classList.replace('bi-chevron-down', 'bi-chevron-up');
+      document.getElementById('optionsHeader')?.setAttribute('aria-expanded', 'true');
+    });
+    optionsBody.addEventListener('hide.bs.collapse', () => {
+      optionsChevron.classList.replace('bi-chevron-up', 'bi-chevron-down');
+      document.getElementById('optionsHeader')?.setAttribute('aria-expanded', 'false');
+    });
+  }
+</script>
 
 <!-- Price Change Confirmation Modal (Manual Mode) -->
 <div class="modal fade" id="priceChangeModal" tabindex="-1" aria-labelledby="priceChangeModalLabel" aria-hidden="true">
@@ -585,9 +668,60 @@
 }
 </style>
 <script>
+const commonFieldLabels = {
+  name: 'Product name',
+  category: 'Category',
+  description: 'Description',
+  image: 'Product image',
+  pasted_image: 'Pasted product image',
+  image_url: 'Product image URL',
+  stock_unit: 'Stock unit',
+  pricing_mode_field: 'Pricing mode',
+  show_mrp_field: 'Show MRP',
+  show_suggested_field: 'Suggested price',
+  allow_loose_distribution: 'Allow Loose',
+  allow_bundle: 'Allow Bundle',
+  delivery_target: 'Supplier ships to',
+  shipment_mode: 'Handover',
+};
+
+function readCommonFormValues() {
+  const values = {};
+  document.querySelectorAll('#productForm [name]').forEach((el) => {
+    const name = el.name;
+    if (!name || name === 'csrfmiddlewaretoken' || name === 'variants_json'
+        || name.startsWith('variants-') || name === 'stock_amount'
+        || name === 'price_per_kg') return;
+
+    let value;
+    let display;
+    if (el.type === 'checkbox' || el.type === 'radio') {
+      value = el.checked;
+      display = el.checked ? 'On' : 'Off';
+    } else if (el.type === 'file') {
+      value = Array.from(el.files || []).map(file => file.name);
+      display = value.length ? value.join(', ') : '';
+    } else if (el.tagName === 'SELECT') {
+      value = el.value;
+      display = el.selectedOptions.length ? el.selectedOptions[0].text.trim() : '';
+    } else {
+      value = el.value;
+      display = String(el.value || '').trim();
+    }
+
+    if (!values[name]) values[name] = [];
+    values[name].push({value, display});
+  });
+  return values;
+}
+
+let ORIGINAL_FORM_VALUES = {};
+
 // Bundle state — declared up-front so recalculate() can safely read it even
 // on the first pre-load call (the bundle IIFE at the bottom runs later).
 window.bundleQty = window.bundleQty || {};
+window.bundleCount = window.bundleCount || {};
+window.bundleRemainder = window.bundleRemainder || {};
 
 // ── Enable Bootstrap tooltips (opt-in) ───────────────────────────────────
 (function () {
@@ -733,6 +867,8 @@ const selected       = new Set();
 const manualPrices   = {};
 const manualMrps     = {};
 const manualSuggest  = {};
+const manualSupply   = {};
+const manualOnlyBundle = {};
 // Suggested-price behaviour: editing one size spreads the same markup to the
 // sizes the supplier has not edited themselves, and a suggested price is never
 // allowed below the supplier price of that pack.
@@ -765,16 +901,32 @@ function showSuggestNote(msg, isWarning) {
 
 // Track which sizes are currently visible
 let visibleUnits = new Set();
-let skipDOMReadOnNextRecalculate = false; // Flag to skip DOM read after modal price update
+let skipDOMReadOnNextRecalculate = false; // Skip stale inputs after replacing the active variant state
 const manualStocks = {}; // per-variant stock when loose distribution is OFF
 
 const looseToggle = document.getElementById('looseToggle');
+
+function syncPackPanelColumns() {
+  const stockCard = document.getElementById('totalStockCard');
+  const priceCard = document.getElementById('pricePerUnitCard');
+  const sideColumn = document.getElementById('stockPricePanelColumn');
+  const variantsColumn = document.getElementById('variantsPanelColumn');
+  const hasVisibleSideCard = [stockCard, priceCard].some(
+    card => card && card.style.display !== 'none'
+  );
+  if (sideColumn) sideColumn.classList.toggle('d-none', !hasVisibleSideCard);
+  if (variantsColumn) {
+    variantsColumn.classList.toggle('col-lg-7', hasVisibleSideCard);
+    variantsColumn.classList.toggle('col-lg-12', !hasVisibleSideCard);
+  }
+}
 
 // ── Loose Distribution UI toggle ─────────────────────────────────────────────
 function applyLooseStockUI() {
   const isLoose = looseToggle.checked;
 
-  // Total Stock section: enabled when loose is ON, greyed when OFF
+  // Total Stock is only relevant in loose mode. Hide its card completely
+  // when stock is managed per pack size.
   // NOTE: stock_unit must NEVER be disabled — it's a required form field the
   // backend needs even when loose is OFF. Only grey it visually.
   stockAmtEl.disabled   = !isLoose;
@@ -782,17 +934,15 @@ function applyLooseStockUI() {
   stockUnitEl.style.pointerEvents = isLoose ? '' : 'none';
   stockUnitEl.style.opacity       = isLoose ? '' : '0.5';
 
-  const stockCard = stockAmtEl.closest('.row.g-2');
+  const stockCard = document.getElementById('totalStockCard');
   if (stockCard) {
-    stockCard.style.opacity = isLoose ? '' : '0.45';
-    stockCard.title = isLoose ? '' : 'Total Stock is managed per-pack-size when Loose Distribution is disabled';
+    stockCard.style.display = isLoose ? '' : 'none';
   }
+  syncPackPanelColumns();
 
   const hint = document.getElementById('stockModeHint');
   if (hint) {
-    hint.textContent = isLoose
-      ? '— single shared pool'
-      : '— greyed out: enter stock per pack size →';
+    hint.textContent = isLoose ? '— single shared pool' : '';
   }
 
   // Re-render the pack size table so stock cells toggle correctly
@@ -815,6 +965,50 @@ function calcAutoPrice(unitSize) {
   const p = parseFloat(priceEl.value) || 0;
   const divisor = (stockUnitEl.value === 'qty') ? 100 : 1000;
   return Math.round((p / divisor) * unitSize * 100) / 100;
+}
+
+function manualPackPriceBounds(smallerUnit, largerUnit, largerPrice) {
+  const sizeRatio = smallerUnit / largerUnit;
+  const proportionalMin = Math.round(largerPrice * sizeRatio * 100) / 100;
+  const smallPackPremiumMax = Math.round(largerPrice * sizeRatio * 1.4 * 100) / 100;
+  const strictlyBelowLarger = Math.round((largerPrice - 0.01) * 100) / 100;
+  return {
+    min: proportionalMin,
+    max: Math.min(smallPackPremiumMax, strictlyBelowLarger),
+  };
+}
+
+function formatBundleContents(unitSize, quantity) {
+  const total = unitSize * quantity;
+  const compact = (value) => Number(value.toFixed(3)).toString();
+  if (stockUnitEl.value === 'qty') return `${total} pcs`;
+  if (stockUnitEl.value === 'ml' || stockUnitEl.value === 'litre') {
+    return total >= 1000 ? `${compact(total / 1000)} L` : `${total} ml`;
+  }
+  return total >= 1000 ? `${compact(total / 1000)} kg` : `${total} g`;
+}
+
+function bundlePackPrice(row) {
+  const input = row.querySelector('.manual-price');
+  return input
+    ? (parseFloat(input.value) || 0)
+    : (parseFloat((row.children[1].textContent || '').replace(/[^\d.]/g, '')) || 0);
+}
+
+function updateBundleReadout(row, unitSize, quantity, packPrice, stockUnits) {
+  const out = row.querySelector('.bundle-readout');
+  if (!out) return;
+  if (quantity < 1) {
+    out.textContent = 'Enter packs per bundle to see total, price and availability.';
+    return;
+  }
+  const count = Math.floor(Math.max(0, stockUnits) / quantity);
+  const remainder = Math.max(0, stockUnits) % quantity;
+  const noun = count === 1 ? 'bundle' : 'bundles';
+  out.textContent = `${quantity} × ${formatBundleContents(unitSize, 1)} = `
+    + `${formatBundleContents(unitSize, quantity)} · ₹${(packPrice * quantity).toFixed(2)} · `
+    + `${count} ${noun} available`
+    + (remainder ? ` + ${remainder} extra pack${remainder === 1 ? '' : 's'}` : '');
 }
 
 function renderPackBtns() {
@@ -851,6 +1045,10 @@ function rebuildButtons(tree, unit) {
     btn.dataset.label = size.label;
     btn.className = selected.has(size.unit) ? 'btn btn-success btn-sm' : 'btn btn-outline-success btn-sm';
     btn.textContent = size.label;
+    btn.title = selected.has(size.unit)
+      ? `${size.label} is selected. Click to remove it. Shift-click to toggle without expanding nearby sizes.`
+      : `Click to add ${size.label}. Nearby sizes will also appear. Shift-click to add without expanding.`;
+    btn.setAttribute('data-bs-toggle', 'tooltip');
 
     btn.addEventListener('click', function(e) {
       if (e.shiftKey || e.ctrlKey) {
@@ -865,6 +1063,9 @@ function rebuildButtons(tree, unit) {
     });
 
     packBtnsEl.appendChild(btn);
+    if (window.bootstrap && bootstrap.Tooltip) {
+      bootstrap.Tooltip.getOrCreateInstance(btn);
+    }
   });
 
   if (visible.length === 0) {
@@ -898,6 +1099,8 @@ function expandAround(tree, clickedUnit) {
 }
 
 function recalculate() {
+  const skipDOMRead = skipDOMReadOnNextRecalculate;
+  skipDOMReadOnNextRecalculate = false;
   if (selected.size === 0) {
     variantPreview.innerHTML = '<p class="text-muted small">Select pack sizes above to see preview.</p>';
     updateFormset([]);
@@ -905,8 +1108,8 @@ function recalculate() {
   }
 
   // Capture current DOM MRP and price values BEFORE rebuilding the table
-  // (UNLESS we just updated prices from the modal)
-  if (!skipDOMReadOnNextRecalculate) {
+  // unless the active variant state was just replaced.
+  if (!skipDOMRead) {
     variantPreview.querySelectorAll('.manual-mrp').forEach(inp => {
       const u = parseInt(inp.dataset.unit);
       const val = parseFloat(inp.value);
@@ -925,32 +1128,53 @@ function recalculate() {
     // Capture per-pack stock when loose is OFF
     variantPreview.querySelectorAll('.manual-stock').forEach(inp => {
       const u = parseInt(inp.dataset.unit);
-      const val = parseInt(inp.value);
-      if (!isNaN(val)) manualStocks[u] = val;
+      const raw = (inp.value || '').trim();
+      const val = parseInt(raw, 10);
+      if (raw === '' || Number.isNaN(val)) delete manualStocks[u];
+      else manualStocks[u] = val;
     });
-  } else {
-    skipDOMReadOnNextRecalculate = false; // Reset flag
+    variantPreview.querySelectorAll('.bundle-count').forEach(inp => {
+      const u = parseInt(inp.dataset.unit);
+      const val = parseInt(inp.value);
+      if (!isNaN(val)) window.bundleCount[u] = Math.max(0, val);
+    });
   }
   const isLoose     = looseToggle ? looseToggle.checked : true;
   const masterBase  = toBaseUnits(parseFloat(stockAmtEl.value) || 0, stockUnitEl.value);
   const isManual    = manualToggle.checked;
+  const pricePerUnitCard = document.getElementById('pricePerUnitCard');
+  if (pricePerUnitCard) pricePerUnitCard.style.display = isManual ? 'none' : '';
+  syncPackPanelColumns();
   const showMrp     = mrpToggle.checked;
   const showSuggest = suggestToggle.checked;
-  const bundleOn    = (typeof window.bundleEnabled === 'function') ? window.bundleEnabled() : false;
+  // Read the checkbox directly: bundleEnabled is attached by the bundle script
+  // later in this template, after the edit form's first render.
+  const bundleOn    = !looseToggle.checked && !!document.getElementById('bundleToggle')?.checked;
   const sorted      = [...selected].sort((a,b) => a - b);
 
   const stockHeaderLabel = isLoose
     ? 'Stock (units) <span class="text-muted small">from pool</span>'
-    : 'Stock (units) <span class="badge bg-success text-white ms-1">enter each</span>';
+    : bundleOn
+      ? 'Stock (units) <span class="badge bg-success text-white ms-1">auto-calculated from bundle count</span>'
+      : 'Stock (units) <span class="badge bg-success text-white ms-1">enter each</span>';
+  const stockHeaderHelp = isLoose
+    ? 'Available packs are calculated from the shared Total Stock pool.'
+    : bundleOn
+      ? 'Stock units are calculated as bundle count × packs per bundle. Enter the bundle count.'
+      : 'Enter available units separately for this pack size and variant.';
 
   let html = `<table class="table table-sm table-bordered mb-0">
     <thead class="table-light"><tr>
-      <th>Pack Size</th>
+      <th data-bs-toggle="tooltip" title="A pack size customers can order. Select sizes above to add or remove them.">Pack Size <i class="bi bi-info-circle text-muted"></i></th>
       <th>Price (₹) ${isManual ? '<span class="badge bg-info text-dark ms-1">editable</span>' : '<span class="text-muted small">auto</span>'}</th>
       ${showMrp ? `<th>MRP (₹) <span class="badge bg-warning text-dark ms-1">editable</span></th>` : ''}
       ${showSuggest ? `<th>Suggested (₹) <span class="badge bg-info text-dark ms-1">guidance</span></th>` : ''}
-      <th>${stockHeaderLabel}</th>
-      ${bundleOn ? `<th>Bundle <span class="badge bg-info text-dark ms-1">wholesale</span></th>` : ''}
+      <th data-bs-toggle="tooltip" title="${stockHeaderHelp}">${stockHeaderLabel} <i class="bi bi-info-circle text-muted"></i></th>
+      ${bundleOn ? `<th>Packs per bundle <span class="badge bg-info text-dark ms-1">wholesale</span></th>
+        <th>Bundle count <button type="button" class="btn btn-link btn-sm p-0" data-bs-toggle="popover"
+          data-bs-trigger="focus" data-bs-placement="auto" title="Bundle Count"
+          data-bs-content="When a packs-per-bundle value is entered, set the complete bundle count here; stock units equal bundle count × packs per bundle. Only Bundle separately requires buyers to order multiples of the bundle size. Example: 8 bundles × 12 packs = 96 units.">
+          <i class="bi bi-info-circle"></i></button></th>` : ''}
     </tr></thead><tbody>`;
 
   const variants = [];
@@ -971,32 +1195,84 @@ function recalculate() {
     const autoStock = (masterBase && unitSize) ? Math.floor(masterBase / unitSize) : 0;
     // Loose mode → single pool, stock is auto-computed (read-only per variant)
     // Branded mode → supplier enters stock for each pack size independently
-    const stockVal = isLoose
+    let stockVal = isLoose
       ? autoStock
-      : (manualStocks[unitSize] !== undefined ? manualStocks[unitSize] : autoStock);
+      : (manualStocks[unitSize] !== undefined ? manualStocks[unitSize] : '');
+
+    // When a bundle size is configured, stock is entered as complete bundles.
+    // The Only Bundle toggle independently controls permitted order quantities.
+    window.bundleQty = window.bundleQty || {};
+    window.bundleCount = window.bundleCount || {};
+    const bQty = parseInt(window.bundleQty[unitSize]) || 0;
+    const onlyBundle = bundleOn && !isLoose && manualOnlyBundle[unitSize] === true;
+    const bundleStockMode = bundleOn && !isLoose && bQty > 0;
+    let bundleCount = window.bundleCount[unitSize];
+    let bundleRemainder = Math.max(0, parseInt(window.bundleRemainder[unitSize]) || 0);
+    if (bundleCount == null && bQty > 0 && manualStocks[unitSize] !== undefined) {
+      bundleCount = Math.floor(stockVal / bQty);
+      bundleRemainder = stockVal % bQty;
+      window.bundleCount[unitSize] = bundleCount;
+      window.bundleRemainder[unitSize] = bundleRemainder;
+    }
+    if (bundleStockMode) {
+      if (bundleCount == null) {
+        stockVal = '';
+      } else {
+        bundleCount = Math.max(0, parseInt(bundleCount) || 0);
+        bundleRemainder = Math.min(bQty - 1, bundleRemainder);
+        stockVal = bundleCount * bQty + bundleRemainder;
+        manualStocks[unitSize] = stockVal;
+      }
+    }
 
     const stockCell = isLoose
-      ? `<td class="text-center bg-light text-muted">${autoStock}<br><span style="font-size:10px">(from pool)</span></td>`
-      : `<td><input type="number" class="form-control form-control-sm manual-stock" style="width:90px"
+      ? `<td class="stock-cell text-center bg-light text-muted">${autoStock}<br><span style="font-size:10px">(from pool)</span></td>`
+      : bundleStockMode
+      ? `<td class="stock-cell"><input type="number" class="form-control form-control-sm bg-light bundle-derived-stock" style="width:90px"
+             value="${stockVal}" disabled aria-label="Calculated stock units" title="Bundle count × packs per bundle">
+           <div class="text-muted" style="font-size:10px;margin-top:2px">bundle count × packs per bundle</div></td>`
+      : `<td class="stock-cell"><input type="number" class="form-control form-control-sm manual-stock" style="width:90px"
              value="${stockVal}" step="1" min="0" data-unit="${unitSize}" placeholder="0"></td>`;
+    const supplierCanSupply = manualSupply[unitSize] !== false;
+    const bundleOnlyHelp = 'When checked, wholesale buyers must order this pack in the configured bundle size. Example: a bundle of 12 × 500g packs means they can order 12, 24, or 36 packs, but not 1 pack. When unchecked, single packs are also available.';
+    const supplyCell = `${looseToggle.checked ? `<div class="form-check form-switch mb-0 mt-1"
+                             title="Allow Loose is on: choose which pack sizes you can supply directly.">
+        <input class="form-check-input supplier-supply" type="checkbox" role="switch"
+               data-unit="${unitSize}" ${supplierCanSupply ? 'checked' : ''}>
+        <label class="form-check-label small">Supplier can supply</label>
+      </div>` : ''}
+      ${bundleOn && !looseToggle.checked ? `<div class="form-check form-switch mb-0 mt-1" title="Wholesale bundle ordering">
+        <input class="form-check-input supplier-only-bundle" type="checkbox" role="switch"
+               data-unit="${unitSize}" ${manualOnlyBundle[unitSize] === true ? 'checked' : ''}>
+        <label class="form-check-label small">Only Bundle</label>
+        <button type="button" class="btn btn-link btn-sm p-0 ms-1 supplier-bundle-help"
+                data-bs-toggle="popover" data-bs-trigger="focus" data-bs-placement="auto"
+                title="Only Bundle" data-bs-content="${bundleOnlyHelp}"
+                aria-label="Explain Only Bundle"><i class="bi bi-info-circle"></i></button>
+      </div>` : ''}`;
 
-    // Bundle column — packs-per-bundle for THIS pack. Price + "makes N" computed.
-    // (bundleQty may not be initialised yet on the very first pre-load call.)
-    window.bundleQty = window.bundleQty || {};
-    const bQty = window.bundleQty[unitSize] || '';
-    const bPrice = (bQty && price) ? '₹' + (parseFloat(price) * bQty).toFixed(2) : '—';
+    // Bundle quantity is packs per bundle; bundle count is the available
+    // number of bundles. In bundle-only mode, count × quantity determines stock.
+    const bQtyValue = bQty || '';
     const bMakes = (bQty) ? Math.floor(stockVal / bQty) : 0;
     const bundleCell = bundleOn
       ? `<td>
            <div class="input-group input-group-sm" style="width:120px">
              <input type="number" class="form-control form-control-sm bundle-qty"
-                    value="${bQty}" step="1" min="0" data-unit="${unitSize}" placeholder="e.g. 12"
+                    value="${bQtyValue}" step="1" min="0" data-unit="${unitSize}" placeholder="e.g. 12"
                     title="Packs in one box/bag">
            </div>
            <div class="text-muted bundle-readout" data-unit="${unitSize}" style="font-size:10px;margin-top:2px">
-             ${bQty ? bPrice + ' · makes ' + bMakes : 'no bundle'}
+             ${bQty ? `${bQty} × ${formatBundleContents(unitSize, 1)} = ${formatBundleContents(unitSize, bQty)} · ₹${(parseFloat(price) * bQty).toFixed(2)} · ${bMakes} ${bMakes === 1 ? 'bundle' : 'bundles'} available` : 'Enter packs per bundle to see total, price and availability.'}
            </div>
-         </td>`
+         </td>
+         <td>${bundleStockMode
+           ? `<input type="number" class="form-control form-control-sm bundle-count" style="width:100px"
+                    value="${bundleCount == null ? '' : bundleCount}" step="1" min="0" data-unit="${unitSize}"
+                    aria-label="Complete bundles in stock for ${label}" title="Number of complete bundles in stock">`
+           : bQty
+           ? `<span class="bundle-count-readout" data-unit="${unitSize}">${bMakes} available</span>`
+           : `<span class="text-muted">—</span>`}</td>`
       : '';
 
     const mrpCell = showMrp
@@ -1008,19 +1284,20 @@ function recalculate() {
 
     if (isManual) {
       html += `<tr>
-        <td><strong>${label}</strong></td>
+        <td><strong>${label}</strong>${supplyCell}</td>
         <td>
           <input type="number" class="form-control form-control-sm manual-price" style="width:110px"
-               value="${parseFloat(price).toFixed(2)}" step="1" min="1"
+               value="${parseFloat(price).toFixed(2)}" step="0.01" min="0.01"
                data-unit="${unitSize}" data-auto="${auto.toFixed(2)}">
           <div class="text-muted" style="font-size:11px;margin-top:2px">
-            Auto: <span class="price-auto-hint">₹${auto.toFixed(2)}</span> — set higher or lower
+            Auto reference: <span class="price-auto-hint">₹${auto.toFixed(2)}</span>
           </div>
         </td>
         ${mrpCell}${suggestCell}
         ${stockCell}${bundleCell}</tr>`;
     } else {
-      html += `<tr><td><strong>${label}</strong></td><td>₹${parseFloat(price).toFixed(2)}</td>
+      html += `<tr><td><strong>${label}</strong>${supplyCell}</td>
+        <td>₹${parseFloat(price).toFixed(2)}</td>
         ${mrpCell}${suggestCell}
         ${stockCell}${bundleCell}</tr>`;
     }
@@ -1028,8 +1305,88 @@ function recalculate() {
                    suggest: showSuggest ? suggest : null, stock: stockVal, unit: unitSize});
   });
 
-  html += '</tbody></table>';
+  html += '</tbody></table><div id="manualPriceWarning" class="mt-2"></div>';
   variantPreview.innerHTML = html;
+  const setHelpTooltip = (element, text) => {
+    if (!element) return;
+    element.title = text;
+    element.setAttribute('data-bs-toggle', 'tooltip');
+  };
+  variantPreview.querySelectorAll('thead th').forEach(th => {
+    const label = th.textContent.trim().toLowerCase();
+    if (label.startsWith('price')) {
+      setHelpTooltip(th, isManual
+        ? 'Enter an individual price for each selected pack. The automatic reference is shown below each price.'
+        : 'Pack price is calculated from the base selling price and the pack size.');
+    } else if (label.startsWith('mrp')) {
+      setHelpTooltip(th, 'Optional printed maximum retail price for this pack. If entered, it must be higher than the selling price.');
+    } else if (label.startsWith('suggested')) {
+      setHelpTooltip(th, 'Optional recommended resale price. It is guidance for downstream sellers, not a price cap.');
+    } else if (label.startsWith('packs per bundle')) {
+      setHelpTooltip(th, 'Number of packs of this size inside one wholesale box or bag. Leave blank if this pack is not bundled.');
+    } else if (label.startsWith('bundle count')) {
+      setHelpTooltip(th, 'Number of complete bundles available for this pack size. Stock units are calculated from bundle count × packs per bundle.');
+    }
+  });
+  variantPreview.querySelectorAll('.manual-price').forEach(el => setHelpTooltip(el,
+    'Enter the selling price for this pack. It may differ from the automatic reference, within the pack-price rules.'));
+  variantPreview.querySelectorAll('.manual-mrp').forEach(el => setHelpTooltip(el,
+    'Optional printed MRP for this pack. If entered, it must be higher than the selling price.'));
+  variantPreview.querySelectorAll('.manual-suggest').forEach(el => setHelpTooltip(el,
+    'Optional recommended resale price. Keep it at or above the supplier selling price.'));
+  variantPreview.querySelectorAll('.manual-stock').forEach(el => setHelpTooltip(el,
+    'Enter the number of individual packs in stock for this size and variant.'));
+  variantPreview.querySelectorAll('.bundle-qty').forEach(el => setHelpTooltip(el,
+    'Number of individual packs in one box or bag. Leave blank if this pack is not bundled.'));
+  variantPreview.querySelectorAll('.bundle-count').forEach(el => setHelpTooltip(el,
+    'Enter complete bundles in stock. Stock units are calculated as bundle count × packs per bundle.'));
+  variantPreview.querySelectorAll('.supplier-supply').forEach(el => setHelpTooltip(el,
+    'Choose whether you can supply this pack size directly when Allow Loose is enabled.'));
+  variantPreview.querySelectorAll('.supplier-only-bundle').forEach(el => setHelpTooltip(el,
+    'When on, wholesale buyers must order this pack in complete bundle multiples.'));
+  const updateManualPriceWarning = () => {
+    const warningEl = document.getElementById('manualPriceWarning');
+    if (!warningEl) return;
+    warningEl.replaceChildren();
+    if (!isManual || variants.length < 2) return;
+
+    const stockUnit = stockUnitEl.value;
+    const basisLabel = stockUnit === 'qty' ? 'per 100 pcs'
+      : stockUnit === 'litre' ? 'per litre' : 'per kg';
+    const bySize = [...variants].filter(pack => pack.unit > 0 && pack.price > 0)
+      .sort((a, b) => a.unit - b.unit);
+    const warnings = [];
+    for (let i = 0; i < bySize.length - 1; i++) {
+      const smaller = bySize[i];
+      const larger = bySize[i + 1];
+      const bounds = manualPackPriceBounds(smaller.unit, larger.unit, larger.price);
+      if (smaller.price < bounds.min - 0.005 || smaller.price > bounds.max + 0.005) {
+        warnings.push(`${smaller.label} is ₹${smaller.price.toFixed(2)}; for ${larger.label} at ₹${larger.price.toFixed(2)}, enter ₹${bounds.min.toFixed(2)}–₹${bounds.max.toFixed(2)} (${basisLabel} relationship).`);
+      }
+    }
+    if (!warnings.length) return;
+
+    const alert = document.createElement('div');
+    alert.className = 'alert alert-warning py-2 px-3 small mb-0';
+    alert.setAttribute('role', 'status');
+    const title = document.createElement('strong');
+    title.textContent = 'Check manual pack prices: ';
+    alert.appendChild(title);
+    alert.appendChild(document.createTextNode(warnings.join(' ')
+      + ' Correct the smaller-pack price to continue.'));
+    warningEl.appendChild(alert);
+  };
+  updateManualPriceWarning();
+  if (window.bootstrap && bootstrap.Popover) {
+    variantPreview.querySelectorAll('[data-bs-toggle="popover"]').forEach(function (el) {
+      bootstrap.Popover.getOrCreateInstance(el);
+    });
+  }
+  if (window.bootstrap && bootstrap.Tooltip) {
+    variantPreview.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(function (el) {
+      bootstrap.Tooltip.getOrCreateInstance(el);
+    });
+  }
 
   // Bundle-column inputs: live price + "makes N" readout, stored in bundleQty.
   variantPreview.querySelectorAll('.bundle-qty').forEach(inp => {
@@ -1040,18 +1397,118 @@ function recalculate() {
       else delete window.bundleQty[unit];
 
       const row = this.closest('tr');
-      const priceInp = row.querySelector('.manual-price');
-      const packPrice = priceInp ? (parseFloat(priceInp.value) || 0)
-                                 : (parseFloat((row.children[1].textContent || '').replace(/[^\d.]/g, '')) || 0);
-      const stockInp = row.querySelector('.manual-stock');
-      const packStock = stockInp ? (parseInt(stockInp.value) || 0)
-                                 : parseInt((row.querySelector('td:nth-last-child(2)')?.textContent || '').replace(/[^\d]/g, '')) || 0;
-      const out = row.querySelector('.bundle-readout');
-      if (out) {
-        out.textContent = qty > 0
-          ? '₹' + (packPrice * qty).toFixed(2) + ' · makes ' + Math.floor(packStock / qty)
-          : 'no bundle';
+      if (qty > 0 && !looseToggle.checked) {
+        // Preserve an explicitly entered stock; never infer a bundle count
+        // from a blank pack stock field.
+        if (manualStocks[unit] !== undefined) {
+          const currentStock = manualStocks[unit];
+          const count = Math.floor(currentStock / qty);
+          const remainder = currentStock % qty;
+          window.bundleCount[unit] = count;
+          window.bundleRemainder[unit] = remainder;
+          manualStocks[unit] = count * qty + remainder;
+          const countInput = row.querySelector('.bundle-count');
+          if (countInput) countInput.value = count;
+          const stockDisplay = row.querySelector('.bundle-derived-stock');
+          if (stockDisplay) stockDisplay.value = count * qty + remainder;
+        } else {
+          delete window.bundleCount[unit];
+          delete window.bundleRemainder[unit];
+        }
       }
+      const packPrice = bundlePackPrice(row);
+      const stockInp = row.querySelector('.manual-stock, .bundle-derived-stock');
+      const stockCell = row.querySelector('.stock-cell');
+      const packStock = stockInp ? (parseInt(stockInp.value) || 0)
+        : parseInt((stockCell?.textContent || '').replace(/[^\d]/g, '')) || 0;
+      updateBundleReadout(row, unit, qty, packPrice, packStock);
+      const countReadout = row.querySelector('.bundle-count-readout');
+      if (countReadout) countReadout.textContent = qty > 0
+        ? `${Math.floor(packStock / qty)} available` : '—';
+    });
+    inp.addEventListener('change', function () {
+      const unit = parseInt(this.dataset.unit);
+      const qty = parseInt(this.value) || 0;
+      const row = this.closest('tr');
+      if (qty > 0 && !looseToggle.checked) {
+        window.bundleQty[unit] = qty;
+        if (window.bundleCount[unit] != null) {
+          const count = Math.max(0, parseInt(window.bundleCount[unit]) || 0);
+          manualStocks[unit] = count * qty + (parseInt(window.bundleRemainder[unit]) || 0);
+        }
+        recalculate();
+      } else if (qty <= 0) {
+        // Clearing the bundle size returns stock entry to individual packs.
+        delete window.bundleCount[unit];
+        delete window.bundleRemainder[unit];
+        delete manualStocks[unit];
+        if (manualOnlyBundle[unit] === true) {
+          manualOnlyBundle[unit] = false;
+          const onlyToggle = row.querySelector('.supplier-only-bundle');
+          if (onlyToggle) onlyToggle.checked = false;
+        }
+        recalculate();
+      }
+    });
+  });
+  variantPreview.querySelectorAll('.bundle-count').forEach(inp => {
+    inp.addEventListener('input', function () {
+      const unit = parseInt(this.dataset.unit);
+      const raw = (this.value || '').trim();
+      if (raw === '') {
+        delete window.bundleCount[unit];
+        delete window.bundleRemainder[unit];
+        delete manualStocks[unit];
+        const row = this.closest('tr');
+        const v = variants.find(x => x.unit === unit);
+        if (v) v.stock = '';
+        const stockDisplay = row.querySelector('.bundle-derived-stock');
+        if (stockDisplay) stockDisplay.value = '';
+        updateBundleReadout(row, unit, parseInt(window.bundleQty[unit]) || 0,
+          bundlePackPrice(row), 0);
+        return;
+      }
+      const count = Math.max(0, parseInt(raw, 10) || 0);
+      const qty = parseInt(window.bundleQty[unit]) || 0;
+      window.bundleCount[unit] = count;
+      const remainder = Math.max(0, parseInt(window.bundleRemainder[unit]) || 0);
+      const stock = count * qty + remainder;
+      manualStocks[unit] = stock;
+      const row = this.closest('tr');
+      const v = variants.find(x => x.unit === unit);
+      if (v) v.stock = stock;
+      const stockDisplay = row.querySelector('.bundle-derived-stock');
+      if (stockDisplay) stockDisplay.value = stock;
+      updateBundleReadout(row, unit, qty, bundlePackPrice(row), stock);
+    });
+  });
+  variantPreview.querySelectorAll('.supplier-supply').forEach(inp => {
+    inp.addEventListener('change', function () {
+      manualSupply[parseInt(this.dataset.unit)] = this.checked;
+    });
+  });
+  variantPreview.querySelectorAll('.supplier-only-bundle').forEach(inp => {
+    inp.addEventListener('change', function () {
+      const unit = parseInt(this.dataset.unit);
+      if (!this.checked) {
+        manualOnlyBundle[unit] = false;
+        recalculate();
+        return;
+      }
+      const bundleInput = variantPreview.querySelector(`.bundle-qty[data-unit="${unit}"]`);
+      let quantity = parseInt(bundleInput?.value || window.bundleQty[unit], 10) || 0;
+      if (quantity < 2) {
+        this.checked = false;
+        manualOnlyBundle[unit] = false;
+        window.alert('Enter at least 2 packs per bundle before requiring bundle-only orders.');
+        return;
+      }
+      if (bundleInput) {
+        bundleInput.value = quantity;
+      }
+      window.bundleQty[unit] = quantity;
+      manualOnlyBundle[unit] = true;
+      recalculate();
     });
   });
 
@@ -1063,12 +1520,18 @@ function recalculate() {
         manualPrices[unit] = entered;
         const v = variants.find(x => x.unit === unit);
         if (v) v.price = entered;
+        updateManualPriceWarning();
 
         // Keep this pack's suggested price in step with its new supplier price —
         // but only when there is a real suggestion to follow. The Suggested box
         // must stay BLANK until the supplier types one, or a markup ratio was
         // set by editing another size. Otherwise it would just mirror the price.
         const sInp = this.closest('tr').querySelector('.manual-suggest');
+        const row = this.closest('tr');
+        const bundleQty = parseInt(window.bundleQty[unit]) || 0;
+        const bundleStockInput = row.querySelector('.manual-stock, .bundle-derived-stock');
+        const bundleStock = bundleStockInput ? (parseInt(bundleStockInput.value) || 0) : 0;
+        updateBundleReadout(row, unit, bundleQty, entered, bundleStock);
         if (sInp) {
           // Update the Suggested box only when there is a real suggestion to
           // keep in step: a markup ratio set by editing another size, or a
@@ -1084,55 +1547,7 @@ function recalculate() {
           flagSuggest(sInp, entered);
         }
 
-        // Real-time warning: price must be > 0 AND not below the Auto price.
-        // The Auto price (data-auto) is the floor the supplier may not go under.
-        const auto = parseFloat(this.dataset.auto) || 0;
-        const row = this.closest('tr');
-        let warn = row.querySelector('.price-below-warn');
-        const showWarn = (msg) => {
-          this.style.borderColor = '#dc3545';
-          this.style.background  = '#fff5f5';
-          if (!warn) {
-            warn = document.createElement('div');
-            warn.className = 'price-below-warn text-danger';
-            warn.style.fontSize = '11px';
-            this.parentNode.appendChild(warn);
-          }
-          warn.textContent = msg;
-        };
-        const clearWarn = () => {
-          this.style.borderColor = '';
-          this.style.background  = '';
-          if (warn) warn.remove();
-        };
-        if (entered <= 0) {
-          showWarn('⚠ Price must be greater than 0');
-        } else if (auto > 0 && entered < auto) {
-          showWarn(`⚠ Price ₹${entered.toFixed(2)} is below the auto price ₹${auto.toFixed(2)}. Set it to ₹${auto.toFixed(2)} or higher.`);
-        } else {
-          clearWarn();
-        }
         updateFormset(variants);
-      });
-
-      // On blur (leaving the box): keep the warning visible if the price is
-      // below the auto floor, so the supplier sees it the moment they tab out.
-      inp.addEventListener('blur', function() {
-        const entered = parseFloat(this.value) || 0;
-        const auto    = parseFloat(this.dataset.auto) || 0;
-        const row = this.closest('tr');
-        let warn = row.querySelector('.price-below-warn');
-        if (entered > 0 && auto > 0 && entered < auto) {
-          this.style.borderColor = '#dc3545';
-          this.style.background  = '#fff5f5';
-          if (!warn) {
-            warn = document.createElement('div');
-            warn.className = 'price-below-warn text-danger';
-            warn.style.fontSize = '11px';
-            this.parentNode.appendChild(warn);
-          }
-          warn.textContent = `⚠ Price ₹${entered.toFixed(2)} is below the auto price ₹${auto.toFixed(2)}. Set it to ₹${auto.toFixed(2)} or higher.`;
-        }
       });
     });
   }
@@ -1245,10 +1660,19 @@ function recalculate() {
   variantPreview.querySelectorAll('.manual-stock').forEach(inp => {
     inp.addEventListener('input', function() {
       const u = parseInt(this.dataset.unit);
-      const val = parseInt(this.value) || 0;
-      manualStocks[u] = val;
+      const raw = (this.value || '').trim();
+      const val = parseInt(raw, 10);
+      if (raw === '' || Number.isNaN(val)) delete manualStocks[u];
+      else manualStocks[u] = val;
+      const stockValue = raw === '' || Number.isNaN(val) ? 0 : val;
+      const row = this.closest('tr');
+      const qty = parseInt(window.bundleQty[u]) || 0;
+      updateBundleReadout(row, u, qty, bundlePackPrice(row), stockValue);
+      const countReadout = row.querySelector('.bundle-count-readout');
+      if (countReadout) countReadout.textContent = qty > 0
+        ? `${Math.floor(stockValue / qty)} available` : '—';
       const v = variants.find(x => x.unit === u);
-      if (v) v.stock = val;
+      if (v) v.stock = raw === '' || Number.isNaN(val) ? '' : val;
       updateFormset(variants);
     });
   });
@@ -1291,10 +1715,14 @@ function updateFormset(variants) {
   // Per-pack stock inputs (branded mode)
   variantPreview.querySelectorAll('.manual-stock').forEach(inp => {
     const u = parseInt(inp.dataset.unit);
-    const val = parseInt(inp.value);
-    if (!isNaN(val)) {
+    const raw = (inp.value || '').trim();
+    const val = parseInt(raw, 10);
+    const v = variants.find(x => x.unit === u);
+    if (raw === '' || Number.isNaN(val)) {
+      delete manualStocks[u];
+      if (v) v.stock = '';
+    } else {
       manualStocks[u] = val;
-      const v = variants.find(x => x.unit === u);
       if (v) v.stock = val;
     }
   });
@@ -1306,9 +1734,9 @@ function updateFormset(variants) {
     row.dataset.new = '1';
     row.innerHTML = `
       <input type="text"   name="variants-${idx}-label"        value="${v.label}">
-      <input type="number" name="variants-${idx}-selling_price" value="${parseFloat(v.price).toFixed(2)}">
-      <input type="number" name="variants-${idx}-mrp"           value="${v.mrp !== null && v.mrp !== undefined ? parseFloat(v.mrp).toFixed(2) : ''}">
-      <input type="number" name="variants-${idx}-suggested_price" value="${v.suggest !== null && v.suggest !== undefined ? parseFloat(v.suggest).toFixed(2) : ''}">
+      <input type="number" name="variants-${idx}-selling_price" step="0.01" value="${parseFloat(v.price).toFixed(2)}">
+      <input type="number" name="variants-${idx}-mrp" step="0.01" value="${v.mrp !== null && v.mrp !== undefined ? parseFloat(v.mrp).toFixed(2) : ''}">
+      <input type="number" name="variants-${idx}-suggested_price" step="0.01" value="${v.suggest !== null && v.suggest !== undefined ? parseFloat(v.suggest).toFixed(2) : ''}">
       <input type="number" name="variants-${idx}-stock"         value="${v.stock}">
       <input type="number" name="variants-${idx}-unit_grams"    value="${v.unit}">
       <input type="checkbox" name="variants-${idx}-is_active" checked style="display:none">
@@ -1405,8 +1833,12 @@ const VariantMgr = (function () {
       prices: prices,
       mrps: {...manualMrps},
       suggest: {...manualSuggest},
+      supply: {...manualSupply},
+      onlyBundle: {...manualOnlyBundle},
       stocks: stocks,
       bundles: {...window.bundleQty},
+      bundleCounts: {...window.bundleCount},
+      bundleRemainders: {...window.bundleRemainder},
       visible: [...visibleUnits],
       // Unit is COMMON (product-level) — not stashed per variant.
       stockAmount: stockAmtEl ? stockAmtEl.value : '',
@@ -1415,7 +1847,10 @@ const VariantMgr = (function () {
   }
   // Apply a state object back into the live pack UI globals, then redraw.
   function applyState(s) {
-    s = s || {selected:[], prices:{}, mrps:{}, suggest:{}, stocks:{}, bundles:{}, visible:[]};
+    s = s || {
+      selected:[], prices:{}, mrps:{}, suggest:{}, supply:{},
+      onlyBundle:{}, stocks:{}, bundles:{}, bundleCounts:{}, bundleRemainders:{}, visible:[]
+    };
     selected.clear();          (s.selected || []).forEach(u => selected.add(u));
     visibleUnits.clear();       (s.visible  || s.selected || []).forEach(u => visibleUnits.add(u));
     Object.keys(manualPrices).forEach(k => delete manualPrices[k]);
@@ -1424,21 +1859,35 @@ const VariantMgr = (function () {
     Object.assign(manualMrps, s.mrps || {});
     Object.keys(manualSuggest).forEach(k => delete manualSuggest[k]);
     Object.assign(manualSuggest, s.suggest || {});
+    Object.keys(manualSupply).forEach(k => delete manualSupply[k]);
+    Object.assign(manualSupply, s.supply || {});
+    Object.keys(manualOnlyBundle).forEach(k => delete manualOnlyBundle[k]);
+    Object.assign(manualOnlyBundle, s.onlyBundle || {});
     Object.keys(manualStocks).forEach(k => delete manualStocks[k]);
     Object.assign(manualStocks, s.stocks || {});
     window.bundleQty = {};
     Object.assign(window.bundleQty, s.bundles || {});
+    window.bundleCount = {};
+    Object.assign(window.bundleCount, s.bundleCounts || {});
+    window.bundleRemainder = {};
+    Object.assign(window.bundleRemainder, s.bundleRemainders || {});
     // Restore this variant's own pool + price-per-unit fields. (Unit is common,
     // so it is left untouched here — the same unit applies to every variant.)
     if (stockAmtEl)  stockAmtEl.value = (s.stockAmount != null ? s.stockAmount : '');
     if (priceEl)     priceEl.value = (s.pricePerKg != null ? s.pricePerKg : '');
     renderPackBtns();
+    // The preview still contains the previous variant's inputs. Don't let
+    // recalculate() copy those stale per-pack values over this variant's state.
+    skipDOMReadOnNextRecalculate = true;
     recalculate();
   }
 
   // Build a state object from a server variant group.
   function stateFromGroup(g) {
-    const st = {selected:[], prices:{}, mrps:{}, suggest:{}, stocks:{}, bundles:{}, visible:[]};
+    const st = {
+      selected:[], prices:{}, mrps:{}, suggest:{}, supply:{},
+      onlyBundle:{}, stocks:{}, bundles:{}, bundleCounts:{}, bundleRemainders:{}, visible:[]
+    };
     (g.packs || []).forEach(p => {
       const u = parseInt(p.unit_grams);
       if (!u) return;
@@ -1446,8 +1895,16 @@ const VariantMgr = (function () {
       st.prices[u] = parseFloat(p.selling_price);
       if (p.mrp != null) st.mrps[u] = parseFloat(p.mrp);
       if (p.suggested_price != null) st.suggest[u] = parseFloat(p.suggested_price);
+      st.supply[u] = p.supplier_can_supply !== false;
+      st.onlyBundle[u] = p.only_bundle === true;
       if (p.stock != null) st.stocks[u] = parseInt(p.stock);
       if (p.bundle_qty) st.bundles[u] = parseInt(p.bundle_qty);
+      if (p.bundle_qty) st.bundleCounts[u] = p.bundle_count != null
+        ? parseInt(p.bundle_count)
+        : Math.floor((parseInt(p.stock) || 0) / parseInt(p.bundle_qty));
+      if (p.bundle_qty) st.bundleRemainders[u] = p.bundle_remainder != null
+        ? parseInt(p.bundle_remainder)
+        : (parseInt(p.stock) || 0) % parseInt(p.bundle_qty);
     });
     // Repopulate the per-variant pool fields so Total Stock / Selling Price are
     // NOT blank when the supplier reopens the page.
@@ -1530,9 +1987,9 @@ const VariantMgr = (function () {
     wrap.classList.remove('d-none');
     wrap.classList.add('flex-wrap');
     wrap.innerHTML =
-      '<label class="small fw-semibold mb-0">This variant\'s name:</label>' +
+      '<label class="small fw-semibold mb-0" title="Give each variant a distinct buyer-facing choice name, such as Regular or Premium.">This variant\'s name:</label>' +
       '<input type="text" class="form-control form-control-sm" style="max-width:200px" ' +
-             'id="variantNameInput" placeholder="e.g. Premium" value="' +
+             'id="variantNameInput" placeholder="e.g. Premium" title="Enter a unique name for this variant. Each variant has separate sizes, prices, and stock." value="' +
              (variants[active].name || '').replace(/"/g,'&quot;') + '">' +
       '<div class="btn-group btn-group-sm" role="group" aria-label="Reorder variant">' +
         '<button type="button" class="btn btn-outline-secondary" id="moveVariantLeft" ' +
@@ -1542,7 +1999,7 @@ const VariantMgr = (function () {
                 'title="Move later"' + (active === variants.length - 1 ? ' disabled' : '') + '>' +
                 '<i class="bi bi-arrow-right"></i></button>' +
       '</div>' +
-      '<button type="button" class="btn btn-outline-danger btn-sm" id="removeVariantBtn">' +
+      '<button type="button" class="btn btn-outline-danger btn-sm" id="removeVariantBtn" title="Remove this variant and all of its pack settings.">' +
              '<i class="bi bi-trash"></i> Remove</button>';
     document.getElementById('variantNameInput').addEventListener('input', function () {
       variants[active].name = this.value;
@@ -1556,9 +2013,14 @@ const VariantMgr = (function () {
   function addVariant() {
     if (variants.length >= MAX) return;
     variants[active].state = captureState();
-    // New variant copies the CURRENT variant's packs as a starting point.
-    const copy = JSON.parse(JSON.stringify(variants[active].state));
-    variants.push({ id: null, name: '', state: copy });
+    // A new variant is independent: don't inherit the previous variant's pack
+    // sizes, prices, stock, or bundle configuration.
+    const blankState = {
+      selected: [], prices: {}, mrps: {}, suggest: {}, supply: {},
+      onlyBundle: {}, stocks: {}, bundles: {}, bundleCounts: {},
+      bundleRemainders: {}, visible: [], stockAmount: '', pricePerKg: '',
+    };
+    variants.push({ id: null, name: '', state: blankState });
     active = variants.length - 1;
     applyState(variants[active].state);
     renderTabs();
@@ -1581,14 +2043,15 @@ const VariantMgr = (function () {
   // Serialize every variant into variants_json for the POST.
   function serialize() {
     variants[active].state = captureState();
+    const bundleOn = !looseToggle.checked && !!document.getElementById('bundleToggle')?.checked;
     const divisor = (stockUnitEl && stockUnitEl.value === 'qty') ? 100 : 1000;
     // Grams-per-base-unit for the stock pool (qty is 1:1, kg/litre are 1000).
     const stockDivisor = (stockUnitEl && stockUnitEl.value === 'qty') ? 1 : 1000;
     const out = variants.map(v => {
       const s = v.state;
       // This variant's own per-unit (per kg / litre / 100pcs) selling price —
-      // the auto price for a pack = perUnit / divisor * unit_grams. Used as the
-      // minimum floor a manual pack price may not go below.
+      // the auto price for a pack = perUnit / divisor * unit_grams. In manual
+      // mode this is a reference; the supplier may set a different price.
       const perUnit = parseFloat(s.pricePerKg) || 0;
       // This variant's own loose pool, in base units (grams/ml/qty), sent so
       // the server stores it authoritatively on ProductVariantType. Only a
@@ -1599,19 +2062,48 @@ const VariantMgr = (function () {
       const packs = (s.selected || []).map(u => {
         const btn = document.querySelector('#packBtns button[data-unit="' + u + '"]');
         const auto = perUnit > 0 ? Math.round((perUnit / divisor) * u * 100) / 100 : 0;
+        // In auto mode the rendered table uses the calculated price directly.
+        // `s.prices` can still contain an older saved/manual price from when
+        // this variant was loaded, so serializing it would send a value that
+        // disagrees with the price shown on screen and can fail server checks.
+        const sellingPrice = manualToggle.checked
+          ? (s.prices[u] != null ? s.prices[u] : auto)
+          : auto;
+        const bundleQty = bundleOn && !looseToggle.checked
+          ? Math.max(0, parseInt(s.bundles[u]) || 0) : 0;
+        const bundleCount = bundleQty > 0 && s.bundleCounts[u] != null
+          ? Math.max(0, parseInt(s.bundleCounts[u]) || 0) : null;
+        const bundleRemainder = bundleCount !== null
+          ? Math.max(0, parseInt(s.bundleRemainders[u]) || 0) : 0;
+        const stockEntered = looseToggle.checked
+          || (bundleQty > 0 ? bundleCount !== null : s.stocks[u] != null);
         return {
           id: null,
           label: btn ? btn.dataset.label : (u + ''),
           unit_grams: u,
-          selling_price: (s.prices[u] != null ? s.prices[u] : 0),
+          selling_price: sellingPrice,
           auto_price: auto,
           mrp: (s.mrps[u] != null ? s.mrps[u] : null),
           suggested_price: (s.suggest[u] != null ? s.suggest[u] : null),
-          stock: (s.stocks[u] != null ? s.stocks[u] : 0),
-          bundle_qty: (s.bundles[u] != null ? s.bundles[u] : 0),
+          stock: (bundleCount !== null
+            ? bundleCount * bundleQty + bundleRemainder
+            : (s.stocks[u] != null ? s.stocks[u] : 0)),
+          stock_entered: stockEntered,
+          supplier_can_supply: !looseToggle.checked || s.supply[u] !== false,
+          only_bundle: bundleOn && !looseToggle.checked && s.onlyBundle[u] === true,
+          bundle_qty: bundleQty,
+          bundle_count: bundleCount,
+          bundle_remainder: bundleRemainder,
         };
       });
-      return { id: v.id, name: v.name || '', packs: packs, pool_grams: poolGrams };
+      return {
+        id: v.id,
+        name: v.name || '',
+        packs: packs,
+        pool_grams: poolGrams,
+        pool_stock_entered: s.stockAmount != null && String(s.stockAmount).trim() !== '',
+        price_per_kg: s.pricePerKg != null ? s.pricePerKg : '',
+      };
     });
     jsonEl.value = JSON.stringify(out);
   }
@@ -1635,8 +2127,72 @@ const VariantMgr = (function () {
   init();
   // markPoolTouched: called when the Total Stock pool field is edited, so the
   // currently-active variant's loose pack stocks get recomputed on save.
-  return { serialize, markPoolTouched: () => poolTouched.add(active) };
+  return {
+    serialize,
+    markPoolTouched: () => poolTouched.add(active),
+    requireSupplierSupplyForPacked() {
+      if (looseToggle.checked) return;
+      Object.keys(manualSupply).forEach(key => { manualSupply[key] = true; });
+      variants.forEach(variant => {
+        variant.state.supply = variant.state.supply || {};
+        Object.keys(variant.state.supply).forEach(key => {
+          variant.state.supply[key] = true;
+        });
+      });
+    },
+    clearBundleModes() {
+      window.bundleQty = {};
+      window.bundleCount = {};
+      window.bundleRemainder = {};
+      Object.keys(manualOnlyBundle).forEach(key => { manualOnlyBundle[key] = false; });
+      variants.forEach(variant => {
+        variant.state.onlyBundle = variant.state.onlyBundle || {};
+        Object.keys(variant.state.onlyBundle).forEach(key => {
+          variant.state.onlyBundle[key] = false;
+        });
+        variant.state.bundles = {};
+        variant.state.bundleCounts = {};
+        variant.state.bundleRemainders = {};
+      });
+    },
+    clearStockPools() {
+      variants.forEach(variant => {
+        variant.state = variant.state || {};
+        variant.state.stockAmount = '';
+      });
+      poolTouched.clear();
+      if (stockAmtEl) stockAmtEl.value = '';
+    },
+    clearPerPackStocks() {
+      Object.keys(manualStocks).forEach(key => delete manualStocks[key]);
+      window.bundleCount = {};
+      window.bundleRemainder = {};
+      poolTouched.clear();
+      variants.forEach(variant => {
+        variant.state = variant.state || {};
+        variant.state.stocks = {};
+        variant.state.bundleCounts = {};
+        variant.state.bundleRemainders = {};
+      });
+    }
+  };
 })();
+
+// MRP takes precedence if an older product has both display options enabled.
+if (mrpToggle.checked && suggestToggle.checked) {
+  suggestToggle.checked = false;
+  document.getElementById('showSuggestField').value = 'false';
+}
+if (!looseToggle.checked) {
+  VariantMgr.requireSupplierSupplyForPacked();
+} else {
+  VariantMgr.clearBundleModes();
+}
+recalculate();
+
+// Capture the baseline only after the UI has loaded the active variant's
+// persisted stock and price values into the shared controls.
+ORIGINAL_FORM_VALUES = readCommonFormValues();
 
 // ── Event listeners ───────────────────────────────────────────────────────────
 stockUnitEl.addEventListener('change', function() {
@@ -1665,10 +2221,18 @@ priceEl.addEventListener('focus', function() {
   _lastConfirmedPrice = this.value;
 });
 
-priceEl.addEventListener('change', function() {
+priceEl.addEventListener('change', function(event) {
   const newPrice = this.value;
   const isManual = manualToggle.checked;
   const hasManualPrices = Object.keys(manualPrices).length > 0;
+
+  // Spinner edits already step in whole rupees. Keep manually entered pack
+  // prices as-is and avoid opening the explicit typed-price confirmation.
+  if (event.rupeeSpinner) {
+    _lastConfirmedPrice = newPrice;
+    recalculate();
+    return;
+  }
 
   if (!isManual || !hasManualPrices || newPrice === _lastConfirmedPrice) {
     _lastConfirmedPrice = newPrice;
@@ -1743,25 +2307,51 @@ manualToggle.addEventListener('change', function() {
   document.getElementById('pricingModeField').value = this.checked ? 'manual' : 'auto';
   recalculate();
 });
-// MRP and Suggested price can now be ON together: MRP is the hard cap, the
-// suggested price is the "reasonable price" guidance that cautions the shop.
 mrpToggle.addEventListener('change', function() {
+  if (this.checked) {
+    suggestToggle.checked = false;
+    document.getElementById('showSuggestField').value = 'false';
+  }
   document.getElementById('showMrpField').value = this.checked ? 'true' : 'false';
   recalculate();
 });
 suggestToggle.addEventListener('change', function() {
+  if (this.checked) {
+    mrpToggle.checked = false;
+    document.getElementById('showMrpField').value = 'false';
+  }
   document.getElementById('showSuggestField').value = this.checked ? 'true' : 'false';
   recalculate();
 });
-looseToggle.addEventListener('change', applyLooseStockUI);
+looseToggle.addEventListener('change', function() {
+  if (!this.checked) {
+    VariantMgr.requireSupplierSupplyForPacked();
+    VariantMgr.clearPerPackStocks();
+    document.getElementById('bundleToggle').disabled = false;
+  } else {
+    const bundleToggleEl = document.getElementById('bundleToggle');
+    bundleToggleEl.checked = false;
+    bundleToggleEl.disabled = true;
+    VariantMgr.clearBundleModes();
+    VariantMgr.clearStockPools();
+  }
+  applyLooseStockUI();
+});
 
 // On form submit — do a final DOM read of all MRP inputs before submitting
 document.getElementById('productForm').addEventListener('submit', function(e) {
   // Validate against ALL variants (not just the live one). Serialize first so
   // we inspect exactly what will be saved.
   let allVariants = [];
-  try { VariantMgr.serialize(); allVariants = JSON.parse(document.getElementById('variantsJson').value || '[]'); }
-  catch (err) { allVariants = []; }
+  try {
+    VariantMgr.serialize();
+    allVariants = JSON.parse(document.getElementById('variantsJson').value || '[]');
+  } catch (err) {
+    console.error('Could not serialize product pack data before save.', err);
+    e.preventDefault();
+    alert('Could not read the pack sizes. Refresh the page and try again.');
+    return;
+  }
 
   // A product must have at least one pack (with a price > 0) across its variants.
   const totalPacks = allVariants.reduce((n, v) => n + ((v.packs || []).length), 0);
@@ -1774,6 +2364,55 @@ document.getElementById('productForm').addEventListener('submit', function(e) {
   }
 
   // Block any pack whose price is zero or negative — report with its variant.
+  // Every variant must be complete on its own; a valid first variant must
+  // not allow an empty or unnamed test variant to slip through.
+  const mrpOn = mrpToggle.checked;
+  const setupErrors = [];
+  const seenVariantNames = new Set();
+  const bundleOn = !looseToggle.checked && !!document.getElementById('bundleToggle')?.checked;
+  allVariants.forEach((variant, index) => {
+    const name = (variant.name || '').trim();
+    const variantLabel = name || (allVariants.length === 1 ? 'Product' : `Variant ${index + 1}`);
+    if (allVariants.length > 1 && !name) setupErrors.push(`Variant ${index + 1}: enter a name.`);
+    if (looseToggle.checked && variant.pool_stock_entered !== true) {
+      setupErrors.push(`${variantLabel}: enter Total Stock before saving.`);
+    }
+    if (name) {
+      const key = name.toLocaleLowerCase();
+      if (seenVariantNames.has(key)) setupErrors.push(`${name}: variant names must be unique.`);
+      seenVariantNames.add(key);
+    }
+    if (!variant.packs || variant.packs.length === 0) {
+      setupErrors.push(`${variantLabel}: select at least one pack size.`);
+      return;
+    }
+    variant.packs.forEach(pack => {
+      const tag = `${variantLabel} · ${pack.label || 'pack'}`;
+      if (!(parseInt(pack.unit_grams, 10) > 0)) setupErrors.push(`${tag}: choose a valid pack size.`);
+      if (!(parseFloat(pack.selling_price) > 0)) setupErrors.push(`${tag}: enter a price greater than ₹0.`);
+      const mrp = pack.mrp == null || pack.mrp === '' ? null : parseFloat(pack.mrp);
+      if (mrpOn && !(mrp > 0)) setupErrors.push(`${tag}: enter an MRP greater than ₹0.`);
+      const bundleQty = parseInt(pack.bundle_qty, 10) || 0;
+      if (!looseToggle.checked && !(bundleOn && bundleQty > 0)
+          && pack.stock_entered !== true) {
+        setupErrors.push(`${tag}: enter stock for this pack before saving.`);
+      }
+      if (pack.only_bundle === true && (!bundleOn || bundleQty < 2)) {
+        setupErrors.push(`${tag}: Only Bundle needs at least 2 packs per bundle.`);
+      }
+      if (bundleOn && bundleQty > 0
+          && (pack.bundle_count == null || !Number.isInteger(Number(pack.bundle_count))
+              || Number(pack.bundle_count) < 0)) {
+        setupErrors.push(`${tag}: enter a valid bundle count.`);
+      }
+    });
+  });
+  if (setupErrors.length) {
+    e.preventDefault();
+    alert('Please complete every variant before saving:\n\n' + setupErrors.join('\n'));
+    return;
+  }
+
   const belowMin = [];
   allVariants.forEach(v => {
     (v.packs || []).forEach(p => {
@@ -1788,32 +2427,47 @@ document.getElementById('productForm').addEventListener('submit', function(e) {
     return;
   }
 
-  // Block any pack whose price is BELOW its auto price. The auto price is the
-  // minimum floor — the supplier may set it equal or higher, never lower.
-  const belowAuto = [];
-  allVariants.forEach(v => {
-    const vn = v.name || 'Variant';
-    (v.packs || []).forEach(p => {
-      const sell = parseFloat(p.selling_price);
-      const auto = parseFloat(p.auto_price) || 0;
-      if (auto > 0 && sell > 0 && sell < auto - 0.0001) {
-        belowAuto.push(vn + ' · ' + p.label + ': price ₹' + sell.toFixed(2)
-          + ' is below the auto price ₹' + auto.toFixed(2) + ' (set ₹' + auto.toFixed(2) + ' or higher)');
-      }
-    });
-  });
-  if (belowAuto.length > 0) {
-    e.preventDefault();
-    alert('⚠ Pack prices cannot be below the auto price:\n\n' + belowAuto.join('\n')
-      + '\n\nPlease edit the price(s) and try saving again.');
-    return;
-  }
-
   // ── Price-order rules (checked across ALL variants) ──────────────────
   //   • When MRP is on:  selling price must be STRICTLY LESS than MRP.
   //   • When Suggested is on: selling < suggested, and (if MRP on) suggested ≤ MRP.
+  if (manualToggle.checked) {
+    const packPriceErrors = [];
+    allVariants.forEach((variant, index) => {
+      const variantName = (variant.name || '').trim()
+        || (allVariants.length === 1 ? 'Product' : `Variant ${index + 1}`);
+      const packs = (variant.packs || []).filter(pack =>
+        Number(pack.unit_grams) > 0 && parseFloat(pack.selling_price) > 0
+      ).sort((a, b) => Number(a.unit_grams) - Number(b.unit_grams));
+
+      for (let i = 0; i < packs.length - 1; i++) {
+        const smaller = packs[i];
+        const larger = packs[i + 1];
+        const smallerUnit = Number(smaller.unit_grams);
+        const largerUnit = Number(larger.unit_grams);
+        const largerPrice = parseFloat(larger.selling_price);
+        const smallerPrice = parseFloat(smaller.selling_price);
+        const bounds = manualPackPriceBounds(smallerUnit, largerUnit, largerPrice);
+        if (smallerPrice < bounds.min - 0.005 || smallerPrice > bounds.max + 0.005) {
+          packPriceErrors.push(
+            `${variantName} · ${smaller.label}: ₹${smallerPrice.toFixed(2)} must be between `
+            + `₹${bounds.min.toFixed(2)} and ₹${bounds.max.toFixed(2)} when `
+            + `${larger.label} is ₹${largerPrice.toFixed(2)}.`
+          );
+        }
+      }
+    });
+
+    if (packPriceErrors.length) {
+      e.preventDefault();
+      alert('Please correct these manual pack prices before saving:\n\n'
+        + packPriceErrors.join('\n')
+        + '\n\nSmaller pack prices must be at least their size-proportional price, '
+        + 'and no more than a 40% small-pack premium (up to 70% of the larger pack for a half-size pack).');
+      return;
+    }
+  }
+
   const EPS = 0.0001;
-  const mrpOn = mrpToggle.checked;
   const suggestOn = suggestToggle.checked;
   const priceErrors = [];
   allVariants.forEach(v => {
@@ -1865,8 +2519,10 @@ document.getElementById('productForm').addEventListener('submit', function(e) {
   // Read per-pack stock inputs (branded / loose OFF mode)
   variantPreview.querySelectorAll('.manual-stock').forEach(inp => {
     const u = parseInt(inp.dataset.unit);
-    const val = parseInt(inp.value);
-    if (!isNaN(val)) manualStocks[u] = val;
+    const raw = (inp.value || '').trim();
+    const val = parseInt(raw, 10);
+    if (raw === '' || Number.isNaN(val)) delete manualStocks[u];
+    else manualStocks[u] = val;
   });
 
   // Rebuild formset with latest DOM values
@@ -1918,6 +2574,22 @@ function buildChangeSummary(originalGroups, newGroups) {
   const money = (v) => (v === null || v === undefined || v === '') ? '—' : ('₹' + parseFloat(v).toFixed(2));
   const changes = [];   // [{variant, pack, field, from, to}]
 
+  const currentFormValues = readCommonFormValues();
+  Object.keys({...ORIGINAL_FORM_VALUES, ...currentFormValues}).forEach((name) => {
+    const before = ORIGINAL_FORM_VALUES[name] || [];
+    const after = currentFormValues[name] || [];
+    if (JSON.stringify(before.map(item => item.value)) === JSON.stringify(after.map(item => item.value))) return;
+    const label = commonFieldLabels[name] || name.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const show = (items) => items.map(item => item.display || '—').join(', ') || '—';
+    changes.push({
+      variant: 'Product settings',
+      pack: '—',
+      field: label,
+      from: show(before),
+      to: show(after),
+    });
+  });
+
   const indexGroup = (g) => {
     const m = {};
     (g.packs || []).forEach(p => { m[parseInt(p.unit_grams)] = p; });
@@ -1929,10 +2601,31 @@ function buildChangeSummary(originalGroups, newGroups) {
 
   (newGroups || []).forEach((ng, i) => {
     const vname = ng.name || (newGroups.length === 1 ? 'Product' : ('Variant ' + (i + 1)));
-    const og = origByKey[ng.id != null ? ('id' + ng.id) : ('i' + i)]
-            || (originalGroups && originalGroups[i]) || {packs: []};
+    const originalVariant = ng.id != null ? origByKey['id' + ng.id] : null;
+    const og = originalVariant || {packs: []};
     const oPacks = indexGroup(og);
     const nPacks = indexGroup(ng);
+    const isAddedVariant = !originalVariant;
+
+    if (!isAddedVariant && String(og.name || '') !== String(ng.name || '')) {
+      changes.push({variant: vname, pack: '—', field: 'Variant name',
+        from: og.name || '—', to: ng.name || '—'});
+    }
+    const oldUnitPrice = parseFloat(og.price_per_kg);
+    const newUnitPrice = parseFloat(ng.price_per_kg);
+    if (Number.isFinite(newUnitPrice)
+        && (!Number.isFinite(oldUnitPrice) || Math.abs(oldUnitPrice - newUnitPrice) > 0.0001)) {
+      changes.push({variant: vname, pack: '—', field: 'Selling price per kg / litre / 100 pcs',
+        from: money(oldUnitPrice), to: money(newUnitPrice)});
+    }
+    if (isAddedVariant) {
+      changes.push({variant: vname, pack: '—', field: 'Added variant',
+        from: '—', to: ng.name || 'Unnamed'});
+    }
+    if (ng.pool_grams != null && Number(og.pool_grams || 0) !== Number(ng.pool_grams || 0)) {
+      changes.push({variant: vname, pack: '—', field: 'Total stock pool (base units)',
+        from: og.pool_grams || 0, to: ng.pool_grams || 0});
+    }
 
     // Changed / added packs
     Object.keys(nPacks).forEach(ug => {
@@ -1949,7 +2642,12 @@ function buildChangeSummary(originalGroups, newGroups) {
         ['MRP',       money(op.mrp),              money(np.mrp)],
         ['Suggested', money(op.suggested_price),  money(np.suggested_price)],
         ['Stock',     fmt(op.stock),              fmt(np.stock)],
+        ['Supplier supply', op.supplier_can_supply === false ? 'Off' : 'On',
+          np.supplier_can_supply === false ? 'Off' : 'On'],
+        ['Only Bundle', op.only_bundle === true ? 'Yes' : 'No',
+          np.only_bundle === true ? 'Yes' : 'No'],
         ['Bundle qty',fmt(op.bundle_qty || 0),    fmt(np.bundle_qty || 0)],
+        ['Bundle count',fmt(op.bundle_count || 0),fmt(np.bundle_count || 0)],
       ];
       cmp.forEach(([field, a, b]) => {
         if (String(a) !== String(b)) changes.push({variant: vname, pack: plabel, field, from: a, to: b});

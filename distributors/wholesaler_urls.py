@@ -9,4 +9,5 @@ urlpatterns = [
     path('shops/new/', wholesaler_views.create_shop, name='create_shop'),
     path('shops/<int:pk>/reset-password/', wholesaler_views.reset_shop_password, name='reset_shop_password'),
     path('my-stock/', wholesaler_views.my_stock, name='my_stock'),
+    path('bundle-settings/', wholesaler_views.bundle_settings, name='bundle_settings'),
 ]

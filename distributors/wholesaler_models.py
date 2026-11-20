@@ -62,6 +62,15 @@ class Wholesaler(models.Model):
         max_digits=10, decimal_places=2, default=0,
         help_text='Skip items whose supplier price is above this (0 = no limit). '
                   'Stops high-value products from being auto-ordered.')
+    # Bundle chain (kb/10): when ON, this Distributor keeps no buffer stock.
+    # Its shops' restock requests pass straight to the stockist, and the
+    # stockist's bundle rules apply to those shops.
+    no_buffer_stock = models.BooleanField(
+        default=False,
+        verbose_name='No buffer stock',
+        help_text='Pass shop restock requests straight to the stockist instead of '
+                  'filling them from my own stock.'
+    )
     # Legacy flat-% field kept for data history; no longer used in pricing.
     default_margin_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -97,6 +106,12 @@ class WholesalerStock(models.Model):
         'products.ProductVariant', on_delete=models.CASCADE, related_name='wholesaler_stocks'
     )
     quantity = models.PositiveIntegerField(default=0)
+    # Packs promised to open shop requests (kb/13). Free = quantity - blocked.
+    blocked_quantity = models.PositiveIntegerField(default=0)
+
+    @property
+    def free_quantity(self):
+        return max(0, self.quantity - self.blocked_quantity)
     # Per-item opt-out: this one product is never auto-restocked, whatever the
     # global settings say. High-value or slow-moving items get ordered by hand.
     auto_restock_exempt = models.BooleanField(default=False)
@@ -108,6 +123,25 @@ class WholesalerStock(models.Model):
 
     def __str__(self):
         return f'{self.wholesaler.company_name} | {self.variant} — {self.quantity} units'
+
+
+class WholesalerLooseStock(models.Model):
+    """Loose measured stock held by a wholesale Distributor."""
+    wholesaler = models.ForeignKey(
+        Wholesaler, on_delete=models.CASCADE, related_name='loose_stocks'
+    )
+    product = models.ForeignKey(
+        'products.Product', on_delete=models.CASCADE, related_name='wholesaler_loose_stocks'
+    )
+    quantity_grams = models.PositiveIntegerField(default=0)
+    cost_price_per_gram = models.DecimalField(max_digits=10, decimal_places=4, default=0)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('wholesaler', 'product')
+
+    def __str__(self):
+        return f'{self.wholesaler.company_name} | {self.product.name} — {self.quantity_grams} base units'
 
 
 class WholesalerRestockRequest(models.Model):
@@ -130,6 +164,11 @@ class WholesalerRestockRequest(models.Model):
         'products.ProductVariant', on_delete=models.CASCADE, related_name='wholesaler_restock_requests'
     )
     quantity_requested = models.PositiveIntegerField()
+    loose_grams = models.PositiveIntegerField(default=0)
+    marketplace_request = models.ForeignKey(
+        'distributors.RestockRequest', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='wholesaler_restock_requests'
+    )
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     note = models.CharField(max_length=200, blank=True)
     requested_at = models.DateTimeField(auto_now_add=True)

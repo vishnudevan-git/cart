@@ -22,7 +22,7 @@
 <!-- Shown only on paper -->
 <div class="d-none d-print-block mb-2">
   <h5 class="mb-0">Packing list - {{ supplier.company_name }}</h5>
-  <div class="small text-muted">{% now "d M Y, H:i" %} · {{ tab|title }} tab</div>
+  <div class="small text-muted">{% now "d M Y, H:i" %} · {{ tab_label }} tab</div>
 </div>
 
 <p class="text-muted small mb-2 print-hide">
@@ -34,7 +34,7 @@
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 no-print"
        role="button" data-bs-toggle="collapse" data-bs-target="#packSummary">
-    <span class="fw-semibold"><i class="bi bi-box-seam me-1"></i>What to pack ({{ tab }})</span>
+    <span class="fw-semibold"><i class="bi bi-box-seam me-1"></i>What to pack ({{ tab_label }})</span>
     <i class="bi bi-chevron-down text-muted" id="packChevron"
        style="transition: transform .2s ease;"></i>
   </div>
@@ -124,12 +124,12 @@
 </script>
 {% endif %}
 
-<!-- Global shipment mode — slim one-line summary, expandable -->
+<!-- Global shipment routing — slim one-line summary, expandable -->
 <div class="d-flex align-items-center flex-wrap gap-2 mb-3 small print-hide">
-  <span class="text-muted">Shipment:</span>
+  <span class="text-muted">Shipment routing:</span>
   {% if supplier.use_global_shipment_mode %}
     <span class="badge {% if supplier.default_shipment_mode == 'send' %}bg-primary{% else %}bg-secondary{% endif %}">
-      Global · {{ supplier.get_default_shipment_mode_display }}
+      Global · {{ supplier.get_default_shipment_target_display }} · {{ supplier.get_default_shipment_mode_display }}
     </span>
   {% else %}
     <span class="badge bg-light text-dark border">Per-product</span>
@@ -142,15 +142,24 @@
       <form method="post" class="row g-2 align-items-end">
         {% csrf_token %}
         <input type="hidden" name="action" value="set_global_mode">
-        <div class="col-auto">
-          <div class="form-check form-switch mb-0 mt-3">
+        <div class="col-12 col-md-3">
+          <div class="form-check form-switch mb-0 mt-md-3">
             <input class="form-check-input" type="checkbox" name="use_global" value="1"
                    id="useGlobal" {% if supplier.use_global_shipment_mode %}checked{% endif %}>
-            <label class="form-check-label small fw-semibold" for="useGlobal">Use one global mode</label>
+            <label class="form-check-label small fw-semibold" for="useGlobal">Use global shipment routing</label>
           </div>
         </div>
-        <div class="col-12 col-md-5">
-          <select name="default_shipment_mode" class="form-select form-select-sm">
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1" for="defaultShipmentTarget">You ship this to</label>
+          <select name="default_shipment_target" id="defaultShipmentTarget" class="form-select form-select-sm">
+            {% for val, lbl in global_target_choices %}
+            <option value="{{ val }}" {% if supplier.default_shipment_target == val %}selected{% endif %}>{{ lbl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label small mb-1" for="defaultShipmentMode">Handover</label>
+          <select name="default_shipment_mode" id="defaultShipmentMode" class="form-select form-select-sm">
             {% for val, lbl in global_mode_choices %}
             <option value="{{ val }}" {% if supplier.default_shipment_mode == val %}selected{% endif %}>{{ lbl }}</option>
             {% endfor %}
@@ -161,7 +170,7 @@
         </div>
         <div class="col-12">
           <div class="form-text" style="font-size:11px">
-            Self-dispatch = you send it; the <strong>receiver bears the pickup cost</strong>. Allow collect = target picks up.
+            When enabled, both settings apply to all products and are read-only on product pages. Self-dispatch = you send it; the <strong>receiver bears the pickup cost</strong>. Allow collect = target picks up.
           </div>
         </div>
       </form>
@@ -266,39 +275,40 @@
   })();
 </script>
 
-<!-- Status tabs (keep current filters when switching) -->
+<script>
+  (function () {
+    var key = 'supplierOrdersTabScroll';
+    var saved = null;
+    try {
+      saved = sessionStorage.getItem(key);
+      sessionStorage.removeItem(key);
+    } catch (e) {}
+    if (saved !== null) {
+      requestAnimationFrame(function () {
+        window.scrollTo(0, Number(saved) || 0);
+      });
+    }
+    document.addEventListener('click', function (event) {
+      var link = event.target.closest('[data-preserve-scroll]');
+      if (!link) return;
+      try { sessionStorage.setItem(key, String(window.scrollY)); } catch (e) {}
+    });
+  })();
+</script>
+
+<!-- Shipment-status tabs (keep current filters when switching) -->
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 print-hide">
   <ul class="nav nav-pills gap-2">
+    {% for status in shipment_status_tabs %}
     <li class="nav-item">
-      <a class="nav-link {% if tab == 'action' %}active{% endif %}" href="?tab=action{{ filter_qs }}">
-        Needs action
-        {% if count_action %}<span class="badge bg-warning text-dark ms-1">{{ count_action }}</span>{% endif %}
+      <a class="nav-link {% if tab == status.key %}active{% endif %}" href="?tab={{ status.key }}{{ filter_qs }}" data-preserve-scroll>
+        {{ status.label }}
+        <span class="badge {% if status.key == 'awaiting' or status.key == 'delayed' %}bg-warning text-dark{% elif status.key == 'unavailable' or status.key == 'cancelled' %}bg-danger{% elif status.key == 'received' %}bg-success{% elif status.key == 'dispatched' %}bg-info text-dark{% else %}bg-primary{% endif %} ms-1">
+          {{ status.order_count }}{% if status.order_count %} <span class="fw-normal">({{ status.product_count }})</span>{% endif %}
+        </span>
       </a>
     </li>
-    {% if count_delayed or tab == 'delayed' %}
-    <li class="nav-item">
-      <a class="nav-link {% if tab == 'delayed' %}active{% endif %}" href="?tab=delayed{{ filter_qs }}">
-        <i class="bi bi-clock-history me-1"></i>Delayed <span class="badge bg-warning text-dark ms-1">{{ count_delayed }}</span>
-      </a>
-    </li>
-    {% endif %}
-    {% if count_unavailable or tab == 'unavailable' %}
-    <li class="nav-item">
-      <a class="nav-link {% if tab == 'unavailable' %}active{% endif %}" href="?tab=unavailable{{ filter_qs }}">
-        Unavailable <span class="badge bg-danger ms-1">{{ count_unavailable }}</span>
-      </a>
-    </li>
-    {% endif %}
-    <li class="nav-item">
-      <a class="nav-link {% if tab == 'completed' %}active{% endif %}" href="?tab=completed{{ filter_qs }}">
-        Completed <span class="badge bg-light text-dark ms-1">{{ count_completed }}</span>
-      </a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link {% if tab == 'all' %}active{% endif %}" href="?tab=all{{ filter_qs }}">
-        All <span class="badge bg-light text-dark ms-1">{{ count_all }}</span>
-      </a>
-    </li>
+    {% endfor %}
   </ul>
   {% if selectable_count %}
   <label class="small d-inline-flex align-items-center gap-2 mb-0" style="cursor:pointer">
@@ -499,11 +509,7 @@
 {% empty %}
   <div class="card border-0 shadow-sm">
     <div class="card-body text-center text-muted py-5">
-      {% if tab == 'action' %}Nothing needs your action right now. 🎉
-      {% elif tab == 'delayed' %}No delayed lines.
-      {% elif tab == 'unavailable' %}No unavailable lines.
-      {% elif tab == 'completed' %}No completed shipments yet.
-      {% else %}No shipment requests yet.{% endif %}
+      No {{ tab_label|lower }} shipment orders.
     </div>
   </div>
 {% endfor %}

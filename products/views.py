@@ -6,15 +6,38 @@ from .models import Product, Category, ProductVariant
 
 
 def get_distributor(request):
-    """Returns the active Distributor for this request."""
+    """Returns the Distributor for this request.
+    
+    Key behavior:
+    - Returns active distributors normally
+    - Also returns suspended distributors if the customer has pending orders
+      (to allow order completion and history view)
+    """
     from distributors.models import Distributor
+    from orders.models import Order
+    
+    # Check authenticated user's distributor first
     if request.user.is_authenticated and getattr(request.user, 'distributor', None):
-        if getattr(request.user.distributor, 'status', None) == 'active':
-            return request.user.distributor
+        dist = request.user.distributor
+        if getattr(dist, 'status', None) == 'active':
+            return dist
+        # For suspended distributors: check if customer has pending orders
+        if getattr(dist, 'status', None) == 'suspended':
+            pending_orders = Order.objects.filter(customer=request.user, distributor=dist, status__in=['pending', 'confirmed', 'delivered']).exists()
+            if pending_orders:
+                return dist
+    
     dist_id = request.session.get('distributor_id')
     if dist_id:
         try:
-            return Distributor.objects.get(pk=dist_id, status='active')
+            dist = Distributor.objects.get(pk=dist_id)
+            if dist.status == 'active':
+                return dist
+            # For suspended distributors: check if customer has pending orders
+            if dist.status == 'suspended':
+                pending_orders = Order.objects.filter(customer=request.user, distributor=dist, status__in=['pending', 'confirmed', 'delivered']).exists() if request.user.is_authenticated else False
+                if pending_orders or not request.user.is_authenticated:
+                    return dist
         except Distributor.DoesNotExist:
             pass
     return None
@@ -26,6 +49,7 @@ def _product_qs(distributor):
         listed_ids = distributor.dist_products.filter(is_listed=True).values_list('product_id', flat=True)
         # Show approved products + pending products that are self-listed (charges_confirmed=True)
         # Never show deleted products
+        # Show products from suspended suppliers if they have downstream stock (DVP exists)
         # all_objects: this shop's OWN products are private to it, so they are
         # hidden from the default (shared) manager — but its own customers must
         # see them. Everything here is already scoped to this shop's listings.
@@ -34,7 +58,25 @@ def _product_qs(distributor):
             Q(status='approved', charges_confirmed=True) |
             Q(status='approved', direct_supply=True) |
             Q(status='pending', charges_confirmed=True, pk__in=listed_ids)
-        ).filter(pk__in=listed_ids, is_deleted=False).prefetch_related('variants', 'category')
+        ).filter(pk__in=listed_ids, is_deleted=False)
+        
+        # For suspended suppliers: show products if they have ANY DVP (downstream stock exists)
+        # For non-suspended suppliers: show normally
+        from distributors.models import DistributorVariantPrice
+        
+        # Get product IDs that have ANY DVP for this distributor
+        products_with_any_dvp = DistributorVariantPrice.objects.filter(
+            distributor=distributor
+        ).values_list('variant__product_id', flat=True).distinct()
+        
+        # Include products from suspended suppliers if they have downstream stock
+        # Supplier.status is 'approved' or 'suspended' (there is no 'active').
+        qs = qs.filter(
+            ~Q(supplier__status='suspended') |
+            Q(supplier__status='suspended', id__in=products_with_any_dvp)
+        )
+        
+        qs = qs.prefetch_related('variants', 'category')
     else:
         qs = Product.objects.none()
     return qs
@@ -45,9 +87,54 @@ def _no_distributor_response(request):
     return render(request, 'products/no_distributor.html', status=200)
 
 
+def _orderable(variant, distributor):
+    """A customer can order this pack if the shop, or any tier above it, has free stock (kb/13)."""
+    if (variant.stock or 0) > 0:
+        return True
+    from orders.upstream_stock import tier_free
+    from products.models import ProductVariant
+    if any(tier_free(distributor, variant, t) > 0 for t in ('wholesaler', 'stockist')):
+        return True
+    supplier = ProductVariant.objects.filter(pk=variant.pk).values_list('stock', 'blocked_stock').first()
+    return bool(supplier and max(0, supplier[0] - supplier[1]) > 0)
+
+
 def _enrich_product(product, distributor):
-    """Attach distributor pricing to product and all its variants."""
-    active_variants = list(product.variants.filter(is_active=True).order_by('selling_price'))
+    """Attach distributor pricing to product and all its variants.
+    
+    Key behavior:
+    - Show variants that are:
+      a) is_active=True, OR
+      b) is_active=False BUT there's a DVP (meaning downstream stock exists or existed)
+    - This ensures removed packs with existing downstream stock remain visible
+    until stock is depleted.
+    
+    DVP.is_active=False is used when pack is removed, but the DVP row is kept
+    for pricing history. We check if a DVP exists at all (not NULL) to show
+    variants that were recently removed but still have downstream stock.
+    """
+    from distributors.models import DistributorVariantPrice
+    
+    # Get all DVPs for this product from this distributor (even inactive ones)
+    all_dvp_map = {
+        dvp.variant_id: dvp
+        for dvp in DistributorVariantPrice.objects.filter(
+            distributor=distributor,
+            variant__product=product,
+        )
+    }
+    
+    # Filter variants to show:
+    # - Active variants (is_active=True)
+    # - Inactive variants that have a DVP row (meaning downstream stock existed)
+    # Note: DVP.is_active may be False but if the DVP row exists, show the variant
+    variants_to_show = []
+    for v in product.variants.all():
+        dvp = all_dvp_map.get(v.pk)
+        if v.is_active or dvp:
+            variants_to_show.append(v)
+    
+    active_variants = variants_to_show
 
     # Multi-variant hint for the catalogue card: 2+ active, named variant-types.
     try:
@@ -62,7 +149,6 @@ def _enrich_product(product, distributor):
         product.variant_count = 0
 
     if distributor:
-        from distributors.models import DistributorVariantPrice
         from stockist.models import Stockist, get_stockist_price, stockist_for
 
         active_stockist = stockist_for(distributor)
@@ -137,7 +223,7 @@ def home(request):
             if distributor.hide_out_of_stock_products:
                 products = [
                     p for p in products
-                    if any((v.stock or 0) > 0 for v in getattr(p, 'enriched_variants', []))
+                    if any(_orderable(v, distributor) for v in getattr(p, 'enriched_variants', []))
                 ]
             return render(request, 'products/home.html', {
                 'categories': categories,
@@ -171,7 +257,7 @@ def home(request):
     if distributor.hide_out_of_stock_products:
         products = [
             p for p in products
-            if any((v.stock or 0) > 0 for v in getattr(p, 'enriched_variants', []))
+            if any(_orderable(v, distributor) for v in getattr(p, 'enriched_variants', []))
         ]
     return render(request, 'products/home.html', {
         'categories': categories,
@@ -235,7 +321,7 @@ def product_list(request):
     if distributor.hide_out_of_stock_products:
         products = [
             p for p in products
-            if any((v.stock or 0) > 0 for v in getattr(p, 'enriched_variants', []))
+            if any(_orderable(v, distributor) for v in getattr(p, 'enriched_variants', []))
         ]
 
     min_price = request.GET.get('min_price')
@@ -532,7 +618,7 @@ def distributor_storefront(request, invite_code):
     if distributor.hide_out_of_stock_products:
         products = [
             p for p in products
-            if any((v.stock or 0) > 0 for v in getattr(p, 'enriched_variants', []))
+            if any(_orderable(v, distributor) for v in getattr(p, 'enriched_variants', []))
         ]
 
     if sort == 'price_asc':

@@ -27,5 +27,10 @@ Rule of thumb: **PROJECT_NOTES.md** = the diary (append-only history).
 7. [07 — Supplier Shipment Routing](07-supplier-shipment-routing.md) — how a supplier routes a product, skips tiers, and the collect/send handover. Live explainer at `/supplier-shipment/`.
 8. [08 — Supplier Suspension](08-supplier-suspension.md) — what suspending a supplier does: login block, in-progress-order guard, and the buffer-stock-aware product-hiding cascade. **Source of truth for suspension behaviour.**
 9. [09 — Account Lifecycle](09-account-lifecycle.md) — the Active → Suspended → Deleted (soft) → Hard-deleted (purged) flow for all partner roles + customers, the grace-period setting, and the purge job. **Source of truth for the account lifecycle.**
+10. [10 — Bundle Supply Chain](10-bundle-supply-chain.md) — why bundle rules are carried down the chain (Supplier → Stockist → Distributor → Marketplace), the rules, the settings pages, the no-buffer switch and restock routing. **Source of truth for bundle behaviour.**
+11. [11 — Requirements and Decision Log](11-requirements-decision-log.md) — the owner's requests and answers, with plan changes marked **PLAN CHANGE**.
+12. [12 — Handover: Owner Context, Decisions and Open Items](12-handover-owner-context.md) — **read first in a new session.** Owner's working rules, decisions and where they live in the code, current state, open items, and mistakes to avoid.
 
-_Last reviewed: 2026-11-02 (reflects PROJECT_NOTES.md through Stage 8.3 + supplier shipment routing)._
+13. [13 - Stock Availability, Blocking and Returns](13-stock-availability-and-blocking.md) - free stock, blocking on requests, customer-only cancel and return to source. **Source of truth for stock rules.**
+
+_Last reviewed: 2026-11-18 (articles 10–12 added: bundle chain, decision log, handover; reflects PROJECT_NOTES.md through the 2026-11-18 changes)._

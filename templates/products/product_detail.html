@@ -98,7 +98,7 @@
               <span class="badge bg-success">In Stock</span>
               <span class="text-muted small ms-1">{{ dv.stock }} left</span>
             {% else %}
-              <span class="badge bg-danger">Out of Stock</span>
+              
             {% endif %}
           </div>
         {% endif %}{% endwith %}
@@ -384,7 +384,7 @@ document.querySelectorAll('.variant-option').forEach(btn => {
     const stockEl = document.getElementById('stockBadge');
     stockEl.innerHTML = v.stock > 0
       ? '<span class="badge bg-success">In Stock</span><span class="text-muted small ms-1">' + v.stock + ' left</span>'
-      : '<span class="badge bg-danger">Out of Stock</span>';
+      : '';
 
     if (addBtn) {
       if (v.stock === 0) addBtn.classList.add('disabled');

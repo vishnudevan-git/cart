@@ -19,23 +19,24 @@
   <div class="col-md-5">
     <div class="card border-0 shadow-sm p-3">
       <h6 class="fw-semibold mb-3">Request Restock from Supplier</h6>
+      <p class="small text-muted">Bundle-only packs must be requested in full bundle quantities.</p>
       <form method="post">
         {% csrf_token %}
         <div class="mb-3">
           <label class="form-label small fw-semibold">Variant</label>
           <select name="variant_id" class="form-select" required>
             <option value="">— Select variant —</option>
-            {% for inv in all_variants %}
-            <option value="{{ inv.variant.pk }}">
-              {{ inv.variant.product.name }} — {{ inv.variant.label }} ({{ inv.quantity }} in stock)
-              {% if inv.quantity <= 10 %} ⚠️ Low{% endif %}
+            {% for variant in supplier_pack_variants %}
+            <option value="{{ variant.pk }}">
+              {{ variant.product.name }} — {{ variant.label }} · {{ variant.product.supplier.company_name }}
+              {% if variant.only_bundle %} (bundle of {{ variant.supplier_order_multiple }} only){% endif %}
             </option>
             {% endfor %}
           </select>
         </div>
         <div class="mb-3">
-          <label class="form-label small fw-semibold">Quantity Needed</label>
-          <input type="number" name="quantity" class="form-control" min="1" required>
+          <label class="form-label small fw-semibold">Quantity Needed (packs)</label>
+          <input type="number" name="quantity" class="form-control" min="1" step="1" required>
         </div>
         <div class="mb-3">
           <label class="form-label small fw-semibold">Note (optional)</label>
@@ -56,8 +57,8 @@
             {% for r in requests %}
             <tr>
               <td>{{ r.variant.product.name }}</td>
-              <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
-              <td>{{ r.quantity_requested }}</td>
+              <td><span class="badge bg-secondary">{{ r.variant.label }}</span>{% if r.loose_supply %}<span class="badge bg-info text-dark ms-1">Loose</span>{% endif %}</td>
+              <td>{{ r.quantity_requested }} pack(s)</td>
               <td>
                 <span class="badge {% if r.status == 'fulfilled' %}bg-success{% elif r.status == 'rejected' %}bg-danger{% elif r.status == 'approved' %}bg-info text-dark{% else %}bg-warning text-dark{% endif %}">
                   {{ r.get_status_display }}

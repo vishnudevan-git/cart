@@ -405,10 +405,10 @@
                     {% endif %}
                   </td>
                   <td>
-                    <input type="number" name="selling_price_{{ v.pk }}" step="1" min="0"
-                           value="{{ vd.selling_price|floatformat:0 }}" form="form-{{ p.pk }}"
+                    <input type="number" name="selling_price_{{ v.pk }}" step="0.01" min="0"
+                           value="{{ vd.selling_price|floatformat:2 }}" form="form-{{ p.pk }}"
                            class="form-control form-control-sm dist-price" style="width:85px"
-                           data-admin="{{ vd.stockist_price|floatformat:0 }}"
+                           data-admin="{{ vd.stockist_price|floatformat:2 }}"
                            data-vid="{{ v.pk }}"
                            data-product="{{ p.pk }}"
                             data-master-unit="{{ p.master_unit }}"

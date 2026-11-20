@@ -7,8 +7,7 @@
 {% if pending_count %}
 <div class="alert alert-warning py-2 small mb-3">
   <i class="bi bi-bell-fill me-1"></i>
-  <strong>{{ pending_count }}</strong> pending distributor restock request(s).
-  Collect from supplier and deliver to distributor.
+  <strong>{{ pending_count }}</strong> pending distributor restock request(s). Approve each request to confirm the supplier's handover method.
 </div>
 {% endif %}
 
@@ -59,17 +58,25 @@
             {% if r.is_loose %}{{ r.product.supplier.company_name }}{% else %}{{ r.variant.product.supplier.company_name }}{% endif %}
           </td>
           <td class="small">
-            {% if r.fulfillment_method == 'stockist_pickup' %}🚗 You pick up
-            {% elif r.fulfillment_method == 'supplier_transport' %}🚛 Supplier transport
-            {% elif r.fulfillment_method == 'supplier_courier' %}📦 Courier
+            {% if r.effective_fulfillment_method == 'stockist_pickup' %}🚗 You pick up from supplier
+            {% elif r.effective_fulfillment_method == 'supplier_transport' %}🚛 Supplier sends to you
+            {% elif r.effective_fulfillment_method == 'supplier_courier' %}📦 Courier
             {% else %}—{% endif %}
           </td>
           <td class="text-muted">{{ r.requested_at|date:"d M Y, H:i" }}</td>
           <td>
             {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
-            {% elif r.status == 'approved' %}<span class="badge bg-info text-dark">Approved — collect &amp; deliver</span>
+            {% elif r.status == 'approved' %}
+              {% if r.fulfillment_method == 'stockist_pickup' %}
+                <span class="badge bg-info text-dark">Approved — collect from supplier</span>
+              {% else %}
+                <span class="badge bg-info text-dark">Approved — awaiting supplier dispatch</span>
+              {% endif %}
             {% elif r.status == 'dispatched' or r.status == 'stockist_picked' %}
               <span class="badge bg-primary">📦 Picked by Stockist</span>
+              {% if r.tracking_info %}<div class="small text-muted">{{ r.tracking_info }}</div>{% endif %}
+            {% elif r.status == 'in_transit' %}
+              <span class="badge bg-info">🚚 Supplier dispatched</span>
               {% if r.tracking_info %}<div class="small text-muted">{{ r.tracking_info }}</div>{% endif %}
             {% elif r.status == 'delivered' %}<span class="badge bg-success">✓ Delivered</span>
             {% elif r.status == 'rejected' %}<span class="badge bg-danger">Rejected</span>
@@ -81,16 +88,9 @@
               {% csrf_token %}
               <input type="hidden" name="req_id" value="{{ r.pk }}">
               <input type="hidden" name="action" value="approve">
-              {% if not r.is_loose %}
-              <div class="d-flex align-items-center gap-1 mb-1">
-                <select name="fulfillment_method" class="form-select form-select-sm" style="max-width:170px;font-size:.75rem">
-                  <option value="stockist_pickup">🚗 I'll pick up</option>
-                  <option value="supplier_transport">🚛 Supplier transport</option>
-                  <option value="supplier_courier">📦 Courier</option>
-                </select>
-              </div>
-              {% endif %}
-              <button class="btn btn-sm btn-info">Approve</button>
+              <button class="btn btn-sm btn-info">
+                Approve · {% if r.effective_fulfillment_method == 'stockist_pickup' %}I'll collect{% else %}supplier sends{% endif %}
+              </button>
             </form>
             <form method="post" class="d-inline ms-1">
               {% csrf_token %}
@@ -99,6 +99,7 @@
               <button class="btn btn-sm btn-outline-danger">Reject</button>
             </form>
             {% elif r.status == 'approved' %}
+            {% if r.fulfillment_method == 'stockist_pickup' %}
             <form method="post" class="d-inline">
               {% csrf_token %}
               <input type="hidden" name="req_id" value="{{ r.pk }}">
@@ -107,6 +108,9 @@
                 {% if r.is_loose %}🌾 Stock Collected{% else %}📦 Picked from Supplier{% endif %}
               </button>
             </form>
+            {% else %}
+            <span class="small text-muted">Waiting for supplier to dispatch</span>
+            {% endif %}
             {% elif r.status == 'stockist_picked' or r.status == 'dispatched' or r.status == 'in_transit' %}
             <form method="post" class="d-inline">
               {% csrf_token %}
@@ -145,7 +149,7 @@ one of these requests is the ONLY way their stock increases.{% endcomment %}
           <td class="fw-semibold">{{ r.wholesaler.company_name }}</td>
           <td>{{ r.variant.product.name }}</td>
           <td><span class="badge bg-secondary">{{ r.variant.label }}</span></td>
-          <td class="fw-semibold">{{ r.quantity_requested }}</td>
+          <td class="fw-semibold">{% if r.loose_grams %}{{ r.loose_grams }} {{ r.variant.product.master_unit }} loose{% else %}{{ r.quantity_requested }}{% endif %}</td>
           <td>
             {% if r.status == 'pending' %}<span class="badge bg-warning text-dark">Pending</span>
             {% elif r.status == 'delivered' %}<span class="badge bg-success">Delivered</span>
@@ -159,7 +163,7 @@ one of these requests is the ONLY way their stock increases.{% endcomment %}
               <input type="hidden" name="kind" value="wholesaler">
               <input type="hidden" name="req_id" value="{{ r.pk }}">
               <button name="action" value="deliver" class="btn btn-sm btn-success"
-                      data-confirm="Deliver {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to {{ r.wholesaler.company_name }}?"
+                      data-confirm="{% if r.loose_grams %}Transfer {{ r.loose_grams }} {{ r.variant.product.master_unit }} of loose {{ r.variant.product.name }} to {{ r.wholesaler.company_name }}?{% else %}Deliver {{ r.quantity_requested }}× {{ r.variant.label }} of {{ r.variant.product.name }} to {{ r.wholesaler.company_name }}?{% endif %}"
                       data-confirm-type="success" data-confirm-title="Confirm delivery?">Deliver</button>
               <button name="action" value="reject" class="btn btn-sm btn-outline-danger">Reject</button>
             </form>

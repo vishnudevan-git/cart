@@ -1,0 +1,1481 @@
+<!DOCTYPE html><html lang="" data-motion-profile="medium"><head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Customer Management</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/static/css/premium-ui.css?v=20261031c" rel="stylesheet">
+  <style>
+    :root { --env-ribbon-h: 0px; }
+    body { font-family: var(--ui-font-family); font-size: 14px; }
+    body { padding-top: var(--env-ribbon-h); }
+    h1,h2,h3,h4,h5,h6 { font-family: var(--ui-font-family); font-weight: 700; }
+    .fw-semibold { font-weight: 600 !important; }
+    .btn { font-weight: 600; }
+    :root { --sidebar-w: 240px; }
+    body { background: #f4f6f9; }
+
+    .env-ribbon {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1080;
+      height: 34px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .78rem;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: #fff;
+    }
+    .env-ribbon.env-demo { background: linear-gradient(135deg, #b45309, #f97316); }
+    .env-ribbon.env-prod { background: linear-gradient(135deg, #065f46, #0f766e); }
+
+    /* Sidebar */
+    .sidebar {
+      background: var(--green);
+      color: #fff;
+      width: var(--sidebar-w);
+      position: fixed;
+      top: var(--env-ribbon-h); left: 0;
+      height: calc(100vh - var(--env-ribbon-h));
+      overflow-y: auto;
+      z-index: 1040;
+      transition: transform .25s ease;
+    }
+    .sidebar .brand {
+      font-size: 1.1rem; font-weight: 700;
+      padding: 1rem 1.25rem;
+      border-bottom: 1px solid rgba(255,255,255,.2);
+      white-space: nowrap;
+    }
+    .sidebar .nav-link {
+      color: rgba(255,255,255,.85);
+      padding: .55rem 1.25rem;
+      white-space: nowrap;
+    }
+    .sidebar .nav-link:hover,
+    .sidebar .nav-link.active {
+      color: #fff;
+      background: rgba(255,255,255,.15);
+      border-radius: 4px;
+    }
+    .sidebar .nav-link i { margin-right: .45rem; }
+
+    /* Main content */
+    .main-content {
+      margin-left: var(--sidebar-w);
+      padding: 1.5rem;
+      min-height: 100vh;
+      transition: margin-left .25s ease;
+    }
+
+    /* Desktop collapsed sidebar (shared across all logins) */
+    @media (min-width: 768px) {
+      body.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+      body.sidebar-collapsed .main-content { margin-left: 0; }
+    }
+    .sidebar-toggle-desktop {
+      display: none;
+    }
+    @media (min-width: 768px) {
+      .sidebar-toggle-desktop { display: inline-flex; }
+    }
+    .topbar {
+      background: #fff;
+      padding: .75rem 1.25rem;
+      border-bottom: 1px solid #dee2e6;
+      margin: -1.5rem -1.5rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .stat-card { border-left: 4px solid var(--green); }
+
+    /* Sidebar overlay for mobile */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 1039;
+    }
+    .sidebar-overlay.show { display: block; }
+
+    .rupee-spin-wrap { position: relative; display: inline-flex; min-width: 0; }
+    .rupee-spin-wrap > input.rupee-whole-stepper { padding-right: 1.45rem !important; }
+    .input-group > .rupee-spin-wrap { flex: 1 1 auto; width: 1% !important; }
+    .rupee-spin-buttons {
+      position: absolute; z-index: 2; top: 1px; right: 2px; bottom: 1px;
+      width: 17px; display: flex; flex-direction: column;
+    }
+    .rupee-spin-buttons button {
+      flex: 1 1 50%; border: 0; padding: 0; margin: 0; background: transparent;
+      color: #777; font-size: 9px; line-height: 1; cursor: pointer;
+    }
+    .rupee-spin-buttons button:hover { color: var(--green, #287d36); }
+    .rupee-whole-stepper::-webkit-inner-spin-button,
+    .rupee-whole-stepper::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    .rupee-whole-stepper { -moz-appearance: textfield; }
+
+    /* Mobile */
+    @media (max-width: 767.98px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main-content { margin-left: 0; padding: 1rem; }
+      .topbar { margin: -1rem -1rem 1rem; }
+    }
+  </style>
+  <style>
+  :root {
+    --theme-color: #2e7d32;
+    --ui-font-family: Inter, sans-serif;
+    --green: var(--theme-color);
+  }
+
+  .navbar { background: var(--theme-color) !important; }
+  .btn-success, .btn-green { background: var(--theme-color) !important; border-color: var(--theme-color) !important; }
+  .btn-success:hover, .btn-green:hover { filter: brightness(0.9); }
+  .btn-outline-success { color: var(--theme-color) !important; border-color: var(--theme-color) !important; }
+  .btn-outline-success:hover { background: var(--theme-color) !important; color: #fff !important; }
+  .text-success { color: var(--theme-color) !important; }
+  .badge-cart { background: var(--theme-color); }
+  a.text-success:hover { filter: brightness(0.85); }
+  footer { background: var(--theme-color); color: rgba(255,255,255,.8); }
+
+  [data-bs-theme='dark'] body { background: #1a1a2e !important; }
+  [data-bs-theme='dark'] .main-content { background: #1a1a2e !important; }
+  [data-bs-theme='dark'] .card,
+  [data-bs-theme='dark'] .card-header,
+  [data-bs-theme='dark'] .card-footer,
+  [data-bs-theme='dark'] .bg-white,
+  [data-bs-theme='dark'] .bg-light,
+  [data-bs-theme='dark'] .topbar { background-color: #16213e !important; color: #e0e0e0 !important; }
+
+  [data-bs-theme='dark'] thead,
+  [data-bs-theme='dark'] thead tr,
+  [data-bs-theme='dark'] thead th,
+  [data-bs-theme='dark'] .table-light,
+  [data-bs-theme='dark'] .table-light > * {
+    background-color: #0f3460 !important;
+    color: #e0e0e0 !important;
+    --bs-table-bg: #0f3460 !important;
+    --bs-table-color: #e0e0e0 !important;
+  }
+
+  [data-bs-theme='dark'] .table { --bs-table-bg: #16213e; color: #e0e0e0; }
+  [data-bs-theme='dark'] .table > :not(caption) > * > * { background-color: #16213e; color: #e0e0e0; }
+  [data-bs-theme='dark'] .table td,
+  [data-bs-theme='dark'] .table th { border-color: #2a3a5a !important; }
+  [data-bs-theme='dark'] .text-muted { color: #9aa0b0 !important; }
+  [data-bs-theme='dark'] .border,
+  [data-bs-theme='dark'] .border-bottom { border-color: #2a3a5a !important; }
+
+  [data-bs-theme='dark'] .form-control,
+  [data-bs-theme='dark'] .form-select,
+  [data-bs-theme='dark'] .input-group-text {
+    background-color: #0f3460 !important;
+    color: #e0e0e0 !important;
+    border-color: #2a3a5a !important;
+  }
+
+  [data-bs-theme='dark'] select option { background-color: #0f3460; color: #e0e0e0; }
+  [data-bs-theme='dark'] .list-group-item { background-color: #16213e !important; color: #e0e0e0 !important; border-color: #2a3a5a !important; }
+  [data-bs-theme='dark'] .modal-content { background-color: #16213e !important; }
+  [data-bs-theme='dark'] .dropdown-menu { background-color: #16213e !important; border-color: #2a3a5a !important; }
+  [data-bs-theme='dark'] .dropdown-item { color: #e0e0e0 !important; }
+  [data-bs-theme='dark'] .dropdown-item:hover { background-color: #0f3460 !important; }
+  [data-bs-theme='dark'] .btn-outline-secondary { color: #9aa0b0; border-color: #2a3a5a; }
+  [data-bs-theme='dark'] .stat-card { border-left-color: #4caf50; }
+  [data-bs-theme='dark'] .alert { border-color: #2a3a5a; }
+
+  /* ── Offcanvas (cart basket) dark mode ─────────────────────────────────── */
+  [data-bs-theme='dark'] .offcanvas,
+  [data-bs-theme='dark'] .offcanvas-header,
+  [data-bs-theme='dark'] .offcanvas-body {
+    background-color: #16213e !important;
+    color: #e0e0e0 !important;
+  }
+  [data-bs-theme='dark'] .offcanvas .border-bottom,
+  [data-bs-theme='dark'] .offcanvas .border-top { border-color: #2a3a5a !important; }
+  [data-bs-theme='dark'] .offcanvas .btn-close { filter: invert(1) grayscale(100%) brightness(2); }
+
+  /* ── Navbar dark mode ───────────────────────────────────────────────────── */
+  [data-bs-theme='dark'] nav.navbar,
+  [data-bs-theme='dark'] #mainNavbar {
+    background-color: #16213e !important;
+  }
+  [data-bs-theme='dark'] #mainNavbar .nav-link,
+  [data-bs-theme='dark'] #mainNavbar .navbar-brand {
+    color: #e0e0e0 !important;
+  }
+
+  /* ── Spinner / input-group-text dark mode ───────────────────────────── */
+  [data-bs-theme='dark'] .input-group-text,
+  [data-bs-theme='dark'] .input-group-text.bg-white {
+    background-color: #0f3460 !important;
+    color: #e0e0e0 !important;
+  }
+
+  /* ── Home / storefront contrast fixes (dark) ──────────────────────────── */
+  /* Shop by Category cards — readable light label text */
+  [data-bs-theme='dark'] .category-card,
+  [data-bs-theme='dark'] .category-card.card {
+    background-color: #16213e !important;
+    border-color: #2a3a5a !important;
+  }
+  [data-bs-theme='dark'] .category-card .text-dark,
+  [data-bs-theme='dark'] .category-card .fw-semibold,
+  [data-bs-theme='dark'] .category-card .small,
+  [data-bs-theme='dark'] .category-card a {
+    color: #E2E8F0 !important;
+  }
+
+  /* Top utility banner — seamless dark, matches navbar */
+  [data-bs-theme='dark'] .store-utility-strip {
+    background: #16213e !important;
+    border-color: #2a3a5a !important;
+    color: #F8FAFC !important;
+  }
+  [data-bs-theme='dark'] .store-utility-strip span { color: #F8FAFC !important; }
+  [data-bs-theme='dark'] .store-utility-strip i { color: #7de3aa !important; }
+
+  /* Hero buttons (Search + Shop All) — soften stark white, gentle hover */
+  [data-bs-theme='dark'] .home-hero .btn-light,
+  [data-bs-theme='dark'] .home-hero .btn-shop-all {
+    background-color: #E2E8F0 !important;
+    border-color: #E2E8F0 !important;
+    color: #0f172a !important;
+  }
+  [data-bs-theme='dark'] .home-hero .btn-light:hover,
+  [data-bs-theme='dark'] .home-hero .btn-light:focus,
+  [data-bs-theme='dark'] .home-hero .btn-shop-all:hover,
+  [data-bs-theme='dark'] .home-hero .btn-shop-all:focus {
+    background-color: #F1F5F9 !important;
+    border-color: #F1F5F9 !important;
+    color: #0f172a !important;
+  }
+
+  /* Section headings pop on dark */
+  [data-bs-theme='dark'] .product-grid-section h5,
+  [data-bs-theme='dark'] .container > h5 { color: #F1F5F9 !important; }
+</style>
+
+  
+</head>
+<body>
+
+
+
+<!-- Sidebar overlay (mobile) -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- Sidebar -->
+<div class="sidebar" id="sidebar">
+  
+  <div class="brand" style="padding: 1rem 1.25rem; color: #fff; font-size: 0.9rem; opacity: 0.8;">
+    Dashboard
+  </div>
+  
+  <nav class="nav flex-column mt-2 pb-4">
+    
+  <a class="nav-link " href="/admin-panel/dashboard/"><i class="bi bi-speedometer2"></i> Dashboard</a>
+
+
+<!-- Partners Dropdown -->
+<div class="nav-item">
+  <a class="nav-link d-flex justify-content-between align-items-center active" data-bs-toggle="collapse" href="#partnersCollapse" role="button" aria-expanded="true" aria-controls="partnersCollapse">
+    <span><i class="bi bi-people-fill"></i> Partners</span>
+    <i class="bi bi-chevron-down small"></i>
+  </a>
+  <div class="collapse show" id="partnersCollapse">
+    <div class="bg-dark bg-opacity-10 rounded mt-1 overflow-hidden">
+      <a class="nav-link ps-4 py-2 " href="/admin-panel/users/"><i class="bi bi-person me-2"></i> Users</a>
+      <a class="nav-link ps-4 py-2 active text-white fw-bold bg-white bg-opacity-10" href="/admin-panel/customers/"><i class="bi bi-person-check me-2"></i> Customers</a>
+      <a class="nav-link ps-4 py-2 " href="/admin-panel/suppliers/"><i class="bi bi-shop me-2"></i> Suppliers</a>
+      <a class="nav-link ps-4 py-2 " href="/admin-panel/wholesale-distributors/"><i class="bi bi-diagram-3 me-2"></i> Distributors</a>
+      <a class="nav-link ps-4 py-2 " href="/admin-panel/distributors/"><i class="bi bi-truck me-2"></i> Marketplaces</a>
+      <a class="nav-link ps-4 py-2 " href="/admin-panel/stockist/"><i class="bi bi-boxes me-2"></i> Stockist</a>
+      <a class="nav-link ps-4 py-2 " href="/admin-panel/hierarchy/"><i class="bi bi-diagram-3-fill me-2"></i> Hierarchy</a>
+    </div>
+  </div>
+</div>
+
+<a class="nav-link " href="/admin-panel/stock/"><i class="bi bi-layers"></i> Stock</a>
+<a class="nav-link " href="/admin-panel/products/"><i class="bi bi-box-seam"></i> Products</a>
+<a class="nav-link " href="/admin-panel/marketplace/"><i class="bi bi-shop-window"></i> Catalogue (Prices)</a>
+<a class="nav-link " href="/admin-panel/price-trace/"><i class="bi bi-diagram-2"></i> Price Trace</a>
+<a class="nav-link " href="/admin-panel/orders/"><i class="bi bi-receipt"></i> Orders</a>
+<a class="nav-link " href="/admin-panel/categories/"><i class="bi bi-tags"></i> Categories</a>
+<a class="nav-link " href="/admin-panel/reports/"><i class="bi bi-bar-chart"></i> Reports</a>
+<a class="nav-link " href="/admin-panel/support/">
+  <i class="bi bi-headset"></i> Support
+  
+</a>
+<a class="nav-link " href="/rentals/admin/">
+  <i class="bi bi-tools"></i> Rentals
+  
+</a>
+
+
+
+    <hr style="border-color:rgba(255,255,255,.2);margin:.5rem 1rem">
+    
+      <a class="nav-link" href="/"><i class="bi bi-shop"></i> Storefront</a>
+    
+    <div class="px-3 pb-3 mt-2">
+      <a href="/accounts/logout/" class="text-decoration-none">
+        <span style="background:linear-gradient(135deg,#f43b47,#ff6b35);color:#fff;padding:.3rem .8rem;border-radius:8px;font-size:.85rem;font-weight:700;display:inline-flex;align-items:center;gap:.4rem">
+          <i class="bi bi-box-arrow-right"></i>Logout
+        </span>
+      </a>
+    </div>
+  </nav>
+</div>
+
+<!-- Main content -->
+<div class="main-content">
+  <div class="topbar reveal-on-scroll is-visible">
+    <div class="d-flex align-items-center gap-2">
+      <!-- Hamburger (mobile only) -->
+      <button class="btn btn-sm btn-outline-secondary d-md-none" onclick="openSidebar()" aria-label="Open menu">
+        <i class="bi bi-list fs-5"></i>
+      </button>
+      <!-- Collapse toggle (desktop only) — shared across all logins -->
+      <button class="btn btn-sm btn-outline-secondary sidebar-toggle-desktop" onclick="toggleSidebarDesktop()" aria-label="Hide or show menu" title="Hide / show menu">
+        <i class="bi bi-list fs-5"></i>
+      </button>
+      <h6 class="mb-0 fw-semibold">Customer Management</h6>
+    </div>
+    <span class="text-muted small d-flex align-items-center gap-3">
+      9000000005
+
+
+      
+      <!-- Dark mode toggle -->
+      <a href="/accounts/toggle-dark/" class="text-muted text-decoration-none" title="Toggle dark mode">
+        <i class="bi bi-moon-fill"></i>
+      </a>
+      
+      
+      <a href="/accounts/change-password/" class="text-muted text-decoration-none" title="Change password">
+        <i class="bi bi-shield-lock"></i>
+      </a>
+      <a href="/accounts/logout/" class="text-decoration-none ms-1" title="Logout">
+        <span style="background:linear-gradient(135deg,#f43b47,#ff6b35);color:#fff;padding:.25rem .6rem;border-radius:8px;font-size:.8rem;font-weight:700">
+          <i class="bi bi-box-arrow-right me-1"></i>Logout
+        </span>
+      </a>
+    </span>
+  </div>
+
+  
+
+  
+
+  
+
+<!-- Tab bar -->
+<div class="d-flex gap-2 mb-3 flex-wrap align-items-center">
+  <a href="/admin-panel/customers/" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-people me-1"></i>Active Customers
+  </a>
+  <a href="/admin-panel/customers/?unlinked=1" class="btn btn-sm btn-outline-warning">
+    <i class="bi bi-person-x me-1"></i>No Marketplace
+    <span class="badge bg-warning text-dark ms-1">1</span>
+  </a>
+  <a href="/admin-panel/customers/?suspended_dist=1" class="btn btn-sm btn-danger">
+    <i class="bi bi-pause-circle me-1"></i>Suspended Marketplace
+    <span class="badge bg-danger ms-1">5</span>
+  </a>
+  <a href="/admin-panel/customers/?deleted=1" class="btn btn-sm btn-outline-danger">
+    <i class="bi bi-trash me-1"></i>Deleted Customers
+    <span class="badge bg-danger ms-1">1</span>
+  </a>
+</div>
+
+<!-- Filter bar -->
+
+<div class="card border-0 shadow-sm p-3 mb-3 reveal-on-scroll is-visible">
+  <form method="get" id="filterForm" class="d-flex flex-wrap gap-2 align-items-center">
+    
+    <input type="hidden" name="suspended_dist" value="1">
+    <input type="text" name="q" class="form-control form-control-sm" style="max-width:220px" placeholder="Search username / name / email" value="">
+    <button type="submit" class="btn btn-sm btn-outline-primary"><i class="bi bi-search me-1"></i>Search</button>
+
+    <!-- Chain filters: Stockist → Distributor → Marketplace -->
+    <select name="stockist" class="form-select form-select-sm" style="max-width:180px" title="Filter by Stockist">
+      <option value="">All Stockists</option>
+      <option value="1">Stockist</option>
+    </select>
+    <select name="distributor" class="form-select form-select-sm" style="max-width:180px" title="Filter by Distributor">
+      <option value="">All Distributors</option>
+      <option value="6">Coimbatore Wholesale</option>
+    </select>
+    <select name="marketplace" class="form-select form-select-sm" style="max-width:180px" title="Filter by Marketplace">
+      <option value="">All Marketplaces</option>
+      <option value="6">Anna Nagar Organics</option>
+    </select>
+
+    
+    <span class="text-muted small ms-auto">5 customers</span>
+    
+
+<div class="d-flex align-items-center gap-2">
+  
+  <span class="text-muted small" id="totalCount_customerTable">Total Records | <strong>5</strong></span>
+  
+
+  <!-- Search icon -->
+  <button class="btn btn-sm btn-link text-muted p-1" id="searchToggle_customerTable" title="Search columns" type="button">
+    <i class="bi bi-search fs-6"></i>
+  </button>
+
+  <!-- Column chooser icon -->
+  <div class="dropdown">
+    <button class="btn btn-sm btn-link text-muted p-1 dropdown-toggle-no-caret" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" title="Column Chooser">
+      <i class="bi bi-layout-three-columns fs-6"></i>
+    </button>
+    <div class="dropdown-menu dropdown-menu-end shadow p-0" style="min-width:220px;max-height:400px;overflow-y:auto" id="colChooser_customerTable">
+      <div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center bg-light">
+        <span class="fw-semibold small">Column Chooser</span>
+        <div class="d-flex gap-1">
+          <button class="btn btn-outline-success btn-sm py-0 px-2" id="showAll_customerTable" type="button">All</button>
+          <button class="btn btn-outline-secondary btn-sm py-0 px-2" id="hideAll_customerTable" type="button">None</button>
+        </div>
+      </div>
+      <div id="colList_customerTable" class="py-1 px-2"><div class="form-check py-1 ps-4 pe-3"><input class="form-check-input" type="checkbox" id="cc_customerTable_username" checked="" data-col="username">
+                         <label class="form-check-label small" for="cc_customerTable_username">Username</label></div><div class="form-check py-1 ps-4 pe-3"><input class="form-check-input" type="checkbox" id="cc_customerTable_name" checked="" data-col="name">
+                         <label class="form-check-label small" for="cc_customerTable_name">Name</label></div><div class="form-check py-1 ps-4 pe-3"><input class="form-check-input" type="checkbox" id="cc_customerTable_distributor" checked="" data-col="distributor">
+                         <label class="form-check-label small" for="cc_customerTable_distributor">Marketplace</label></div><div class="form-check py-1 ps-4 pe-3"><input class="form-check-input" type="checkbox" id="cc_customerTable_phone" checked="" data-col="phone">
+                         <label class="form-check-label small" for="cc_customerTable_phone">Phone</label></div><div class="form-check py-1 ps-4 pe-3"><input class="form-check-input" type="checkbox" id="cc_customerTable_status" checked="" data-col="status">
+                         <label class="form-check-label small" for="cc_customerTable_status">Status</label></div><div class="form-check py-1 ps-4 pe-3"><input class="form-check-input" type="checkbox" id="cc_customerTable_joined" checked="" data-col="joined">
+                         <label class="form-check-label small" for="cc_customerTable_joined">Joined</label></div><div class="form-check py-1 ps-4 pe-3"><input class="form-check-input" type="checkbox" id="cc_customerTable_actions" checked="" data-col="actions">
+                         <label class="form-check-label small" for="cc_customerTable_actions">Actions</label></div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const TID  = 'customerTable';
+  const SKEY = 'col_prefs_' + TID;
+  let searchVisible = false;
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const table = document.getElementById(TID);
+    if (!table) return;
+
+    const thead = table.querySelector('thead');
+    const tbody = table.querySelector('tbody');
+    const headerRow = thead.querySelector('tr');
+
+    // ── Collect columns ────────────────────────────────────────────────────
+    const cols = [];
+    headerRow.querySelectorAll('th[data-col]').forEach(th => {
+      const col   = th.dataset.col;
+      const label = th.innerText.replace(/[↑↓⇅▲▼]/g, '').trim() || col;
+      if (col && !cols.find(c => c.col === col)) cols.push({col, label, th});
+    });
+
+    // ── Load prefs ─────────────────────────────────────────────────────────
+    let prefs = {};
+    try { prefs = JSON.parse(localStorage.getItem(SKEY) || '{}'); } catch(e) {}
+
+    // Safety: if a saved preference ends up hiding EVERY data column (e.g. an
+    // accidental "None" click, or stale/corrupt prefs), the whole table looks
+    // empty. Never allow that — reset to all-visible so rows always show.
+    const anyVisible = cols.some(({col}) => prefs[col] !== false);
+    if (cols.length && !anyVisible) {
+      prefs = {};
+      try { localStorage.removeItem(SKEY); } catch(e) {}
+    }
+
+    function savePrefs() { localStorage.setItem(SKEY, JSON.stringify(prefs)); }
+
+    function applyVisibility() {
+      cols.forEach(({col}) => {
+        const hidden = prefs[col] === false;
+        table.querySelectorAll(`[data-col="${col}"]`).forEach(el => {
+          el.style.display = hidden ? 'none' : '';
+        });
+        // Also hide search input for hidden col
+        const si = document.getElementById('srch_' + TID + '_' + col);
+        if (si) si.closest('td') && (si.closest('td').style.display = hidden ? 'none' : '');
+      });
+    }
+
+    // ── Build column chooser ───────────────────────────────────────────────
+    const colList = document.getElementById('colList_' + TID);
+
+    function buildChooser() {
+      colList.innerHTML = '';
+      cols.forEach(({col, label}) => {
+        const visible = prefs[col] !== false;
+        const div = document.createElement('div');
+        div.className = 'form-check py-1 ps-4 pe-3';
+        div.innerHTML = `<input class="form-check-input" type="checkbox" id="cc_${TID}_${col}"
+                                ${visible ? 'checked' : ''} data-col="${col}">
+                         <label class="form-check-label small" for="cc_${TID}_${col}">${label}</label>`;
+        div.querySelector('input').addEventListener('change', function() {
+          prefs[this.dataset.col] = this.checked;
+          savePrefs(); applyVisibility();
+        });
+        colList.appendChild(div);
+      });
+    }
+
+    document.getElementById('showAll_' + TID).addEventListener('click', function(e) {
+      e.stopPropagation();
+      cols.forEach(({col}) => { prefs[col] = true; });
+      savePrefs(); buildChooser(); applyVisibility();
+    });
+    document.getElementById('hideAll_' + TID).addEventListener('click', function(e) {
+      e.stopPropagation();
+      // Keep the FIRST column visible so the table can never become fully blank.
+      const keep = (cols[0] || {}).col;
+      cols.forEach(({col}) => { if (col !== 'actions' && col !== keep) prefs[col] = false; });
+      savePrefs(); buildChooser(); applyVisibility();
+    });
+
+    buildChooser();
+    applyVisibility();
+
+    // ── Per-column search row ──────────────────────────────────────────────
+    const searchRow = document.createElement('tr');
+    searchRow.id = 'searchRow_' + TID;
+    searchRow.style.display = 'none';
+    searchRow.style.background = '#f8f9fa';
+
+    cols.forEach(({col, th}) => {
+      const td = document.createElement('td');
+      td.dataset.col = col;
+      td.style.padding = '4px 6px';
+      if (prefs[col] === false) td.style.display = 'none';
+      if (col === 'actions' || col === 'image') {
+        td.innerHTML = '';
+      } else {
+        td.innerHTML = `<input type="text" class="form-control form-control-sm col-search-input"
+                               data-col="${col}" id="srch_${TID}_${col}"
+                               placeholder="Search…" autocomplete="off"
+                               style="min-width:60px">`;
+      }
+      searchRow.appendChild(td);
+    });
+
+    // If header has more th than data-col th, add empty td for non-data-col columns
+    const totalTh = headerRow.querySelectorAll('th').length;
+    const dataTh  = cols.length;
+    for (let i = dataTh; i < totalTh; i++) {
+      const td = document.createElement('td');
+      td.style.padding = '4px';
+      searchRow.appendChild(td);
+    }
+
+    thead.appendChild(searchRow);
+
+    // Per-column filter logic
+    function applySearch() {
+      const filters = {};
+      searchRow.querySelectorAll('.col-search-input').forEach(inp => {
+        const v = inp.value.trim().toLowerCase();
+        if (v) filters[inp.dataset.col] = v;
+      });
+
+      tbody.querySelectorAll('tr').forEach(row => {
+        if (!Object.keys(filters).length) { row.style.display = ''; return; }
+        let match = true;
+        for (const [col, q] of Object.entries(filters)) {
+          const cell = row.querySelector(`[data-col="${col}"]`);
+          if (cell && !cell.textContent.toLowerCase().includes(q)) {
+            match = false; break;
+          }
+        }
+        row.style.display = match ? '' : 'none';
+      });
+    }
+
+    searchRow.addEventListener('input', applySearch);
+
+    // Toggle search row
+    document.getElementById('searchToggle_' + TID).addEventListener('click', function() {
+      searchVisible = !searchVisible;
+      searchRow.style.display = searchVisible ? '' : 'none';
+      this.querySelector('i').className = searchVisible
+        ? 'bi bi-x-lg fs-6 text-danger'
+        : 'bi bi-search fs-6';
+      if (!searchVisible) {
+        searchRow.querySelectorAll('input').forEach(i => i.value = '');
+        applySearch();
+      } else {
+        const first = searchRow.querySelector('input');
+        if (first) first.focus();
+      }
+    });
+  });
+})();
+</script>
+
+  </form>
+</div>
+
+
+<!-- Bulk action form. Rows and buttons attach to it with the HTML form attribute,
+     so the per-row forms below can stay as they are (nested forms are not allowed). -->
+<form method="post" action="/admin-panel/customers/bulk/" id="bulkForm" class="d-none">
+  <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+  <input type="hidden" name="return_query" value="suspended_dist=1">
+</form>
+<div class="card border-0 shadow-sm p-2 mb-3 reveal-on-scroll is-visible" id="bulkToolbar">
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <div class="form-check mb-0 me-1">
+      <input class="form-check-input" type="checkbox" id="selectAll" title="Select all shown">
+      <label class="form-check-label small fw-semibold" for="selectAll">All</label>
+    </div>
+    <span class="text-muted small me-2" id="selectedCount">0 selected</span>
+    
+      <button type="submit" form="bulkForm" name="action" value="enable" class="btn btn-sm btn-success bulk-action-btn" disabled="" data-confirm="Enable the selected customers?" data-confirm-title="Enable customers?" data-confirm-type="success">
+        <i class="bi bi-check-circle me-1"></i>Enable
+      </button>
+      <button type="submit" form="bulkForm" name="action" value="disable" class="btn btn-sm btn-outline-secondary bulk-action-btn" disabled="" data-confirm="Disable the selected customers? They will not be able to log in or shop until enabled." data-confirm-title="Disable customers?" data-confirm-type="warning">
+        <i class="bi bi-slash-circle me-1"></i>Disable
+      </button>
+      <button type="submit" form="bulkForm" name="action" value="delete" class="btn btn-sm btn-outline-danger bulk-action-btn" disabled="" data-confirm="Delete the selected customers? They can be restored from Deleted Customers." data-confirm-title="Delete customers?" data-confirm-type="danger">
+        <i class="bi bi-trash me-1"></i>Delete
+      </button>
+      <div class="d-flex align-items-center gap-1 ms-md-2">
+        <select name="distributor_id" form="bulkForm" class="form-select form-select-sm bulk-assign-select" style="max-width:200px" disabled="">
+          <option value="">Assign marketplace...</option>
+          <option value="6" data-distributor="Coimbatore Wholesale" data-stockist="Stockist">Anna Nagar Organics</option>
+        </select>
+        <button type="submit" form="bulkForm" name="action" value="assign_distributor" class="btn btn-sm btn-outline-primary bulk-action-btn bulk-assign-btn" disabled="" data-confirm="Assign the selected customers to this marketplace?" data-confirm-title="Assign marketplace?" data-confirm-type="warning">
+          Assign
+        </button>
+      </div>
+    
+  </div>
+</div>
+<!-- Desktop table -->
+<div class="card border-0 shadow-sm d-none d-md-block">
+  <div class="table-wrap">
+    <table class="table align-middle mb-0" id="customerTable">
+      <thead class="table-light">
+        <tr>
+          <th style="width:40px"><input type="checkbox" class="form-check-input" id="selectAllTable" title="Select all shown"></th>
+          <th data-col="username">
+
+  <a href="?suspended_dist=1&amp;sort=username" class="text-decoration-none text-muted">
+    Username <i class="bi bi-arrow-down-up opacity-50"></i>
+  </a>
+
+</th>
+          <th data-col="name">
+
+  <a href="?suspended_dist=1&amp;sort=name" class="text-decoration-none text-muted">
+    Name <i class="bi bi-arrow-down-up opacity-50"></i>
+  </a>
+
+</th>
+          <th data-col="distributor">Marketplace</th>
+          <th data-col="phone">Phone</th>
+          <th data-col="status">Status</th>
+          <th data-col="joined">
+
+  <a href="?suspended_dist=1&amp;sort=date_joined" class="text-decoration-none text-dark">
+    Joined <i class="bi bi-sort-down"></i>
+  </a>
+
+</th>
+          <th data-col="actions">Actions</th>
+        </tr>
+      <tr id="searchRow_customerTable" style="display: none; background: rgb(248, 249, 250);"><td data-col="username" style="padding: 4px 6px;"><input type="text" class="form-control form-control-sm col-search-input" data-col="username" id="srch_customerTable_username" placeholder="Search…" autocomplete="off" style="min-width:60px"></td><td data-col="name" style="padding: 4px 6px;"><input type="text" class="form-control form-control-sm col-search-input" data-col="name" id="srch_customerTable_name" placeholder="Search…" autocomplete="off" style="min-width:60px"></td><td data-col="distributor" style="padding: 4px 6px;"><input type="text" class="form-control form-control-sm col-search-input" data-col="distributor" id="srch_customerTable_distributor" placeholder="Search…" autocomplete="off" style="min-width:60px"></td><td data-col="phone" style="padding: 4px 6px;"><input type="text" class="form-control form-control-sm col-search-input" data-col="phone" id="srch_customerTable_phone" placeholder="Search…" autocomplete="off" style="min-width:60px"></td><td data-col="status" style="padding: 4px 6px;"><input type="text" class="form-control form-control-sm col-search-input" data-col="status" id="srch_customerTable_status" placeholder="Search…" autocomplete="off" style="min-width:60px"></td><td data-col="joined" style="padding: 4px 6px;"><input type="text" class="form-control form-control-sm col-search-input" data-col="joined" id="srch_customerTable_joined" placeholder="Search…" autocomplete="off" style="min-width:60px"></td><td data-col="actions" style="padding: 4px 6px;"></td><td style="padding: 4px;"></td></tr></thead>
+      <tbody>
+        
+        <tr class="">
+          <td><input type="checkbox" class="form-check-input row-check" name="customer_ids" value="73" form="bulkForm" data-current="North Chennai Daily Needs"></td>
+          <td data-col="username" class="fw-semibold">972120311</td>
+          <td data-col="name">Prakash Kumar</td>
+          <td data-col="distributor" class="small">
+            
+              <i class="bi bi-truck text-muted me-1"></i>North Chennai Daily Needs
+              
+              
+                <span class="badge bg-danger ms-1" title="Marketplace is suspended — customer cannot shop">Suspended</span>
+              
+            
+          </td>
+          <td data-col="phone" class="small">972120311</td>
+          <td data-col="status">
+            
+              <span class="badge bg-warning text-dark" title="Marketplace suspended — customer cannot shop">
+                <i class="bi bi-pause-circle me-1"></i>Can't Shop
+              </span>
+            
+          </td>
+          
+          <td data-col="joined" class="small">30 Oct 2026</td>
+          
+          <td data-col="actions">
+            
+              <div class="d-flex gap-1 flex-wrap align-items-center">
+                <a href="/admin-panel/users/73/" class="btn btn-sm btn-outline-primary">View</a>
+
+                
+
+                <!-- Delete inline -->
+                <form method="post" data-confirm="This will soft-delete 972120311. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+                  <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="user_id" value="73">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete customer">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            
+          </td>
+        </tr>
+        
+        <tr class="">
+          <td><input type="checkbox" class="form-check-input row-check" name="customer_ids" value="72" form="bulkForm" data-current="North Chennai Daily Needs"></td>
+          <td data-col="username" class="fw-semibold">972120211</td>
+          <td data-col="name">Mohan Menon</td>
+          <td data-col="distributor" class="small">
+            
+              <i class="bi bi-truck text-muted me-1"></i>North Chennai Daily Needs
+              
+              
+                <span class="badge bg-danger ms-1" title="Marketplace is suspended — customer cannot shop">Suspended</span>
+              
+            
+          </td>
+          <td data-col="phone" class="small">972120211</td>
+          <td data-col="status">
+            
+              <span class="badge bg-warning text-dark" title="Marketplace suspended — customer cannot shop">
+                <i class="bi bi-pause-circle me-1"></i>Can't Shop
+              </span>
+            
+          </td>
+          
+          <td data-col="joined" class="small">30 Oct 2026</td>
+          
+          <td data-col="actions">
+            
+              <div class="d-flex gap-1 flex-wrap align-items-center">
+                <a href="/admin-panel/users/72/" class="btn btn-sm btn-outline-primary">View</a>
+
+                
+
+                <!-- Delete inline -->
+                <form method="post" data-confirm="This will soft-delete 972120211. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+                  <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="user_id" value="72">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete customer">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            
+          </td>
+        </tr>
+        
+        <tr class="">
+          <td><input type="checkbox" class="form-check-input row-check" name="customer_ids" value="71" form="bulkForm" data-current="North Chennai Daily Needs"></td>
+          <td data-col="username" class="fw-semibold">972120111</td>
+          <td data-col="name">Karthik Pillai</td>
+          <td data-col="distributor" class="small">
+            
+              <i class="bi bi-truck text-muted me-1"></i>North Chennai Daily Needs
+              
+              
+                <span class="badge bg-danger ms-1" title="Marketplace is suspended — customer cannot shop">Suspended</span>
+              
+            
+          </td>
+          <td data-col="phone" class="small">972120111</td>
+          <td data-col="status">
+            
+              <span class="badge bg-warning text-dark" title="Marketplace suspended — customer cannot shop">
+                <i class="bi bi-pause-circle me-1"></i>Can't Shop
+              </span>
+            
+          </td>
+          
+          <td data-col="joined" class="small">30 Oct 2026</td>
+          
+          <td data-col="actions">
+            
+              <div class="d-flex gap-1 flex-wrap align-items-center">
+                <a href="/admin-panel/users/71/" class="btn btn-sm btn-outline-primary">View</a>
+
+                
+
+                <!-- Delete inline -->
+                <form method="post" data-confirm="This will soft-delete 972120111. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+                  <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="user_id" value="71">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete customer">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            
+          </td>
+        </tr>
+        
+        <tr class="">
+          <td><input type="checkbox" class="form-check-input row-check" name="customer_ids" value="53" form="bulkForm" data-current="E2E Fresh Store"></td>
+          <td data-col="username" class="fw-semibold">9600000006</td>
+          <td data-col="name">—</td>
+          <td data-col="distributor" class="small">
+            
+              <i class="bi bi-truck text-muted me-1"></i>E2E Fresh Store
+              
+              
+                <span class="badge bg-danger ms-1" title="Marketplace is suspended — customer cannot shop">Suspended</span>
+              
+            
+          </td>
+          <td data-col="phone" class="small">—</td>
+          <td data-col="status">
+            
+              <span class="badge bg-warning text-dark" title="Marketplace suspended — customer cannot shop">
+                <i class="bi bi-pause-circle me-1"></i>Can't Shop
+              </span>
+            
+          </td>
+          
+          <td data-col="joined" class="small">28 Jul 2026</td>
+          
+          <td data-col="actions">
+            
+              <div class="d-flex gap-1 flex-wrap align-items-center">
+                <a href="/admin-panel/users/53/" class="btn btn-sm btn-outline-primary">View</a>
+
+                
+
+                <!-- Delete inline -->
+                <form method="post" data-confirm="This will soft-delete 9600000006. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+                  <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="user_id" value="53">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete customer">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            
+          </td>
+        </tr>
+        
+        <tr class="">
+          <td><input type="checkbox" class="form-check-input row-check" name="customer_ids" value="52" form="bulkForm" data-current="E2E Fresh Store"></td>
+          <td data-col="username" class="fw-semibold">9600000005</td>
+          <td data-col="name">E2E Customer</td>
+          <td data-col="distributor" class="small">
+            
+              <i class="bi bi-truck text-muted me-1"></i>E2E Fresh Store
+              
+              
+                <span class="badge bg-danger ms-1" title="Marketplace is suspended — customer cannot shop">Suspended</span>
+              
+            
+          </td>
+          <td data-col="phone" class="small">9600000005</td>
+          <td data-col="status">
+            
+              <span class="badge bg-warning text-dark" title="Marketplace suspended — customer cannot shop">
+                <i class="bi bi-pause-circle me-1"></i>Can't Shop
+              </span>
+            
+          </td>
+          
+          <td data-col="joined" class="small">28 Jul 2026</td>
+          
+          <td data-col="actions">
+            
+              <div class="d-flex gap-1 flex-wrap align-items-center">
+                <a href="/admin-panel/users/52/" class="btn btn-sm btn-outline-primary">View</a>
+
+                
+
+                <!-- Delete inline -->
+                <form method="post" data-confirm="This will soft-delete 9600000005. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+                  <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+                  <input type="hidden" name="action" value="delete">
+                  <input type="hidden" name="user_id" value="52">
+                  <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete customer">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            
+          </td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Mobile cards -->
+<div class="d-md-none">
+  
+  <div class="card border-0 shadow-sm mb-2 p-3 reveal-on-scroll">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div class="d-flex gap-2 align-items-start">
+        <input type="checkbox" class="form-check-input row-check mt-1" name="customer_ids" value="73" form="bulkForm" title="Select" data-current="North Chennai Daily Needs">
+      <div>
+        <div class="fw-semibold">972120311</div>
+        <div class="text-muted small">Prakash Kumar</div>
+        
+          <div class="text-muted small"><i class="bi bi-truck me-1"></i>North Chennai Daily Needs</div>
+          
+        
+        
+      </div>
+    </div>
+      <div class="d-flex flex-column align-items-end gap-1">
+        
+          <a href="/admin-panel/users/73/" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+          
+          <form method="post" data-confirm="This will soft-delete 972120311. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+            <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="user_id" value="73">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        
+      </div>
+    </div>
+  </div>
+  
+  <div class="card border-0 shadow-sm mb-2 p-3 reveal-on-scroll">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div class="d-flex gap-2 align-items-start">
+        <input type="checkbox" class="form-check-input row-check mt-1" name="customer_ids" value="72" form="bulkForm" title="Select" data-current="North Chennai Daily Needs">
+      <div>
+        <div class="fw-semibold">972120211</div>
+        <div class="text-muted small">Mohan Menon</div>
+        
+          <div class="text-muted small"><i class="bi bi-truck me-1"></i>North Chennai Daily Needs</div>
+          
+        
+        
+      </div>
+    </div>
+      <div class="d-flex flex-column align-items-end gap-1">
+        
+          <a href="/admin-panel/users/72/" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+          
+          <form method="post" data-confirm="This will soft-delete 972120211. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+            <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="user_id" value="72">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        
+      </div>
+    </div>
+  </div>
+  
+  <div class="card border-0 shadow-sm mb-2 p-3 reveal-on-scroll">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div class="d-flex gap-2 align-items-start">
+        <input type="checkbox" class="form-check-input row-check mt-1" name="customer_ids" value="71" form="bulkForm" title="Select" data-current="North Chennai Daily Needs">
+      <div>
+        <div class="fw-semibold">972120111</div>
+        <div class="text-muted small">Karthik Pillai</div>
+        
+          <div class="text-muted small"><i class="bi bi-truck me-1"></i>North Chennai Daily Needs</div>
+          
+        
+        
+      </div>
+    </div>
+      <div class="d-flex flex-column align-items-end gap-1">
+        
+          <a href="/admin-panel/users/71/" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+          
+          <form method="post" data-confirm="This will soft-delete 972120111. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+            <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="user_id" value="71">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        
+      </div>
+    </div>
+  </div>
+  
+  <div class="card border-0 shadow-sm mb-2 p-3 reveal-on-scroll">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div class="d-flex gap-2 align-items-start">
+        <input type="checkbox" class="form-check-input row-check mt-1" name="customer_ids" value="53" form="bulkForm" title="Select" data-current="E2E Fresh Store">
+      <div>
+        <div class="fw-semibold">9600000006</div>
+        <div class="text-muted small">—</div>
+        
+          <div class="text-muted small"><i class="bi bi-truck me-1"></i>E2E Fresh Store</div>
+          
+        
+        
+      </div>
+    </div>
+      <div class="d-flex flex-column align-items-end gap-1">
+        
+          <a href="/admin-panel/users/53/" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+          
+          <form method="post" data-confirm="This will soft-delete 9600000006. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+            <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="user_id" value="53">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        
+      </div>
+    </div>
+  </div>
+  
+  <div class="card border-0 shadow-sm mb-2 p-3 reveal-on-scroll">
+    <div class="d-flex justify-content-between align-items-start mb-1">
+      <div class="d-flex gap-2 align-items-start">
+        <input type="checkbox" class="form-check-input row-check mt-1" name="customer_ids" value="52" form="bulkForm" title="Select" data-current="E2E Fresh Store">
+      <div>
+        <div class="fw-semibold">9600000005</div>
+        <div class="text-muted small">E2E Customer</div>
+        
+          <div class="text-muted small"><i class="bi bi-truck me-1"></i>E2E Fresh Store</div>
+          
+        
+        
+      </div>
+    </div>
+      <div class="d-flex flex-column align-items-end gap-1">
+        
+          <a href="/admin-panel/users/52/" class="btn btn-sm btn-outline-primary py-0 px-2">View</a>
+          
+          <form method="post" data-confirm="This will soft-delete 9600000005. They can be restored from Deleted Customers." data-confirm-title="Delete Customer?" data-confirm-type="danger">
+            <input type="hidden" name="csrfmiddlewaretoken" value="bT6koUodgXsmisZSZUPWikxxqYUcWpjZm8CJGTtXmMvLNKENjSkAK0gNl9rscvzc">
+            <input type="hidden" name="action" value="delete">
+            <input type="hidden" name="user_id" value="52">
+            <button type="submit" class="btn btn-sm btn-outline-danger py-0 px-2"><i class="bi bi-trash"></i> Delete</button>
+          </form>
+        
+      </div>
+    </div>
+  </div>
+  
+</div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/static/js/premium-ui.js?v=20261031b"></script>
+<script src="/static/js/datatable.js?v=20261110c"></script>
+
+<!-- ── Global Confirm Modal ───────────────────────────────────────────────── -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-hidden="true" style="--bs-backdrop-opacity: 0.5;">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-xl" style="border-radius: 12px; transition: all 0.3s ease;">
+      <div class="modal-header border-0 pb-0 pt-4 px-4">
+        <div class="d-flex align-items-center gap-3 flex-grow-1">
+          <div style="width: 44px; height: 44px; border-radius: 50%; background: #e8f5e9; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+            <span id="confirmIcon"></span>
+          </div>
+          <div>
+            <h5 class="modal-title fw-bold mb-0 lh-1" id="confirmTitle" style="font-size: 1.1rem;">Are you sure?</h5>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" style="flex-shrink: 0;"></button>
+      </div>
+      <div class="modal-body px-4 py-3">
+        <p class="text-muted mb-0 lh-base" id="confirmMessage" style="font-size: 0.95rem;"></p>
+      </div>
+      <div class="modal-footer border-0 p-4 pt-3 d-flex gap-2" style="justify-content: flex-end;">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" style="border-radius: 6px; font-weight: 500; padding: 6px 16px;">Cancel</button>
+        <button type="button" class="btn" id="confirmBtn" style="border-radius: 6px; font-weight: 500; padding: 6px 16px;">Confirm</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Global Toast ───────────────────────────────────────────────────────── -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index:9999">
+  <div id="globalToast" class="toast align-items-center border-0 shadow" role="alert" aria-live="assertive">
+    <div class="d-flex">
+      <div class="toast-body d-flex align-items-center gap-2">
+        <span id="toastIcon" class="fs-5"></span>
+        <span id="toastMessage"></span>
+      </div>
+      <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ── Sidebar (mobile slide-in) ──────────────────────────────────────────────
+  function openSidebar() {
+    document.getElementById('sidebar').classList.add('open');
+    document.getElementById('sidebarOverlay').classList.add('show');
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('show');
+  }
+
+  // ── Sidebar collapse (desktop) — shared across all logins, remembered ──────
+  function toggleSidebarDesktop() {
+    const collapsed = document.body.classList.toggle('sidebar-collapsed');
+    try { localStorage.setItem('kiroSidebarCollapsed', collapsed ? '1' : '0'); } catch (e) {}
+  }
+  // Apply the remembered state before paint to avoid a flash.
+  (function () {
+    try {
+      if (localStorage.getItem('kiroSidebarCollapsed') === '1') {
+        document.body.classList.add('sidebar-collapsed');
+      }
+    } catch (e) {}
+  })();
+
+  // ── Toast helper ─────────────────────────────────────────────────────────
+  function showToast(message, type = 'success') {
+    const toast = document.getElementById('globalToast');
+    const icons = { success: '✅', danger: '🗑️', warning: '⚠️', info: 'ℹ️' };
+    const colors = { success: 'text-bg-success', danger: 'text-bg-danger', warning: 'text-bg-warning', info: 'text-bg-info' };
+    toast.className = `toast align-items-center border-0 shadow ${colors[type] || 'text-bg-success'}`;
+    document.getElementById('toastIcon').textContent = icons[type] || '✅';
+    document.getElementById('toastMessage').textContent = message;
+    new bootstrap.Toast(toast, { delay: 3000 }).show();
+  }
+
+  // ── Confirm Modal helper ──────────────────────────────────────────────────
+  // Usage: data-confirm="message" data-confirm-title="Title" data-confirm-type="danger|warning|success"
+  // On any <form> or <a> with data-confirm attribute
+  let _pendingAction = null;
+
+  function showConfirm({ title, message, type = 'danger', icon, onConfirm }) {
+    const modal = document.getElementById('confirmModal');
+    const icons = { danger: '🗑️', warning: '⚠️', success: '✅', info: 'ℹ️' };
+    const btnColors = { danger: 'btn-danger', warning: 'btn-warning', success: 'btn-success', info: 'btn-info' };
+    document.getElementById('confirmTitle').textContent = title || 'Are you sure?';
+    document.getElementById('confirmMessage').textContent = message || '';
+    document.getElementById('confirmIcon').textContent = icon || icons[type] || '⚠️';
+    const btn = document.getElementById('confirmBtn');
+    btn.className = `btn ${btnColors[type] || 'btn-danger'}`;
+    btn.textContent = type === 'danger' ? 'Yes, Delete' : type === 'warning' ? 'Yes, Proceed' : 'Confirm';
+    _pendingAction = onConfirm;
+    new bootstrap.Modal(modal).show();
+  }
+
+  document.getElementById('confirmBtn').addEventListener('click', function () {
+    bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();
+    if (_pendingAction) { _pendingAction(); _pendingAction = null; }
+  });
+
+  // ── Auto-wire data-confirm on forms ──────────────────────────────────────
+  document.addEventListener('submit', function (e) {
+    const form = e.target;
+    const msg = form.dataset.confirm;
+    if (!msg) return;
+    e.preventDefault();
+    showConfirm({
+      title: form.dataset.confirmTitle || 'Are you sure?',
+      message: msg,
+      type: form.dataset.confirmType || 'danger',
+      icon: form.dataset.confirmIcon || null,
+      onConfirm: () => { form.removeAttribute('data-confirm'); form.submit(); }
+    });
+  });
+
+  // ── Auto-wire data-confirm on links AND buttons ──────────────────────────
+  // A link navigates to its href after Confirm. A button inside a <form>
+  // submits that form (with the button's own name/value, via requestSubmit) -
+  // it used to navigate to "undefined" because a button has no href.
+  document.addEventListener('click', function (e) {
+    const el = e.target.closest('[data-confirm]');
+    if (!el || el.tagName === 'FORM') return;
+    e.preventDefault();
+    showConfirm({
+      title: el.dataset.confirmTitle || 'Are you sure?',
+      message: el.dataset.confirm,
+      type: el.dataset.confirmType || 'danger',
+      icon: el.dataset.confirmIcon || null,
+      onConfirm: () => {
+        if (el.href) {
+          window.location.href = el.href;
+        } else if (el.form) {
+          if (el.form.requestSubmit) el.form.requestSubmit(el); else el.form.submit();
+        }
+      }
+    });
+  });
+
+  // ── Auto-wire data-assign-confirm on selects ──────────────────────────────
+  // Usage: add data-assign-confirm="true" to a <select> inside a <form>
+  document.addEventListener('change', function (e) {
+    const sel = e.target;
+    if (!sel.dataset.assignConfirm) return;
+    const form = sel.closest('form');
+    if (!form) return;
+    const label = sel.options[sel.selectedIndex]?.text || '';
+    const userName = form.dataset.userName || 'this user';
+    if (!sel.value) return;
+    showConfirm({
+      title: 'Assign Marketplace?',
+      message: `Assign "${label}" to ${userName}?`,
+      type: 'warning',
+      icon: '🏪',
+      onConfirm: () => form.submit()
+    });
+  });
+
+  // ── Show Django messages as toasts ───────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.alert[data-auto-toast]').forEach(function (el) {
+      const type = el.classList.contains('alert-success') ? 'success'
+                 : el.classList.contains('alert-danger') ? 'danger'
+                 : el.classList.contains('alert-warning') ? 'warning' : 'info';
+      showToast(el.textContent.trim(), type);
+      el.remove();
+    });
+  });
+
+  // Currency number inputs move by whole rupees with their spinner controls,
+  // preserving any paise already entered. Decimal quantities such as kg/stock
+  // are excluded.
+  function isRupeeNumberInput(input) {
+    if (!input || input.type !== 'number') return false;
+    const fieldName = `${input.name || ''} ${input.id || ''}`.toLowerCase();
+    if (/(stock|quantity|qty|weight|kilogram|\bkg\b)/.test(fieldName)) return false;
+    const step = Number(input.getAttribute('step'));
+    return (Number.isFinite(step) && step > 0 && step < 1)
+      || /(price|mrp|amount|cost|charge|payout|payment|commission|rent_per_day)/.test(fieldName);
+  }
+
+  function stepWholeRupee(input, direction) {
+    const current = input.value.trim() === '' ? (Number(input.min) || 0) : Number(input.value);
+    if (!Number.isFinite(current)) return;
+    let next = current + direction;
+    if (input.min !== '' && Number.isFinite(Number(input.min))) next = Math.max(next, Number(input.min));
+    if (input.max !== '' && Number.isFinite(Number(input.max))) next = Math.min(next, Number(input.max));
+    const decimals = (input.value.split('.')[1] || '').length;
+    input.value = decimals ? next.toFixed(Math.min(decimals, 6)) : String(next);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    const changeEvent = new Event('change', { bubbles: true });
+    changeEvent.rupeeSpinner = true;
+    input.dispatchEvent(changeEvent);
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (!isRupeeNumberInput(event.target) || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+    event.preventDefault();
+    stepWholeRupee(event.target, event.key === 'ArrowUp' ? 1 : -1);
+  });
+
+  function addRupeeSpinner(input) {
+    if (!isRupeeNumberInput(input) || input.closest('.rupee-spin-wrap')) return;
+    const wrapper = document.createElement('span');
+    wrapper.className = 'rupee-spin-wrap';
+    wrapper.style.width = input.style.width || '100%';
+    const buttons = document.createElement('span');
+    buttons.className = 'rupee-spin-buttons';
+    buttons.setAttribute('aria-label', 'Adjust whole rupees');
+    [['▲', 1, 'Increase by one rupee'], ['▼', -1, 'Decrease by one rupee']].forEach(([symbol, delta, label]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = symbol;
+      button.title = label;
+      button.setAttribute('aria-label', label);
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        input.focus({ preventScroll: true });
+        stepWholeRupee(input, delta);
+      });
+      buttons.appendChild(button);
+    });
+    input.classList.add('rupee-whole-stepper');
+    input.parentNode.insertBefore(wrapper, input);
+    wrapper.appendChild(input);
+    wrapper.appendChild(buttons);
+  }
+
+  function scanRupeeInputs(root) {
+    if (root.matches && root.matches('input[type="number"]')) addRupeeSpinner(root);
+    root.querySelectorAll?.('input[type="number"]').forEach(addRupeeSpinner);
+  }
+  scanRupeeInputs(document);
+  new MutationObserver(records => records.forEach(record => {
+    record.addedNodes.forEach(node => { if (node.nodeType === 1) scanRupeeInputs(node); });
+  })).observe(document.body, { childList: true, subtree: true });
+</script>
+
+<script>
+(function () {
+  const form = document.getElementById('bulkForm');
+  if (!form) return;
+  const selectAll = document.getElementById('selectAll');
+  const selectAllTable = document.getElementById('selectAllTable');
+  const countEl = document.getElementById('selectedCount');
+  const actionBtns = document.querySelectorAll('.bulk-action-btn');
+  const assignSelect = document.querySelector('.bulk-assign-select');
+  const assignBtn = document.querySelector('.bulk-assign-btn');
+
+  // Each customer has two checkboxes (desktop row and mobile card), so count unique ids.
+  function rows() { return document.querySelectorAll('.row-check'); }
+  function selected() {
+    const ids = new Set();
+    document.querySelectorAll('.row-check:checked').forEach(cb => ids.add(cb.value));
+    return Array.from(ids);
+  }
+  function allIds() {
+    const ids = new Set();
+    rows().forEach(cb => ids.add(cb.value));
+    return ids;
+  }
+
+  function refresh() {
+    const n = selected().length;
+    const total = allIds().size;
+    if (countEl) countEl.textContent = n + ' selected';
+    const allOn = total > 0 && n === total;
+    if (selectAll) selectAll.checked = allOn;
+    if (selectAllTable) selectAllTable.checked = allOn;
+    actionBtns.forEach(btn => {
+      if (btn === assignBtn) {
+        btn.disabled = n === 0 || !(assignSelect && assignSelect.value);
+      } else {
+        btn.disabled = n === 0;
+      }
+    });
+    if (assignSelect) assignSelect.disabled = n === 0;
+  }
+
+  function setAll(on) {
+    rows().forEach(cb => { cb.checked = on; });
+    refresh();
+  }
+  // Keep the desktop and mobile checkboxes for the same customer in step.
+  document.addEventListener('change', function (e) {
+    if (!e.target.classList || !e.target.classList.contains('row-check')) return;
+    document.querySelectorAll('.row-check[value="' + e.target.value + '"]').forEach(cb => {
+      cb.checked = e.target.checked;
+    });
+  });
+
+  if (selectAll) selectAll.addEventListener('change', function () { setAll(this.checked); });
+  if (selectAllTable) selectAllTable.addEventListener('change', function () { setAll(this.checked); });
+  document.addEventListener('change', function (e) {
+    if (e.target.classList && e.target.classList.contains('row-check')) refresh();
+    if (e.target === assignSelect) refresh();
+  });
+
+  // Confirm prompt with one item per line. showConfirm writes plain text, so the
+  // lines are added as text nodes with <br> between them (no HTML is inserted).
+  function confirmLines(title, lines, type, icon, onConfirm) {
+    showConfirm({ title: title, message: lines[0] || '', type: type, icon: icon || undefined, onConfirm: onConfirm });
+    const el = document.getElementById('confirmMessage');
+    if (!el) return;
+    el.textContent = '';
+    lines.forEach((line, i) => {
+      if (i > 0) el.appendChild(document.createElement('br'));
+      el.appendChild(document.createTextNode(line));
+    });
+  }
+
+  // Line 1: the question. Line 2: distributor above the marketplace. Line 3: stockist.
+  function chainLines(question, opt) {
+    const lines = [question];
+    if (opt.dataset.distributor && opt.dataset.distributor !== 'none') {
+      lines.push('Distributor: ' + opt.dataset.distributor);
+    }
+    if (opt.dataset.stockist && opt.dataset.stockist !== 'none') {
+      lines.push('Stockist: ' + opt.dataset.stockist);
+    }
+    return lines;
+  }
+
+  // How many selected customers already have a marketplace (these would be moved).
+  function movingCount() {
+    const current = new Map();
+    document.querySelectorAll('.row-check:checked').forEach(cb => current.set(cb.value, cb.dataset.current || ''));
+    let n = 0;
+    current.forEach(v => { if (v) n++; });
+    return n;
+  }
+
+  function submitWith(action) {
+    let hidden = form.querySelector('input[name="action"]');
+    if (!hidden) {
+      hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'action';
+      form.appendChild(hidden);
+    }
+    hidden.value = action;
+    form.submit();
+  }
+
+  actionBtns.forEach(btn => {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      if (selected().length === 0) return;
+      const action = this.value;
+      const title = this.dataset.confirmTitle || 'Are you sure?';
+      const type = this.dataset.confirmType || 'danger';
+      const go = () => submitWith(action);
+      const count = selected().length;
+      if (action === 'assign_distributor' && assignSelect && assignSelect.value) {
+        const opt = assignSelect.options[assignSelect.selectedIndex];
+        const lines = chainLines(`Assign ${count} customer(s) to ${opt.text}?`, opt);
+        const moving = movingCount();
+        if (moving) lines.push(`${moving} already have a marketplace and will be moved.`);
+        confirmLines(title, lines, type, null, go);
+      } else {
+        confirmLines(title, [(this.dataset.confirm || 'Are you sure?') + ` (${count} selected)`], type, null, go);
+      }
+    });
+  });
+
+  // Inline "assign marketplace" dropdowns on each row. Ask first; submit only on
+  // confirm; put the dropdown back to "Not Assigned" if the admin cancels.
+  document.addEventListener('change', function (e) {
+    const sel = e.target;
+    if (!sel.dataset || !sel.dataset.inlineAssign) return;
+    const form = sel.closest('form');
+    if (!form || !sel.value) return;
+    const label = sel.options[sel.selectedIndex].text;
+    const opt = sel.options[sel.selectedIndex];
+    const who = form.dataset.userName || 'this customer';
+    const modal = document.getElementById('confirmModal');
+    let confirmed = false;
+    if (modal) {
+      modal.addEventListener('hidden.bs.modal', function onHidden() {
+        modal.removeEventListener('hidden.bs.modal', onHidden);
+        if (!confirmed) sel.value = '';
+      });
+    }
+    confirmLines('Assign Marketplace?', chainLines(`Assign "${label}" to ${who}?`, opt), 'warning', '🏪', () => {
+      confirmed = true;
+      form.submit();
+    });
+  });
+
+  refresh();
+})();
+</script>
+
+
+
+</body></html>

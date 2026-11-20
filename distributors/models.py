@@ -97,6 +97,21 @@ class Distributor(models.Model):
     def __str__(self):
         return self.company_name
 
+    # Chain above this marketplace (shown on the admin Customers page before a move).
+    @property
+    def upstream_wholesaler_name(self):
+        w = self.wholesaler
+        return w.company_name if w else 'none'
+
+    @property
+    def upstream_stockist_name(self):
+        w = self.wholesaler
+        return w.stockist.company_name if (w and w.stockist) else 'none'
+
+    @property
+    def chain_label(self):
+        return f'Distributor: {self.upstream_wholesaler_name}, Stockist: {self.upstream_stockist_name}'
+
     def save(self, *args, **kwargs):
         if not self.invite_code:
             import random, string
@@ -343,6 +358,7 @@ class RestockRequest(models.Model):
     STATUS_CHOICES = (
         ('pending', 'Pending'),
         ('approved', 'Approved by Stockist'),
+        ('awaiting_stock', 'Waiting for upstream stock'),
         ('stockist_picked', 'Picked by Stockist'),
         ('in_transit', 'In Transit to Distributor'),
         ('delivered', 'Delivered to Distributor'),
@@ -362,6 +378,8 @@ class RestockRequest(models.Model):
     # lands in DistributorLooseStock instead of packed batches. Loose stock is
     # never added directly any more: it must arrive through this request flow.
     loose_grams = models.PositiveIntegerField(default=0)
+    # True when this shop request has blocked the Distributor's packs (kb/13).
+    wholesaler_blocked = models.BooleanField(default=False)
     status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='pending')
     fulfillment_method = models.CharField(
         max_length=20, choices=FULFILLMENT_CHOICES, default='stockist_pickup', blank=True
@@ -371,11 +389,24 @@ class RestockRequest(models.Model):
         help_text='Courier tracking number or transport details'
     )
     note = models.CharField(max_length=200, blank=True)
+    upstream_request = models.ForeignKey(
+        'distributors.WholesalerRestockRequest', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='marketplace_requests'
+    )
     requested_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ['-requested_at']
+
+    @property
+    def effective_fulfillment_method(self):
+        """Current supplier mode while pending; approved requests keep their snapshot."""
+        if self.status == 'pending':
+            supplier = self.variant.product.supplier
+            mode = supplier.effective_shipment_mode(self.variant.product)
+            return 'stockist_pickup' if mode == 'collect' else 'supplier_transport'
+        return self.fulfillment_method
 
     def __str__(self):
         return f'{self.distributor.company_name} → {self.variant} × {self.quantity_requested}'
@@ -430,5 +461,3 @@ class CustomerZone(models.Model):
 
     def __str__(self):
         return f'{self.customer.username} → {self.zone.name}'
-
-

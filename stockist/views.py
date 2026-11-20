@@ -69,6 +69,11 @@ def inventory(request):
         variants = variants.filter(product__category_id=category_filter)
     if supplier_filter:
         variants = variants.filter(product__supplier_id=supplier_filter)
+    # Packs the supplier has no stock of cannot be ordered or restocked, so they are
+    # hidden. Nothing is deleted: the stockist's charges and inventory rows stay in the
+    # database and the packs reappear when the supplier's stock is above zero.
+    from django.db.models import F as _F
+    variants = variants.filter(stock__gt=_F('blocked_stock'))
 
     inv_map = {i.variant_id: i for i in StockistInventory.objects.filter(stockist=stockist)}
 
@@ -122,6 +127,7 @@ def inventory(request):
         # own use, wastage). Increases come solely from supplier-fulfilled
         # restock requests — stock can never be typed into existence.
         blocked = []
+        held_back = []
         reduced = 0
         for variant in variants:
             key = f'qty_{variant.pk}'
@@ -138,11 +144,21 @@ def inventory(request):
                 if qty > inv_obj.quantity:
                     blocked.append(f'{variant.product.name} {variant.label}')
                 elif qty < inv_obj.quantity:
+                    if qty < inv_obj.blocked_quantity:
+                        # Packs promised to a distributor request cannot leave the count.
+                        held_back.append(f'{variant.product.name} {variant.label}')
+                        continue
                     inv_obj.quantity = qty
                     inv_obj.save()
                     reduced += 1
         if reduced:
             messages.success(request, f'Inventory reduced for {reduced} item(s).')
+        if held_back:
+            messages.warning(
+                request,
+                'Not reduced: these packs are promised to distributor requests: '
+                + ', '.join(held_back[:5])
+            )
             from .auto_restock import check_stockist
             made = check_stockist(stockist)
             if made:
@@ -647,6 +663,26 @@ def charges_upload(request):
 
 
 @stockist_required
+def bundle_settings(request):
+    """Stockist's own bundle rules: global, per supplier, per product (kb/10)."""
+    from products.bundle_chain import handle_settings_post, settings_context
+    stockist = request.user.stockist_profile
+    if request.method == 'POST':
+        try:
+            messages.success(request, handle_settings_post(request, stockist))
+        except ValueError as exc:
+            messages.error(request, str(exc))
+        return redirect('stockist:bundle_settings')
+    ctx = settings_context(stockist)
+    ctx.update({
+        'tier_label': 'Stockist',
+        'buyer_label': 'Distributors and shops you supply',
+        'forward_label': 'the supplier',
+    })
+    return render(request, 'stockist/bundle_settings.html', ctx)
+
+
+@stockist_required
 def restock_requests(request):
     """Stockist views and creates restock requests to supplier (via admin)."""
     stockist = request.user.stockist_profile
@@ -659,30 +695,63 @@ def restock_requests(request):
         qty = request.POST.get('quantity', '0')
         note = request.POST.get('note', '').strip()
         try:
-            variant = ProductVariant.objects.get(pk=variant_id)
+            variant = ProductVariant.objects.shared().get(
+                pk=variant_id, product__supplier__isnull=False,
+                product__status='approved', product__is_deleted=False,
+                product__direct_supply=False,
+            )
             if variant.product.direct_supply:
                 messages.error(request, 'Direct-supply products never pass through the stockist.')
                 return redirect('stockist:restock_requests')
-            StockistRestockRequest.objects.create(
-                stockist=stockist, variant=variant,
-                quantity_requested=int(qty), note=note
-            )
+            if not variant.is_active or not variant.supplier_can_supply:
+                messages.error(request, 'This pack size is not available from the supplier.')
+                return redirect('stockist:restock_requests')
+            quantity = int(qty)
+            if quantity <= 0 or (variant.unit_grams <= 0 and variant.product.allow_loose_distribution):
+                messages.error(request, 'Enter a valid quantity for a measurable supplier pack.')
+                return redirect('stockist:restock_requests')
+            multiple = max(1, variant.supplier_order_multiple)
+            if quantity % multiple:
+                messages.error(
+                    request,
+                    f'This supplier sells {variant.label} in multiples of {multiple}. '
+                    f'Enter a quantity divisible by {multiple}.'
+                )
+                return redirect('stockist:restock_requests')
+            from .supply_requests import RequestBlocked, create_supplier_request
+            try:
+                create_supplier_request(
+                    stockist, variant, quantity, note=note,
+                    loose_supply=variant.product.allow_loose_distribution,
+                )
+            except RequestBlocked as exc:
+                messages.error(
+                    request,
+                    f'{exc} The rest is already held by other requests.'
+                )
+                return redirect('stockist:restock_requests')
             messages.success(request, f'Restock request submitted for {variant}.')
-        except Exception as e:
-            messages.error(request, str(e))
+        except ProductVariant.DoesNotExist:
+            messages.error(request, 'Select an available supplier pack.')
+        except ValueError:
+            messages.error(request, 'Enter a valid quantity.')
         return redirect('stockist:restock_requests')
 
     # All variants for restock request, highlight low stock ones
-    all_variants = StockistInventory.objects.filter(
-        stockist=stockist
-    ).select_related('variant__product')
+    supplier_pack_variants = ProductVariant.objects.shared().filter(
+        is_active=True, supplier_can_supply=True,
+        product__supplier__isnull=False, product__status='approved',
+        product__is_deleted=False, product__direct_supply=False,
+    ).select_related('product__supplier').order_by('product__name', 'unit_grams')
 
-    low_variants = [inv for inv in all_variants if inv.quantity <= 10]
+    low_variants = StockistInventory.objects.filter(
+        stockist=stockist, quantity__lte=10
+    ).select_related('variant__product')
 
     return render(request, 'stockist/restock_requests.html', {
         'requests': requests_qs,
         'low_variants': low_variants,
-        'all_variants': all_variants,
+        'supplier_pack_variants': supplier_pack_variants,
     })
 
 
@@ -724,7 +793,9 @@ def order_list(request):
         # the stockist (ships direct to distributor/shop/customer), the stockist
         # must neither see it nor be told about it.
         line_targets = [
-            (item.product.delivery_target if item.product else 'stockist')
+            (item.product.supplier.effective_shipment_target(item.product)
+             if item.product and item.product.supplier else
+             (item.product.delivery_target if item.product else 'stockist'))
             for item in order.items.all()
         ]
         if line_targets and not any(t == 'stockist' for t in line_targets):
@@ -842,6 +913,7 @@ def distributor_restock(request):
     """Stockist sees restock requests from distributors and can fulfill them."""
     from django.db.models import Q
     from distributors.models import RestockRequest, DistributorStock, DistributorStockBatch
+    from .models import StockistLooseStock
     stockist = request.user.stockist_profile
     status_filter = request.GET.get('status', 'pending')
 
@@ -857,13 +929,18 @@ def distributor_restock(request):
     requests_qs = RestockRequest.objects.filter(
         mine,
         status__in=['pending', 'approved'] if not status_filter else [status_filter],
-    ).exclude(variant__product__direct_supply=True).select_related(
+    ).exclude(variant__product__direct_supply=True).exclude(
+        Q(loose_grams__gt=0, distributor__wholesaler__isnull=False,
+          distributor__wholesaler__no_buffer_stock=False)
+    ).select_related(
         'variant__product__supplier', 'distributor'
     ).order_by('-requested_at')
 
     # ── Stage 7: wholesale Distributor restock requests (this stockist only) ──
     # Delivering one is the ONLY way WholesalerStock ever increases.
-    from distributors.wholesaler_models import WholesalerRestockRequest, WholesalerStock
+    from distributors.wholesaler_models import (
+        WholesalerLooseStock, WholesalerRestockRequest, WholesalerStock,
+    )
     if request.method == 'POST' and request.POST.get('kind') == 'wholesaler':
         from django.utils import timezone
         req_id = request.POST.get('req_id')
@@ -874,24 +951,79 @@ def distributor_restock(request):
         if wreq is None:
             messages.error(request, 'Request not found.')
         elif action == 'deliver':
-            ws, _ = WholesalerStock.objects.get_or_create(
-                wholesaler=wreq.wholesaler, variant=wreq.variant, defaults={'quantity': 0}
-            )
-            ws.quantity += wreq.quantity_requested
-            ws.save()
-            wreq.status = 'delivered'
-            wreq.resolved_at = timezone.now()
-            wreq.save()
-            messages.success(
-                request,
-                f'{wreq.quantity_requested}× {wreq.variant.label} of '
-                f'{wreq.variant.product.name} delivered to {wreq.wholesaler.company_name}.'
-            )
+            from django.db import transaction
+            try:
+                with transaction.atomic():
+                    wreq = WholesalerRestockRequest.objects.select_for_update().select_related(
+                        'wholesaler', 'variant__product'
+                    ).get(pk=wreq.pk, stockist=stockist, status='pending')
+                    if wreq.loose_grams:
+                        source = StockistLooseStock.objects.select_for_update().filter(
+                            stockist=stockist, product=wreq.variant.product
+                        ).first()
+                        if source is None or source.quantity_grams < wreq.loose_grams:
+                            available = source.quantity_grams if source else 0
+                            raise ValueError(
+                                f'Only {available} base units of loose stock are available; '
+                                f'{wreq.loose_grams} are required. Request supply from the supplier first.'
+                            )
+                        destination, _ = WholesalerLooseStock.objects.select_for_update().get_or_create(
+                            wholesaler=wreq.wholesaler, product=wreq.variant.product,
+                            defaults={
+                                'quantity_grams': 0,
+                                'cost_price_per_gram': source.cost_price_per_gram,
+                            },
+                        )
+                        source.quantity_grams -= wreq.loose_grams
+                        source.save(update_fields=['quantity_grams'])
+                        destination.quantity_grams += wreq.loose_grams
+                        destination.cost_price_per_gram = source.cost_price_per_gram
+                        destination.save(update_fields=['quantity_grams', 'cost_price_per_gram'])
+                        delivered_what = f'{wreq.loose_grams} base units of loose {wreq.variant.product.name}'
+                    else:
+                        # The packs leave the stockist's own stock. Refuse if not enough.
+                        inv = StockistInventory.objects.select_for_update().filter(
+                            stockist=stockist, variant=wreq.variant).first()
+                        have = inv.quantity if inv else 0
+                        if have < wreq.quantity_requested:
+                            raise ValueError(
+                                f'Only {have} × {wreq.variant.label} in your stock; '
+                                f'{wreq.quantity_requested} are required.'
+                            )
+                        inv.quantity -= wreq.quantity_requested
+                        inv.save(update_fields=['quantity'])
+                        ws, _ = WholesalerStock.objects.select_for_update().get_or_create(
+                            wholesaler=wreq.wholesaler, variant=wreq.variant, defaults={'quantity': 0}
+                        )
+                        ws.quantity += wreq.quantity_requested
+                        ws.save()
+                        delivered_what = (
+                            f'{wreq.quantity_requested}× {wreq.variant.label} of '
+                            f'{wreq.variant.product.name}'
+                        )
+                    wreq.status = 'delivered'
+                    wreq.resolved_at = timezone.now()
+                    if not wreq.loose_grams:
+                        from stockist.supply_requests import release_wholesaler_block
+                        release_wholesaler_block(stockist, wreq.variant_id, wreq.quantity_requested)
+                    wreq.save(update_fields=['status', 'resolved_at'])
+            except WholesalerRestockRequest.DoesNotExist:
+                messages.error(request, 'This Distributor request is no longer pending.')
+            except ValueError as exc:
+                messages.error(request, str(exc))
+            else:
+                messages.success(
+                    request,
+                    f'{delivered_what} delivered to {wreq.wholesaler.company_name}.'
+                )
         elif action == 'reject':
             from django.utils import timezone as _tz
             wreq.status = 'rejected'
             wreq.resolved_at = _tz.now()
             wreq.save()
+            if not wreq.loose_grams:
+                from stockist.supply_requests import release_wholesaler_block
+                release_wholesaler_block(stockist, wreq.variant_id, wreq.quantity_requested)
             messages.warning(request, f'Distributor request #{req_id} rejected.')
         return redirect('stockist:distributor_restock')
 
@@ -899,14 +1031,27 @@ def distributor_restock(request):
         req_id = request.POST.get('req_id')
         action = request.POST.get('action')
         try:
-            restock_req = RestockRequest.objects.filter(mine).get(pk=req_id)
+            restock_req = RestockRequest.objects.filter(mine).exclude(
+                variant__product__direct_supply=True
+            ).exclude(
+                Q(loose_grams__gt=0, distributor__wholesaler__isnull=False,
+                  distributor__wholesaler__no_buffer_stock=False)
+            ).get(
+                pk=req_id,
+                status__in=('pending', 'approved', 'stockist_picked', 'in_transit'),
+            )
             if action == 'approve':
+                if restock_req.status != 'pending':
+                    messages.error(request, 'Only pending requests can be approved.')
+                    return redirect('stockist:distributor_restock')
+                restock_req.fulfillment_method = restock_req.effective_fulfillment_method
                 restock_req.status = 'approved'
-                fm = request.POST.get('fulfillment_method', '').strip()
-                if fm:
-                    restock_req.fulfillment_method = fm
                 restock_req.save()
-                messages.success(request, f'Request #{req_id} approved. Collect from supplier and deliver.')
+                if restock_req.fulfillment_method == 'stockist_pickup':
+                    message = f'Request #{req_id} approved. Collect from supplier and deliver.'
+                else:
+                    message = f'Request #{req_id} approved. Supplier will dispatch it to you; then deliver it.'
+                messages.success(request, message)
             elif action == 'picked':
                 restock_req.status = 'stockist_picked'
                 restock_req.save()
@@ -915,17 +1060,36 @@ def distributor_restock(request):
                 variant = restock_req.variant
                 dist = restock_req.distributor
                 if restock_req.loose_grams:
-                    # Stage 7: LOOSE delivery — grams land in the loose pool.
-                    # This request flow is the only way loose stock increases.
+                    from django.db import transaction
                     from distributors.models import DistributorLooseStock
-                    ls, _ = DistributorLooseStock.objects.get_or_create(
-                        distributor=dist, product=variant.product,
-                        defaults={'quantity_grams': 0, 'cost_price_per_gram': 0},
-                    )
-                    ls.quantity_grams += restock_req.loose_grams
-                    if variant.unit_grams:
-                        ls.cost_price_per_gram = variant.selling_price / variant.unit_grams
-                    ls.save()
+                    source = StockistLooseStock.objects.filter(
+                        stockist=stockist, product=variant.product
+                    ).first()
+                    if source is None or source.quantity_grams < restock_req.loose_grams:
+                        available = source.quantity_grams if source else 0
+                        messages.error(
+                            request,
+                            f'Only {available} base units of loose stock are available; '
+                            f'{restock_req.loose_grams} are required. Request supply from the supplier first.'
+                        )
+                        return redirect('stockist:distributor_restock')
+                    with transaction.atomic():
+                        source = StockistLooseStock.objects.select_for_update().get(pk=source.pk)
+                        if source.quantity_grams < restock_req.loose_grams:
+                            messages.error(request, 'Loose stock changed; there is not enough to deliver.')
+                            return redirect('stockist:distributor_restock')
+                        ls, _ = DistributorLooseStock.objects.select_for_update().get_or_create(
+                            distributor=dist, product=variant.product,
+                            defaults={
+                                'quantity_grams': 0,
+                                'cost_price_per_gram': source.cost_price_per_gram,
+                            },
+                        )
+                        source.quantity_grams -= restock_req.loose_grams
+                        source.save(update_fields=['quantity_grams'])
+                        ls.quantity_grams += restock_req.loose_grams
+                        ls.cost_price_per_gram = source.cost_price_per_gram
+                        ls.save(update_fields=['quantity_grams', 'cost_price_per_gram'])
                     delivered_what = f'{restock_req.loose_grams}g loose {variant.product.name}'
                 else:
                     # Packed delivery — add to DistributorStock batch
@@ -945,6 +1109,9 @@ def distributor_restock(request):
                 restock_req.save()
                 messages.success(request, f'{delivered_what} delivered to {dist.company_name}.')
             elif action == 'reject':
+                if restock_req.status not in ('pending', 'approved'):
+                    messages.error(request, 'A request already being delivered cannot be rejected.')
+                    return redirect('stockist:distributor_restock')
                 restock_req.status = 'rejected'
                 restock_req.save()
                 messages.warning(request, f'Request #{req_id} rejected.')

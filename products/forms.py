@@ -34,8 +34,9 @@ class ProductForm(forms.ModelForm):
         help_text='Enter your selling price per kg, per litre, or per 100 pieces.'
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, supplier=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.supplier = supplier
         _bootstrap(self)
         # Pre-fill human fields from stored values
         if self.instance and self.instance.pk:
@@ -63,6 +64,20 @@ class ProductForm(forms.ModelForm):
                     self.initial['price_per_kg'] = round(float(mp) * 1000, 2)
                 else:
                     self.initial['price_per_kg'] = round(float(mp) * 100, 2)
+
+    def clean_name(self):
+        """A supplier cannot have two live products with the same exact name."""
+        name = self.cleaned_data.get('name', '')
+        if self.supplier is None or not name:
+            return name
+        clashes = Product.all_objects.filter(
+            supplier=self.supplier, name=name, is_deleted=False)
+        if self.instance.pk:
+            clashes = clashes.exclude(pk=self.instance.pk)
+        if clashes.exists():
+            raise forms.ValidationError(
+                f'You already have a product named "{name}". Use a different name.')
+        return name
 
     class Meta:
         model = Product
@@ -108,15 +123,6 @@ class ProductForm(forms.ModelForm):
 
 
 class ProductVariantForm(forms.ModelForm):
-    def __init__(self, *args, enforce_suggested=True, **kwargs):
-        # enforce_suggested: apply the "suggested price >= supplier price" rule.
-        # The variant formset turns it off when the product is not using a
-        # suggested price at all (then the value is ignored anyway).
-        self.enforce_suggested = enforce_suggested
-        super().__init__(*args, **kwargs)
-        _bootstrap(self)
-        self.fields['is_active'].widget.attrs['class'] = 'form-check-input'
-
     class Meta:
         model = ProductVariant
         fields = ['label', 'selling_price', 'mrp', 'suggested_price', 'stock', 'unit_grams', 'is_active']
@@ -128,11 +134,32 @@ class ProductVariantForm(forms.ModelForm):
             'stock': forms.NumberInput(attrs={'readonly': 'readonly', 'class': 'form-control bg-light'}),
             'unit_grams': forms.HiddenInput(),
         }
+        # MRP is required when show_mrp is enabled
+        # The clean() method will enforce this
+
+    def __init__(self, *args, enforce_suggested=True, require_mrp=False, **kwargs):
+        # enforce_suggested: apply the "suggested price >= supplier price" rule.
+        # require_mrp: when True, MRP is a required field (for products with MRP enabled)
+        self.enforce_suggested = enforce_suggested
+        self.require_mrp = require_mrp
+        super().__init__(*args, **kwargs)
+        _bootstrap(self)
+        self.fields['is_active'].widget.attrs['class'] = 'form-check-input'
 
     def clean(self):
         cleaned = super().clean()
         price = cleaned.get('selling_price')
+        mrp = cleaned.get('mrp')
         suggested = cleaned.get('suggested_price')
+        
+        # Make MRP required when show_mrp is enabled (product form sets this)
+        if self.require_mrp:
+            if not mrp or mrp <= 0:
+                self.add_error(
+                    'mrp',
+                    'MRP is required when MRP display is enabled.'
+                )
+        
         # The suggested retail price guides the shop, so it can never sit
         # below what the supplier charges for that pack.
         if (self.enforce_suggested and price is not None
@@ -153,6 +180,8 @@ class BaseVariantFormSet(BaseInlineFormSet):
         kwargs = super().get_form_kwargs(index)
         data = self.data if self.is_bound else {}
         kwargs['enforce_suggested'] = data.get('show_suggested_field') == 'true'
+        # MRP is required when show_mrp_field is 'true'
+        kwargs['require_mrp'] = data.get('show_mrp_field') == 'true'
         return kwargs
 
 
