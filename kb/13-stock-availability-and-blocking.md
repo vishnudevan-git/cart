@@ -120,3 +120,18 @@ Any new migration needs a backup first and must be listed here and in article 12
 - **Automatic shop requests.** stockist/auto_restock.py::check_marketplace creates shop requests without the distributor block.
 - **Checkout integration test.** Helpers are tested. A full cart-to-order test is not written yet.
 - **Bundle rule on the 7-day / loose paths.** Owner to confirm if bundle lines need anything beyond the whole-line rule.
+## 8. Update 2026-11-20 (loose blocking, automatic requests, logging)
+**Built and tested (stockist/test_loose_blocking.py, 5 tests):**
+- **Loose (weighed) blocking, stockist to distributor.** Stockist loose stock has StockistLooseStock.blocked_grams. A distributor's loose request blocks grams at once (stockist/supply_requests.py::block_loose). Delivery or rejection releases them (elease_loose).
+- **Loose blocking, shop to distributor.** WholesalerLooseStock.blocked_grams. A shop's loose request blocks the distributor's grams when it waits there. Released when the distributor fills it or forwards it (distributors/shop_blocking.py).
+- **Automatic shop requests.** The stockist's auto-restock (stockist/auto_restock.py::check_marketplace) now blocks the distributor's packs when it files a shop request. Before, those requests did not block anything.
+- **Activity log for orders, by role:** customer edits (item removed, quantity reduced, increase refused), stock taken from an upper tier at checkout (	aken_from_<tier>), stock returned to a tier (eturned_to_<tier>), distributor fill and forward (distributor_filled_shop_request, distributor_forwarded_shop_request), and stockist delivery to distributor (delivered_to_distributor). Earlier logs already covered: placed (customer), shop status changes, stockist picked and at-distributor, supplier shipment events, admin user actions. Log file: logs/activity.log.
+- **Migrations applied to db.sqlite3** (backup db.sqlite3.bak-before-loose-blocking-20261120-182534): stockist 0010, distributors 0045.
+
+**Explained to owner: automatic shop requests.** The stockist's auto-restock files a request to the distributor when a shop's own stock drops below its threshold. The request is created automatically, without anyone clicking. It now blocks the distributor's packs at once.
+
+**CORRECTION (important): nearest-first is not yet the agreed flow.** The owner's rule: when a shop cannot cover the whole order, the packs are allotted (blocked) at the nearest tier that has them, and a request still goes to the next level, which must confirm before packs move. The build (section 7) instead takes the packs straight from the upper tier at checkout. The request-and-confirm step is missing. Next step, after owner confirmation: block at checkout and create the upper-level request that the upper tier fills or forwards.
+
+**Still open:**
+- Nearest-first: block plus request plus confirm (see CORRECTION).
+- Full checkout test: owner will place a real order from each role; the test checklist is to be written with the owner.

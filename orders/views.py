@@ -479,6 +479,7 @@ def order_edit(request, pk):
             if qty > item.quantity:
                 # Packs cannot be added to a placed order: the stock for them was never
                 # taken. The customer places a new order for the extra packs instead.
+                _log_customer_edit(order, request.user, item, 'increase refused')
                 messages.error(request, 'You cannot add packs to an existing order. '
                                         'Place a new order for the extra packs.')
                 return redirect('orders:order_edit', pk=pk)
@@ -501,6 +502,7 @@ def order_edit(request, pk):
             item = get_object_or_404(OrderItem, pk=item_id, order=order)
             from .stock_return import return_item_stock
             return_item_stock(order, item, item.quantity)
+            _log_customer_edit(order, request.user, item, 'item removed')
             item.delete()
             messages.success(request, 'Item removed.')
             _recalculate_order(order)
@@ -520,6 +522,14 @@ def order_edit(request, pk):
         'saved_addresses': saved_addresses,
         'selected_address_id': selected_address_id,
     })
+
+
+def _log_customer_edit(order, user, item, what):
+    try:
+        from lakrish_mart.activity_logger import act as _act
+        _act.order(f'customer_edit: {what}', order=order, by=user, detail=f'{item.variant_label} x{item.quantity}')
+    except Exception:
+        pass
 
 
 def _recalculate_order(order):

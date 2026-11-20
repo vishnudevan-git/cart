@@ -14,12 +14,15 @@ def return_item_stock(order, item, quantity):
     if quantity <= 0 or item.variant_id is None:
         return
 
+    from lakrish_mart.activity_logger import act
+    act.stock(f'returned_to_{item.stock_source}', variant=item.variant, qty=quantity, by=order.customer, detail=f'order #{order.pk}, cancelled or reduced by customer')
     if item.stock_source in ('wholesaler', 'stockist'):
         from orders.upstream_stock import return_upper
         return_upper(item.stock_source, order.distributor, item.variant, quantity)
         return
 
     if item.stock_source == 'shop':
+        act.stock('returned_to_shop', variant=item.variant, qty=quantity, by=order.customer, detail=f'order #{order.pk}')
         from distributors.models import DistributorStock, DistributorStockBatch
         stock_obj, _ = DistributorStock.objects.select_for_update().get_or_create(
             distributor=order.distributor, variant=item.variant, defaults={'quantity': 0},

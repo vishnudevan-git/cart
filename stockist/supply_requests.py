@@ -73,3 +73,27 @@ def release_supplier_block(variant_pk, quantity):
 
     ProductVariant.objects.filter(pk=variant_pk).update(
         blocked_stock=Greatest(F('blocked_stock') - quantity, Value(0)))
+
+def block_loose(stockist, product, grams):
+    """Block ``grams`` of the stockist's loose stock for a distributor's loose request.
+
+    Raises RequestBlocked when the free loose stock is less than ``grams``.
+    """
+    from .models import StockistLooseStock
+
+    with transaction.atomic():
+        row = StockistLooseStock.objects.select_for_update().filter(
+            stockist=stockist, product=product).first()
+        free = row.free_grams if row else 0
+        if row is None or grams > free:
+            raise RequestBlocked(free, f'base units of loose {product.name}')
+        StockistLooseStock.objects.filter(pk=row.pk).update(
+            blocked_grams=F('blocked_grams') + grams)
+
+
+def release_loose(stockist, product, grams):
+    """Give back loose grams held for a distributor request that was rejected or delivered."""
+    from .models import StockistLooseStock
+
+    StockistLooseStock.objects.filter(stockist=stockist, product=product).update(
+        blocked_grams=Greatest(F('blocked_grams') - grams, Value(0)))

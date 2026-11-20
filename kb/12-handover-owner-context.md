@@ -192,3 +192,8 @@ Customer**. Code and UI names differ. See `kb/02`.
 ## 10. Update 2026-11-20 (build)
 - Nearest-first checkout, distributor-to-shop blocking, customer hide (no Out of Stock badge), returns to the tier that gave the packs: built. Details in article 13 section 7.
 - Open: loose blocking, automatic shop-request blocking, full checkout test. Git push: see the next step in the chat.
+
+## 11. Update 2026-11-20 (loose, logging)
+- Loose blocking built, automatic shop requests blocked, activity logs added for each role's order actions. See article 13 section 8.
+- CORRECTION: nearest-first takes stock directly; the owner's rule is block plus request plus confirm. Open, awaiting the owner's go-ahead.
+- Owner will place a full order from each role; checklist to be written.

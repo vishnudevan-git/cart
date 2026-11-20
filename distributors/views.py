@@ -1655,7 +1655,7 @@ def my_stock(request):
                             (grams + rep_variant.unit_grams - 1) // rep_variant.unit_grams,
                             required_multiple(dist, rep_variant),
                         )
-                        RestockRequest.objects.create(
+                        _loose_req = RestockRequest.objects.create(
                             distributor=dist,
                             variant=rep_variant,
                             quantity_requested=source_pack_quantity,
@@ -1667,6 +1667,8 @@ def my_stock(request):
                             ),
                             note=f'LOOSE {grams} {product_obj.master_unit} — from My Stock page',
                         )
+                        from distributors.shop_blocking import block_for_shop_request
+                        block_for_shop_request(_loose_req)
                         messages.success(
                             request,
                             f'Loose request for {grams} {product_obj.master_unit} of {product_obj.name} sent. '

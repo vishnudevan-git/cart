@@ -134,8 +134,14 @@ class WholesalerLooseStock(models.Model):
         'products.Product', on_delete=models.CASCADE, related_name='wholesaler_loose_stocks'
     )
     quantity_grams = models.PositiveIntegerField(default=0)
+    # Grams promised to open shop loose requests (kb/13). Free = quantity - blocked.
+    blocked_grams = models.PositiveIntegerField(default=0)
     cost_price_per_gram = models.DecimalField(max_digits=10, decimal_places=4, default=0)
     updated_at = models.DateTimeField(auto_now=True)
+
+    @property
+    def free_grams(self):
+        return max(0, self.quantity_grams - self.blocked_grams)
 
     class Meta:
         unique_together = ('wholesaler', 'product')

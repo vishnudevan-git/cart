@@ -976,6 +976,8 @@ def distributor_restock(request):
                         )
                         source.quantity_grams -= wreq.loose_grams
                         source.save(update_fields=['quantity_grams'])
+                        from stockist.supply_requests import release_loose
+                        release_loose(stockist, wreq.variant.product, wreq.loose_grams)
                         destination.quantity_grams += wreq.loose_grams
                         destination.cost_price_per_gram = source.cost_price_per_gram
                         destination.save(update_fields=['quantity_grams', 'cost_price_per_gram'])
@@ -992,6 +994,8 @@ def distributor_restock(request):
                             )
                         inv.quantity -= wreq.quantity_requested
                         inv.save(update_fields=['quantity'])
+                        from lakrish_mart.activity_logger import act as _act
+                        _act.stock('delivered_to_distributor', variant=wreq.variant, qty=wreq.quantity_requested, by=request.user, detail=f'distributor {wreq.wholesaler.company_name}')
                         ws, _ = WholesalerStock.objects.select_for_update().get_or_create(
                             wholesaler=wreq.wholesaler, variant=wreq.variant, defaults={'quantity': 0}
                         )
@@ -1024,6 +1028,9 @@ def distributor_restock(request):
             if not wreq.loose_grams:
                 from stockist.supply_requests import release_wholesaler_block
                 release_wholesaler_block(stockist, wreq.variant_id, wreq.quantity_requested)
+            else:
+                from stockist.supply_requests import release_loose
+                release_loose(stockist, wreq.variant.product, wreq.loose_grams)
             messages.warning(request, f'Distributor request #{req_id} rejected.')
         return redirect('stockist:distributor_restock')
 

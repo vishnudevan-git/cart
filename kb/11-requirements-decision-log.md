@@ -495,3 +495,6 @@ in the kg group. Organic Ghee (500 g and 1 kg) is in the kg group.
 **Owner.** Push to Git as I think right. Nearest-first: my decision. Distributor-to-shop blocking: build. 7-day hide: build; immediate hide allowed. Bundles: if not available at the nearer level, go to the next level. Build missing things. Render/prod: update only the production database.
 **Built:** see article 13 section 7. Migrations applied to db.sqlite3 with a backup.
 **Still open:** loose blocking, automatic shop-request blocking, full checkout test.
+## 2026-11-20 (loose, logging): owner decisions carried out
+**Owner.** Loose (weighed) stock must block too. Built. Automatic shop requests: explained and now block. Full order test: owner will place orders from each role. Activity log for every role on orders: added where missing.
+**Owner.** "If the shop cannot cover the whole order, only no stock, then request from the upper level?" Answer: yes, the trigger is no free stock at the shop. The build takes packs straight from the upper tier, which skips the request-and-confirm step. Correction recorded in article 13 section 8.

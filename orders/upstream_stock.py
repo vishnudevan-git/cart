@@ -54,6 +54,9 @@ def pick_upper_tier(distributor, variant, quantity):
 
 def consume_upper(tier, distributor, variant, quantity):
     """Take ``quantity`` packs from an upper tier. Caller has checked the free stock."""
+    from lakrish_mart.activity_logger import act
+    act.stock(f'taken_from_{tier}', variant=variant, qty=quantity,
+              detail=f'shop {distributor.company_name}')
     if tier == 'wholesaler':
         from distributors.wholesaler_models import WholesalerStock
         WholesalerStock.objects.filter(wholesaler=_wholesaler(distributor), variant=variant).update(

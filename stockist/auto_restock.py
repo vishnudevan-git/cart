@@ -161,7 +161,7 @@ def check_marketplace(distributor):
         if already_open:
             continue
         from products.bundle_chain import required_multiple, routes_via_wholesaler
-        RestockRequest.objects.create(
+        auto_req = RestockRequest.objects.create(
             distributor=distributor, variant=row.variant,
             quantity_requested=_round_to_supplier_multiple(
                 distributor.auto_restock_quantity, required_multiple(distributor, row.variant)
@@ -174,6 +174,9 @@ def check_marketplace(distributor):
             ),
             note=AUTO_NOTE,
         )
+        # Automatic shop requests block the Distributor's packs the same way (kb/13).
+        from distributors.shop_blocking import block_for_shop_request
+        block_for_shop_request(auto_req)
         created += 1
     return created
 

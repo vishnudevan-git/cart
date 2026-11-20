@@ -133,6 +133,9 @@ def _handle_marketplace_packed(request, w, my_stockist, action):
                 own.save(update_fields=['quantity'])
                 from distributors.shop_blocking import release_shop_request_block
                 release_shop_request_block(shop_request)
+                from lakrish_mart.activity_logger import act as _act
+                _act.stock('distributor_filled_shop_request', variant=variant, qty=qty,
+                           by=request.user, detail=f'shop {shop_request.distributor.company_name}')
                 stock_obj, _ = DistributorStock.objects.get_or_create(
                     distributor=shop_request.distributor, variant=variant,
                     defaults={'quantity': 0},
@@ -153,6 +156,9 @@ def _handle_marketplace_packed(request, w, my_stockist, action):
             # forward
             from distributors.shop_blocking import release_shop_request_block
             release_shop_request_block(shop_request)
+            from lakrish_mart.activity_logger import act as _act
+            _act.stock('distributor_forwarded_shop_request', variant=variant, qty=qty,
+                       by=request.user, detail=f'shop {shop_request.distributor.company_name}')
             if my_stockist is None:
                 raise ValueError('No active stockist is assigned to you.')
             if WholesalerRestockRequest.objects.filter(
@@ -403,6 +409,12 @@ def my_stock(request):
                         (amount + source_variant.unit_grams - 1) // source_variant.unit_grams,
                         required_multiple(w, source_variant),
                     )
+                    # The Distributor no longer holds these grams for the shop request, and
+                    # the stockist now holds them for this distributor request (kb/13).
+                    from distributors.shop_blocking import release_shop_request_block
+                    release_shop_request_block(marketplace_request)
+                    from stockist.supply_requests import block_loose
+                    block_loose(my_stockist, source_variant.product, amount)
                     upstream_request = WholesalerRestockRequest.objects.create(
                         wholesaler=w,
                         stockist=my_stockist,
@@ -471,6 +483,8 @@ def my_stock(request):
                     amount = marketplace_request.loose_grams
                     loose.quantity_grams -= amount
                     loose.save(update_fields=['quantity_grams'])
+                    from distributors.shop_blocking import release_shop_request_block
+                    release_shop_request_block(marketplace_request)
                     destination.quantity_grams += amount
                     destination.cost_price_per_gram = loose.cost_price_per_gram
                     destination.save(update_fields=['quantity_grams', 'cost_price_per_gram'])
